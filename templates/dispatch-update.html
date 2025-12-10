@@ -1,0 +1,449 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Update Dispatch </title>
+{% endblock %}
+
+{% block content %}
+
+<div class="container-xxl">
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Update Dispatch Challan</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Contract Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_id" class="form-label">Contract ID</label>
+                
+                <input type="text" class="form-control" name="contract_id" id="contract_id"
+                  placeholder="Select contract id"  value="{{ dispatch.contract_id }}" readonly />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="dep_date" class="form-label">Dispatch date</label>
+                <input type="date" class="form-control" id="dep_date" name="dep_date" autofocus
+                  oninput="this.classList.remove('invalid')" value="{{ dispatch.dep_date }}" />
+              </div>
+            </div>
+
+            <h5 class="text-primary fw-semibold mb-3">Challan Information</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="challan_no" class="form-label">Challan No. ( Shipment no. )</label>
+                <input type="text" class="form-control" id="challan_no" name="challan_no" placeholder="Enter challan no"
+                  oninput="this.classList.remove('invalid')" value="{{ dispatch.challan_no }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="date" class="form-label">Date</label>
+                <input type="date" class="form-control" id="date" name="date" placeholder=""
+                  oninput="this.classList.remove('invalid')" value="{{ dispatch.date }}" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="truck_no" class="form-label">Truck No.</label>
+                <input type="text" class="form-control" id="truck_no" name="truck_no" placeholder="Enter truck no"
+                  autofocus oninput=" this.classList.remove('invalid')" value="{{ dispatch.truck_no }}"/>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="product_name" class="form-label">Product Name</label>
+                <input type="text" class="form-control" id="product_name" name="product_name"
+                  placeholder="Enter product name" autofocus oninput=" this.classList.remove('invalid')" value="{{ dispatch.product_name }}" />
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3">Destination Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="party_name" class="form-label">Party Name</label>
+                <input type="text" class="form-control" id="party_name" name="party_name" placeholder="Enter party name"
+                  autofocus oninput=" this.classList.remove('invalid')" value="{{ dispatch.party_name }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="from_center" class="form-label">From</label>
+                <input type="text" class="form-control" id="from_center" name="from_center"
+                  placeholder="Enter party name" autofocus oninput=" this.classList.remove('invalid')" value="{{ dispatch.from_center }}" readonly />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="destination" class="form-label">Destination</label>
+                <select id="select-beast" name="destination" class="form-select" placeholder="Enter Destination"
+                  onchange="fecthDestinationDetails(this.value)" value="{{ dispatch.destination }}">
+                  {% for destination in alldestination %}
+                  <option value="{{ destination.id }}">{{destination.destination}}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="taluka" class="form-label">Taluka</label>
+                <input type="text" class="form-control" id="taluka" name="taluka" placeholder="Enter taluka" autofocus
+                  oninput="this.classList.remove('invalid');if (this.value.length > 0) {
+                          document.getElementById('district').removeAttribute('readonly' , true);
+                        }" value="{{ dispatch.taluka }}" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="district" class="form-label">Distric</label>
+                <input type="text" class="form-control" id="district" name="district" placeholder="Enter district"
+                  autofocus oninput=" this.classList.remove('invalid');
+                    let tal = document.getElementById('taluka')
+                    if (tal.value.length == 0 ) {
+                        this.value = ''
+                        this.setAttribute('readonly' , true)
+                    }
+                  " readonly value="{{ dispatch.district }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="km" class="form-label">KM</label>
+                <input type="text" class="form-control" id="km" name="km" placeholder="Enter km" autofocus
+                  oninput=" this.classList.remove('invalid') , fecthrate(this.value)" value="{{ dispatch.km }}" />
+              </div>
+            </div>
+
+            <h5 class="text-primary fw-semibold mb-3">Weight and Payment Information </h5>
+
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="weight" class="form-label">Total Weight in ton</label>
+                <input type="number" class="form-control" id="weight" name="weight" placeholder="Enter weight here"
+                  oninput="this.classList.remove('invalid'), calculate_rent()" value="{{ dispatch.weight }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="rate" class="form-label">Rate <span id="rate_calculation"></span></label>
+                <input type="number" class="form-control" id="rate" name="rate" placeholder="Enter rupees per ton"
+                  autofocus oninput=" this.classList.remove('invalid')" value="{{ dispatch.rate }}" />
+              </div>
+
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="taluka" class="form-label">Freigth Amount</label>
+                <input type="number" class="form-control" id="totalfreight" name="totalfreight"
+                  placeholder="Enter taluka here" value="{{ dispatch.totalfreight }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="unloading_charge" class="form-label">Unloading charge</label>
+                <!-- calucalation   -->
+                <input type="hidden" class="form-control" id="i_unloading_charge" name="i_unloading_charge"
+                  placeholder="Enter unloading charge" value="{{ dispatch.unloading_charge }}" />
+
+                <!-- front end -->
+                <input type="number" class="form-control" id="unloading_charge" name="unloading_charge"
+                  placeholder="Enter unloading charge" oninput="" value="" />
+
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="grand_total" class="form-label">Grand Total</label>
+                <input type="number" class="form-control" id="grand_total" name="grand_total"
+                  placeholder="Enter Grand Total" oninput="" value="{{ dispatch.grand_total }}" />
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3">Truck Booking Info</h5>
+
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="truck_booking_rate" class="form-label">Truck Booking Rate</label>
+                <input type="number" class="form-control" id="truck_booking_rate" name="truck_booking_rate"
+                  placeholder="Enter truck booking rate" oninput="calculate_profite()" value="{{ dispatch.truck_booking_rate }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="total_paid_truck_onwer" class="form-label">Total Amount Paid To truck Onwer</label>
+                <input type="number" class="form-control" id="total_paid_truck_onwer" name="total_paid_truck_onwer"
+                  placeholder="Enter total paid to truck onwer" oninput="" value="{{ dispatch.total_paid_truck_onwer }}" />
+              </div>
+
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="advance_paid" class="form-label">Advance Paid To Truck Onwer</label>
+                <input type="number" class="form-control" id="advance_paid" name="advance_paid"
+                  placeholder="Enter advance paid to truck onwer" oninput="calculate_panding_amount()" value="{{ dispatch.advance_paid }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="panding_amount" class="form-label">Total Panding Amount of Truck Onwer</label>
+                <input type="number" class="form-control" id="panding_amount" name="panding_amount"
+                  placeholder="Enter panding amount" oninput="" value="{{ dispatch.panding_amount }}" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="net_profit" class="form-label">Net Profit</label>
+                <input type="number" class="form-control" id="net_profit" name="net_profit"
+                  placeholder="Enter net profit" oninput="" value="{{ dispatch.net_profit }}" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-sm-6">
+                <button class="btn btn-primary d-grid w-100">Save</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script>
+  document.querySelectorAll('.ts-select').forEach((el) => {
+
+    let settings = {};
+    new TomSelect(el, settings);
+  });
+
+  const tomSelectInstance = new TomSelect("#select-beast", {
+    create: true,
+    sortField: {
+      field: "text",
+      direction: "asc"
+    }
+  });
+
+</script>
+<script>
+
+  function updateDestinations(destinations) {
+    tomSelectInstance.clearOptions(); // remove old options
+    destinations.forEach(dest => {
+      tomSelectInstance.addOption({ value: dest.id, text: dest.destination });
+    });
+    // tomSelectInstance.refreshOptions(); // refresh the dropdown
+    // if (destinations.length > 0) tomSelectInstance.setValue(destinations[0].id);
+  }
+
+
+  function fecthContractDetails() {
+    const contract_id = document.getElementById('contract_id').value;
+    if (!contract_id) return;
+
+    fetch(`get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.from) {
+          document.getElementById('from_center').value = data.from;
+          document.getElementById('from_center').setAttribute('readonly', true);
+          document.getElementById('i_unloading_charge').value = data.unloading_charge;
+        } else {
+          document.getElementById('from_center').value = '';
+          document.getElementById('i_unloading_charge').value = '';
+        }
+        if (data.destinations) {
+          updateDestinations(data.destinations);
+        }
+        if (data.rate_type == "Taluka-Wise") {
+          document.getElementById("km").removeAttribute("oninput", true)
+          console.log("removed");
+          let dexisting = document.getElementById("district").getAttribute("oninput") || '';
+          document.getElementById("district").setAttribute("oninput", dexisting + ";fecthTalukaRate()")
+          let existing = document.getElementById("taluka").getAttribute("oninput") || '';
+          document.getElementById("taluka").setAttribute("oninput", existing + " ;fecthTalukaRate()")
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching Contract details:', err);
+      });
+  }
+  function fecthDestinationDetails(did) {
+    if (!did) return;
+    fetch(`get-destination-details?did=${encodeURIComponent(did)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.district && data.taluka && data.km) {
+          document.getElementById('district').value = data.district;
+          document.getElementById('taluka').value = data.taluka;
+          document.getElementById('km').value = data.km;
+          if (data.rate_type == "Kilometer-Wise") {
+            fecthrate(data.km)
+          }
+          else if (data.rate_type == "Taluka-Wise") {
+            fecthTalukaRate()
+          }
+        } else {
+          document.getElementById('district').value = '';
+          document.getElementById('taluka').value = '';
+          document.getElementById('km').value = '';
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching Contract details:');
+      });
+  }
+
+
+  function fecthrate(km) {
+    let contract_no = document.getElementById("contract_id").value
+    fetch(`/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.rate && data.rate_calculation && data.how_calculation) {
+
+          document.getElementById('rate').value = data.rate;
+          document.getElementById('rate').setAttribute('readonly', true);
+          document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+          document.getElementById('i_rate_calculation').value = data.rate_calculation;
+        } else {
+          document.getElementById('rate').removeAttribute('readonly', true);
+          document.getElementById('rate').value = '';
+          document.getElementById('rate_calculation').innerHTML = ``;
+          document.getElementById('i_rate_calculation').value = "";
+        }
+
+      })
+      .catch(err => {
+        console.error('Error fetching TRUCK details:', err);
+      });
+
+  }
+  function fecthTalukaRate() {
+    let contract_no = document.getElementById("contract_id").value
+    let taluka_name = document.getElementById("taluka").value
+    let district = document.getElementById("district").value
+    if (taluka_name.length > 0 && district.length > 0) {
+      fetch(`/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.rate && data.rate_calculation && data.how_calculation) {
+
+            document.getElementById('rate').value = data.rate;
+            document.getElementById('rate').setAttribute('readonly', true);
+            document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+            document.getElementById('i_rate_calculation').value = data.rate_calculation;
+          } else {
+            document.getElementById('rate').removeAttribute('readonly', true);
+            document.getElementById('rate').value = '';
+            document.getElementById('rate_calculation').innerHTML = ``;
+            document.getElementById('i_rate_calculation').value = "";
+          }
+
+        })
+        .catch(err => {
+          console.error('Error fetching TRUCK details:', err);
+        });
+    }
+
+  }
+
+  function calculate_rent() {
+    let weight = document.getElementById('weight').value
+    let rate = document.getElementById('rate').value
+    let rate_calculation = document.getElementById('i_rate_calculation').innerHTML
+    let totalfreight = document.getElementById('totalfreight')
+    let km = document.getElementById('km').value
+    let unloading_charge = document.getElementById("i_unloading_charge").value
+    let unload_amount = document.getElementById("unloading_charge")
+    let grand_total = document.getElementById('grand_total')
+
+
+    if (rate_calculation == "MT/KM") {
+      totalfreight.value = weight * rate * km;
+      totalfreight.setAttribute("readonly", true)
+    }
+    else {
+      totalfreight.value = weight * rate;
+      totalfreight.setAttribute("readonly", true)
+
+    }
+
+    unload_amount.value = unloading_charge * weight;
+    unload_amount.setAttribute('readonly', true)
+
+    grand_total.value = parseFloat(totalfreight.value) + parseFloat(unload_amount.value);
+    grand_total.setAttribute("readonly", true)
+
+  }
+  function calculate_profite() {
+    let weight = document.getElementById('weight').value
+    let truck_booking_rate = document.getElementById('truck_booking_rate')
+    let total_paid_truck_onwer = document.getElementById('total_paid_truck_onwer')
+    let net_profit = document.getElementById('net_profit')
+    let totalfreight = document.getElementById('totalfreight')
+
+
+    total_paid_truck_onwer.value = truck_booking_rate.value * weight;
+    total_paid_truck_onwer.setAttribute("readonly", true)
+    net_profit.value = totalfreight.value - total_paid_truck_onwer.value;
+    net_profit.setAttribute("readonly", true)
+
+  }
+  function calculate_panding_amount() {
+    let total_paid_truck_onwer = document.getElementById('total_paid_truck_onwer')
+    let advance_paid = document.getElementById('advance_paid').value
+    let panding_amount = document.getElementById('panding_amount')
+
+    panding_amount.value = total_paid_truck_onwer.value - advance_paid;
+    panding_amount.setAttribute("readonly", true)
+
+  }
+
+
+  // function fecthkm() {
+  //     const from = document.getElementById('from').value;
+  //     const to = document.getElementById('village_name').value;
+  //     if (!from && !to) return;
+
+  //     fetch(`/get-km-details?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+  //       .then(response => response.json())
+  //       .then(data => {
+  //         if (data.km) {
+  //           document.getElementById('km').value = data.km;
+  //           document.getElementById('km').setAttribute('readonly', true);
+  //         } else {
+  //           document.getElementById('km').removeAttribute('readonly', true);
+  //           document.getElementById('km').value = '';
+  //         }
+  //       })
+  //       .catch(err => {
+  //         console.error('Error fetching TRUCK details:', err);
+  //       });
+  //   }
+
+  // function fetchDriverDetails() {
+  //   const truck_d = document.getElementById('truck_d').value;
+  //   if (!truck_d) return;
+
+  //   fetch(`/get-licence-details?licence=${encodeURIComponent(truck_d)}`)
+  //     .then(response => response.json())
+  //     .then(data => {
+  //       if (data.licence) {
+  //         document.getElementById('licence').value = data.licence;
+  //         document.getElementById('licence').setAttribute('readonly', true);
+  //       } else {
+  //         document.getElementById('licence').value = '';
+  //       }
+  //     })
+  //     .catch(err => {
+  //       console.error('Error fetching TRUCK details:', err);
+  //     });
+  // }
+  //  function fetchLocationDetails() {
+  //   const village = document.getElementById('village_name').value;
+  //   if (!village) return;
+
+  //   fetch(`/get-contract-details/?village=${encodeURIComponent(village)}`)
+  //     .then(response => response.json())
+  //     .then(data => {
+  //       if (data.taluka && data.district) {
+  //         document.getElementById('taluka').value = data.taluka;
+  //         document.getElementById('district').value = data.district;
+  //       } else {
+  //         document.getElementById('taluka').value = '';
+  //         document.getElementById('district').value = 0;
+  //       }
+  //     })
+  //     .catch(err => {
+  //       console.error('Error fetching location details:', err);
+  //     });
+  // }
+</script>
+
+{% endblock %}

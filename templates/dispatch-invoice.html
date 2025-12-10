@@ -1,0 +1,416 @@
+{% extends 'masterpage.html' %}
+<!-- Content -->
+{% block title %}
+<title>ARBUDA | Create Invoice </title>
+{% endblock %}
+
+
+{% block content %}
+<style>
+  mark {
+    background: yellow;
+    color: black;
+    font-weight: bold;
+    border-radius: 2px;
+  }
+</style>
+
+<div class="container-xxl">
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Create Invoice</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <!-- Register Card -->
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST" action="generate-invoice-pdf">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Invoice Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_no" class="form-label">Contract no.</label>
+                <select class="form-select ts-select" name="contract_no" id="contract_no"
+                  placeholder="Select contract no" autocomplete="off" onchange="fetchDispacth()" required>
+                  <option value="" disabled selected>Select contract no</option>
+                  {% for contract in allcontract %}
+                  <option value="{{ contract.id }}">
+                    {{ contract.company_name }} -- {{ contract.contract_no }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="bill_date" class="form-label">Bill Date</label>
+                <input type="date" class="form-control" id="bill_date" name="bill_date" autofocus
+                  oninput="this.classList.remove('invalid')" required />
+              </div>
+
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="bill_no" class="form-label">Bill No.</label>
+                <input type="text" class="form-control" id="bill_no" name="bill_no" autofocus
+                  oninput="this.classList.remove('invalid')" placeholder="Enter bill no" required />
+              </div>
+            </div>
+
+            <h5 class="text-primary fw-semibold mb-3">Sign Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="v_by_name" class="form-label">Verified By Name</label>
+                <input type="text" class="form-control" id="v_by_name" name="v_by_name" autofocus value="" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="r_by_name" class="form-label">Recommended By Name</label>
+                <input type="text" class="form-control" id="r_by_name" name="r_by_name" autofocus value="" />
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-sm-6">
+                <label class="form-label">Enter Dispacthes Per Page</label>
+                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="10" required>
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3">Search</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="bill_no" class="form-label">Search</label>
+                <input type="text" class="form-control" id="searchBox"
+                  placeholder="Search by Party name,Challan no,destination and Product" oninput="filterTable()" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="fromDate" class="form-label">From Date</label>
+                <input type="date" class="form-control" id="fromDate" name="fromDate" autofocus
+                  onchange="filterTable()" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="toDate" class="form-label">To Date</label>
+                <input type="date" class="form-control" id="toDate" onchange="filterTable()" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="table-responsive mb-3">
+                <table id="dispatchTable" class="table table-bordered ">
+                  <thead>
+                    <tr id="tableHeader" style="word-wrap: none;"></tr>
+                  </thead>
+                  <tbody id="tableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <button class="btn btn-primary d-grid w-100">Generate Bill</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script>
+  document.querySelectorAll('.ts-select').forEach((el) => {
+    let settings = {};
+    new TomSelect(el, settings);
+  });
+</script>
+<script>
+  function fetchSlipDetails() {
+    const lr_id = document.getElementById('lr_id').value;
+    if (!lr_id) return;
+
+    fetch(`/get-lr-slip-details/?slip-no=${encodeURIComponent(lr_id)}`)
+      .then(response => response.json())
+      .then(data => {
+
+        if (data.total_freight) {
+          document.getElementById('total_freight').value = data.total_freight;
+          document.getElementById('total_freight').setAttribute("readonly", true);
+          document.getElementById('taxable_amount').value = data.total_freight;
+          document.getElementById('taxable_amount').setAttribute("readonly", true);
+        } else {
+          document.getElementById('total_freight').value = 0;
+          document.getElementById('total_freight').setAttribute("readonly", true);
+        }
+        if (data.laboring) {
+          document.getElementById('laboring').value = data.laboring;
+          document.getElementById('laboring').setAttribute("readonly", true);
+        } else {
+          document.getElementById('laboring').value = 0;
+          document.getElementById('laboring').setAttribute("readonly", true);
+        }
+        if (data.advance_payment) {
+          document.getElementById('advance_payment').value = data.advance_payment;
+          document.getElementById('advance_payment').setAttribute("readonly", true);
+        } else {
+          document.getElementById('advance_payment').value = 0;
+          document.getElementById('advance_payment').setAttribute("readonly", true);
+        }
+
+
+
+      })
+      .catch(err => {
+        console.error('Error fetching Slip  details:', err);
+      });
+  }
+  function fetchClientDetails() {
+    const client_id = document.getElementById('client_name').value;
+    if (!client_id) return;
+
+    fetch(`/get-client-gst/?client-id=${encodeURIComponent(client_id)}`)
+      .then(response => response.json())
+      .then(data => {
+
+        if (data.gst) {
+          document.getElementById('gst').value = data.gst;
+          document.getElementById('gst').setAttribute("readonly", true);
+        } else {
+          document.getElementById('gst').value = '';
+        }
+
+
+      })
+      .catch(err => {
+        console.error('Error fetching Slip  details:', err);
+      });
+  }
+  function calculate_gst() {
+
+
+    let grand_total = document.getElementById('grand_total')
+    let totalfreight = document.getElementById('total_freight')
+    let advance_payment = document.getElementById('advance_payment')
+    let laboring = document.getElementById('laboring')
+    let gst_amount = document.getElementById('gst_amount')
+    let gst_rate = document.getElementById('gst_rate')
+
+    cgst_amount = (totalfreight.value * gst_rate.value) / 100;
+
+    cgrand_total = (cgst_amount + parseInt(totalfreight.value) + parseInt(laboring.value)) - parseInt(advance_payment.value);
+
+    gst_amount.value = cgst_amount;
+    grand_total.value = cgrand_total;
+
+    gst_amount.setAttribute('readonly', true)
+    grand_total.setAttribute('readonly', true)
+
+
+  }
+
+
+  // function fetchDispacth() {
+  //   const contract_id = document.getElementById('contract_no').value;
+  //   if (!contract_id) return;
+
+  //   fetch(`/get-dispacth?contract-id=${encodeURIComponent(contract_id)}`)
+  //     .then(response => response.json())
+  //     .then(data => {
+  //       if (data.destinations) {
+  //         document.getElementById("tableHeader").innerHTML = "";
+  //         document.getElementById("tableBody").innerHTML = "";
+
+  //         const th1 = document.createElement("th");
+  //           th1.textContent = "Select Challan"; // nice labels
+  //           document.getElementById("tableHeader").appendChild(th1);
+
+  //         data.fields.forEach(field => {
+  //           const th = document.createElement("th");
+  //           th.textContent = field.replace(/_/g, " "); // nice labels
+  //           document.getElementById("tableHeader").appendChild(th);
+  //         });
+
+  //         data.destinations.forEach((dest, index) => {
+  //           const tr = document.createElement("tr");
+  //           const checkboxTd = document.createElement("td");
+  //           const checkbox = document.createElement("input");
+  //           checkbox.type = "checkbox";
+  //           checkbox.name = "dispatch_ids";
+  //           checkbox.value = dest.id; // store dispatch ID
+  //           checkbox.classList.add("row-checkbox"); // optional class for styling / JS use
+  //           checkboxTd.appendChild(checkbox);
+  //           tr.appendChild(checkboxTd);
+
+  //           data.fields.forEach(field => {
+  //             const td = document.createElement("td");
+
+
+
+  //             if (field === "sr_no") {
+  //               td.textContent = index + 1;
+  //             } else if (field === "depature_date") {
+  //               td.textContent = dest.dep_date || "";
+  //             }
+  //             else if (field === "dc_field") {
+  //               td.textContent = dest.challan_no || "";
+  //             }
+  //             else if (field === "luggage") {
+  //               td.textContent = dest.totalfreight || "";
+  //             }
+  //             else if (field === "product") {
+  //               td.textContent = dest.product_name || "";
+  //             }
+  //             else if (field === "amount") {
+  //               td.textContent = parseInt(dest.totalfreight) + parseInt(dest.unloading_charge);
+  //             }
+
+  //             else {
+  //               td.textContent = dest[field] || "";
+  //             }
+
+  //             tr.appendChild(td);
+  //           });
+
+  //           document.getElementById("tableBody").appendChild(tr);
+  //         });
+  //       }
+  //       else {
+  //       }
+
+
+  //     })
+  //     .catch(err => {
+  //       console.error('Error fetching Slip  details:', err);
+  //     });
+  // }
+  let allDispatches = []; // store fetched data globally
+  let allfield
+
+  function fetchDispacth() {
+    const contract_id = document.getElementById('contract_no').value;
+    if (!contract_id) return;
+
+    fetch(`/get-dispacth?contract-id=${encodeURIComponent(contract_id)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.destinations) {
+          allDispatches = data.destinations;
+          allfield = data.fields // save all data
+          document.getElementById('bill_no').value = ""
+          renderTable(allDispatches, data.fields); // render initially
+        }
+        if (data.bill_no) {
+          document.getElementById('bill_no').value = data.bill_no
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching Slip details:', err);
+      });
+  }
+  // function filterTable() {
+  //   const search = document.getElementById("searchBox").value.toLowerCase();
+
+  //   const filtered = allDispatches.filter(item =>
+  //     (item.challan_no && item.challan_no.toLowerCase().includes(search)) ||
+  //     (item.product_name && item.product_name.toLowerCase().includes(search)) ||
+  //     (item.destination && item.destination.toLowerCase().includes(search)) ||
+  //     (item.unloading_charge && item.unloading_charge.toString().includes(search))
+  //   );
+
+  //   // Re-render table with filtered results
+
+  //   renderTable(filtered, allfield );
+  // }
+  let currentSearch = "";
+
+  function filterTable() {
+    const from = document.getElementById("fromDate").value;
+    const to = document.getElementById("toDate").value;
+
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+
+    currentSearch = document.getElementById("searchBox").value.toLowerCase();
+
+    const filtered = allDispatches.filter(item => {
+      // Text search
+      const matchesSearch =
+        (item.challan_no && item.challan_no.toLowerCase().includes(currentSearch)) ||
+        (item.product_name && item.product_name.toLowerCase().includes(currentSearch)) ||
+        (item.destination && item.destination.toLowerCase().includes(currentSearch)) ||
+        (item.party_name && item.party_name.toLowerCase().includes(currentSearch));
+
+      // Date filter (assuming your date field is `dep_date` in format "YYYY-MM-DD")
+      const itemDate = item.dep_date ? new Date(item.dep_date) : null;
+      const matchesDate =
+        (!fromDate || (itemDate && itemDate >= fromDate)) &&
+        (!toDate || (itemDate && itemDate <= toDate));
+
+      return matchesSearch && matchesDate; // must match both
+    });
+
+    renderTable(filtered, allfield);
+  }
+  function renderTable(dispatches, fields) {
+    const tableHeader = document.getElementById("tableHeader");
+    const tableBody = document.getElementById("tableBody");
+
+    tableHeader.innerHTML = "";
+    tableBody.innerHTML = "";
+
+    // Header
+    const th1 = document.createElement("th");
+    th1.textContent = "Select Challan";
+    tableHeader.appendChild(th1);
+
+    fields.forEach(field => {
+      const th = document.createElement("th");
+      th.textContent = field.replace(/_/g, " ");
+      th.style.whiteSpace = "nowrap";
+      tableHeader.appendChild(th);
+    });
+
+    // Rows
+    dispatches.forEach((dest, index) => {
+      const tr = document.createElement("tr");
+
+      // Checkbox
+      const checkboxTd = document.createElement("td");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "dispatch_ids";
+      checkbox.value = dest.id;
+      checkbox.classList.add("row-checkbox");
+      checkboxTd.appendChild(checkbox);
+      tr.appendChild(checkboxTd);
+
+      // Fields
+      fields.forEach(field => {
+        const td = document.createElement("td");
+        if (field === "sr_no") {
+          td.textContent = index + 1;
+        } else if (field === "depature_date" || field === "dep_date") {
+          td.style.whiteSpace = "nowrap";
+          td.textContent = dest.dep_date || "";
+        } else if (field === "dc_field") {
+          td.style.whiteSpace = "wrap"
+          td.innerHTML = highlightText(dest.challan_no?.toString() || "", currentSearch);
+        } else if (field === "luggage") {
+          td.textContent = dest.totalfreight || "";
+        } else if (field === "product") {
+          td.textContent = dest.product_name || "";
+        } else if (field === "amount") {
+          td.textContent = dest.grand_total;
+        } else if (field === "gc_note") {
+          td.textContent = dest.gc_note_no;
+        } else {
+          td.innerHTML = highlightText(dest[field]?.toString() || "", currentSearch);
+        }
+        tr.appendChild(td);
+      });
+
+      tableBody.appendChild(tr);
+    });
+  }
+  function highlightText(text, search) {
+    if (!search) return text; // if no search, return plain text
+    const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
+    return text.replace(regex, `<mark>$1</mark>`);
+  }
+
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,725 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Add Dispatch </title>
+{% endblock %}
+
+{% block content %}
+
+<div class="container-xxl">
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Create Dispatch Challan</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Contract Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_id" class="form-label">Contract ID</label>
+                <select class="form-select ts-select" name="contract_id" id="contract_id"
+                  placeholder="Select contract id" autocomplete="off" onchange="fecthContractDetails()" required>
+                  <option value="" selected disabled>Select contract id</option>
+                  {% for contract in allcontract %}
+                  <option value="{{ contract.id }}">
+                    {{ contract.contract_no }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="dep_date" class="form-label">Dispatch date</label>
+                <input type="date" class="form-control" id="dep_date" name="dep_date" autofocus
+                  oninput="this.classList.remove('invalid')" required />
+              </div>
+            </div>
+
+            <h5 class="text-primary fw-semibold mb-3">Challan Information</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="challan_no" class="form-label">Challan No. ( Shipment no. )</label>
+                <input type="text" class="form-control" id="challan_no" name="challan_no" placeholder="Enter challan no"
+                  oninput="this.classList.remove('invalid')" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="truck_no" class="form-label">Truck No.</label>
+                <input type="text" class="form-control" id="truck_no" name="truck_no" placeholder="Enter truck no"
+                  autofocus oninput=" this.classList.remove('invalid')" required />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="product_name" class="form-label">Product Name</label>
+                <input type="text" class="form-control" id="product_name" name="product_name"
+                  placeholder="Enter product name" autofocus oninput=" this.classList.remove('invalid')" required />
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3">Destination Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="party_name" class="form-label">Party Name</label>
+                <input type="text" class="form-control" id="party_name" name="party_name" placeholder="Enter party name"
+                  autofocus oninput=" this.classList.remove('invalid')" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="from_center" class="form-label">From</label>
+                <input type="text" class="form-control" id="from_center" name="from_center"
+                  placeholder="Enter party name" autofocus oninput=" this.classList.remove('invalid')" required />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="destination" class="form-label">Destination</label>
+                <select id="select-beast" name="destination" class="form-select" placeholder="Enter Destination"
+                  onchange="fecthDestinationDetails(this.value)" required>
+                </select>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="taluka" class="form-label">Taluka</label>
+                <input type="text" class="form-control" id="taluka" name="taluka" placeholder="Enter taluka" autofocus
+                  oninput="this.classList.remove('invalid');" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="district" class="form-label">Distric</label>
+                <input type="text" class="form-control" id="district" name="district" placeholder="Enter district"
+                  autofocus oninput=" this.classList.remove('invalid');" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="km" class="form-label">KM</label>
+                <input type="text" class="form-control" id="km" name="km" placeholder="Enter km" autofocus
+                  oninput=" this.classList.remove('invalid') , fecthrate(this.value)" required />
+              </div>
+            </div>
+
+            <h5 class="text-primary fw-semibold mb-3">Weight and Payment Information </h5>
+
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="weight" class="form-label">Total Weight in ton</label>
+                <input type="number" class="form-control" id="weight" name="weight" placeholder="Enter weight here"
+                  oninput="this.classList.remove('invalid'), calculate_rent()" step="any" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="rate" class="form-label">Rate <span id="rate_calculation"></span></label>
+                <span class="link-primary ps-2 cursor-pointer d-none" id="income-slab" data-bs-toggle="modal"
+                  data-bs-target="#basicModal">
+                  see slabs
+                </span>
+                <div class="modal fade" id="basicModal" tabindex="-1" style="display: none;" aria-hidden="true">
+                  <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel1">Calculation</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body">
+                        <table class="table table-bordered">
+                          <thead>
+                            <tr>
+                              <th>From Km</th>
+                              <th>To Km</th>
+                              <th>Choice</th>
+                              <th>Value</th>
+                            </tr>
+                          </thead>
+                          <tbody id="rate-table"></tbody>
+                        </table>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <input type="number" class="form-control" id="rate" name="rate" placeholder="Enter rupees per ton"
+                  autofocus oninput=" this.classList.remove('invalid')" />
+              </div>
+
+            </div>
+            <div class="row">
+              <!-- calucalation   -->
+              <input type="hidden" class="form-control" id="i_unloading_charge_1" name="i_unloading_charge_1"
+                value="0" />
+              <input type="hidden" class="form-control" id="i_unloading_charge_2" name="i_unloading_charge_2"
+                value="0" />
+              <input type="hidden" class="form-control" id="i_loading_charge" name="i_loading_charge" value="0" />
+              <!-- end calculation -->
+
+              <div class="mb-3 col-sm-6">
+                <label for="taluka" class="form-label">Freigth Amount</label>
+                <input type="number" class="form-control" id="totalfreight" name="totalfreight"
+                  placeholder="Enter Freight Amount" />
+              </div>
+
+              <div class="mb-3 col-sm-6">
+                <label for="loading_charge" class="form-label">loading charge</label>
+
+                <input name="loading_rate" class="form-check-input ms-2" type="radio" value="yes" id="loadingYes"
+                  onchange="toggleloadingInput()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="loadingYes">Yes</label>
+
+                <input name="loading_rate" class="form-check-input ms-2" type="radio" value="no" id="loadingNo" checked
+                  onchange="toggleloadingInput()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="loadingNo">No</label>
+
+                <input type="number" class="form-control" id="loading_charge" name="loading_charge"
+                  style="display: none;" placeholder="Enter loading charge" oninput="" value="" />
+
+                <script>
+                  function toggleloadingInput() {
+                    const yesRadio = document.getElementById("loadingYes");
+                    const inputWrapper = document.getElementById("loading_charge");
+                    if (yesRadio.checked) {
+                      inputWrapper.style.display = "block";
+                    } else {
+                      inputWrapper.style.display = "none";   // Hide input
+                    }
+                  } 
+                </script>
+
+              </div>
+
+            </div>
+
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="unloading_charge_1" class="form-label">Unloading charge 1 </label>
+                <input name="unloading_rate_1" class="form-check-input ms-2" type="radio" value="yes"
+                  id="unloadingYes_1" onchange="toggleunloadingInput_1()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="unloadingYes_1">Yes</label>
+
+                <input name="unloading_rate_1" class="form-check-input ms-2" type="radio" value="no" id="unloadingNo_1"
+                  checked onchange="toggleunloadingInput_1()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="unloadingNo_1">No</label>
+
+                <input type="number" class="form-control" id="unloading_charge_1" name="unloading_charge_1"
+                  style="display: none;" placeholder="Enter unloading charge" oninput="" value="" />
+
+                <script>
+                  function toggleunloadingInput_1() {
+                    const yesRadio = document.getElementById("unloadingYes_1");
+                    const inputWrapper = document.getElementById("unloading_charge_1");
+                    if (yesRadio.checked) {
+                      inputWrapper.style.display = "block";
+                    } else {
+                      inputWrapper.style.display = "none";   // Hide input
+                    }
+                  } 
+                </script>
+
+              </div>
+
+              <div class="mb-3 col-sm-6">
+                <label for="unloading_charge_2" class="form-label">Unloading charge 2</label>
+                <input name="unloading_rate_2" class="form-check-input ms-2" type="radio" value="yes"
+                  id="unloadingYes_2" onchange="toggleunloadingInput_2()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="unloadingYes_2">Yes</label>
+
+                <input name="unloading_rate_2" class="form-check-input ms-2" type="radio" value="no" id="unloadingNo_2"
+                  checked onchange="toggleunloadingInput_2()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="unloadingNo_2">No</label>
+
+                <input type="number" class="form-control" id="unloading_charge_2" name="unloading_charge_2"
+                  style="display: none;" placeholder="Enter unloading charge" oninput="" value="" />
+
+                <script>
+                  function toggleunloadingInput_2() {
+                    const yesRadio = document.getElementById("unloadingYes_2");
+                    const inputWrapper = document.getElementById("unloading_charge_2");
+                    if (yesRadio.checked) {
+                      inputWrapper.style.display = "block";
+                    } else {
+                      inputWrapper.style.display = "none";
+                    }
+                  } 
+                </script>
+              </div> 
+
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="grand_total" class="form-label">Grand Total</label>
+                <input type="number" class="form-control" id="grand_total" name="grand_total"
+                  placeholder="Enter Grand Total" oninput="" step="any" />
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3">Truck Booking Info</h5>
+
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="truck_booking_rate" class="form-label">Truck Booking Rate</label>
+                <input type="number" class="form-control" id="truck_booking_rate" name="truck_booking_rate"
+                  placeholder="Enter truck booking rate" oninput="calculate_profite()" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="total_paid_truck_onwer" class="form-label">Total Amount Paid To truck Onwer</label>
+                <input type="number" class="form-control" id="total_paid_truck_onwer" name="total_paid_truck_onwer"
+                  placeholder="Enter total paid to truck onwer" oninput="" />
+              </div>
+
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="advance_paid" class="form-label">Advance Paid To Truck Onwer</label>
+                <input type="number" class="form-control" id="advance_paid" name="advance_paid"
+                  placeholder="Enter advance paid to truck onwer" oninput="calculate_panding_amount()" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="panding_amount" class="form-label">Total Panding Amount of Truck Onwer</label>
+                <input type="number" class="form-control" id="panding_amount" name="panding_amount"
+                  placeholder="Enter panding amount" oninput="" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="net_profit" class="form-label">Net Profit</label>
+                <input type="number" class="form-control" id="net_profit" name="net_profit"
+                  placeholder="Enter net profit" oninput="" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-sm-6">
+                <button class="btn btn-primary d-grid w-100">Save</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script>
+  document.querySelectorAll('.ts-select').forEach((el) => {
+
+    let settings = {};
+    new TomSelect(el, settings);
+  });
+  const tomSelectInstance = new TomSelect("#select-beast", {
+    create: true,
+    lableField: 'data_id', 
+    sortField: {
+      field: "text",
+      direction: "asc"
+    },
+  });
+
+</script>
+<script>
+  function updateDestinations(destinations) {
+    tomSelectInstance.clearOptions(); // remove old options
+    destinations.forEach(dest => {
+      tomSelectInstance.addOption({
+        value: dest.id,
+        text: `${dest.destination} -- ${dest.km}` ,
+        data_id: dest.id
+      });
+    });
+
+  }
+
+  function fecthContractDetails() {
+    const contract_id = document.getElementById('contract_id').value;
+    if (!contract_id) return;
+
+    fetch(`get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.from) {
+          document.getElementById('from_center').value = data.from;
+          document.getElementById('from_center').setAttribute('readonly', true);
+          document.getElementById('i_unloading_charge_1').value = data.unloading_charge_1;
+          document.getElementById('i_unloading_charge_2').value = data.unloading_charge_2;
+          document.getElementById('i_loading_charge').value = data.loading_charge;
+        } else {
+          document.getElementById('from_center').value = '';
+          document.getElementById('i_unloading_charge_1').value = 0;
+          document.getElementById('i_unloading_charge_2').value = 0;
+          document.getElementById('i_loading_charge').value = 0;
+        }
+        if (data.destinations) {
+          updateDestinations(data.destinations);
+        }
+        if (data.rate_type == "Taluka-Wise") {
+          document.getElementById("km").removeAttribute("oninput", true)
+          console.log("removed");
+          let dexisting = document.getElementById("district").getAttribute("oninput") || '';
+          document.getElementById("district").setAttribute("oninput", dexisting + "fecthTalukaRate();")
+          let existing = document.getElementById("taluka").getAttribute("oninput") || '';
+          document.getElementById("taluka").setAttribute("oninput", existing + " ;fecthTalukaRate()")
+          document.getElementById("taluka").setAttribute("required", true)
+        }
+        if (data.rate_type == "Distric-Wise") {
+          document.getElementById("km").removeAttribute("oninput", true)
+          console.log("removed");
+          let dexisting = document.getElementById("district").getAttribute("oninput") || '';
+          document.getElementById("district").setAttribute("oninput", dexisting + "fecthDistrictRate()")
+        }
+        if (data.rate_type == "Incometax-Wise") {
+          document.getElementById("km").removeAttribute("oninput", true)
+          console.log("removed");
+          document.getElementById("km").setAttribute("oninput", "fecthANDcalcualteincomerate()")
+        }
+        if (data.rate_type == "Cumulative-Wise") {
+          document.getElementById("km").removeAttribute("oninput", true)
+          console.log("removed");
+          document.getElementById("km").setAttribute("oninput", "fecthCumRate()")
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching Contract details:', err);
+      });
+  }
+  function fecthDestinationDetails(did) {
+
+    if (!did) return;
+    console.log(did);
+    fetch(`get-destination-details?did=${encodeURIComponent(did)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.district && data.km) {
+          document.getElementById('district').value = data.district;
+          document.getElementById('taluka').value = data.taluka;
+          document.getElementById('km').value = data.km;
+          if (data.rate_type == "Kilometer-Wise") {
+            fecthrate(data.km)
+          }
+          else if (data.rate_type == "Taluka-Wise") {
+            fecthTalukaRate()
+          }
+          else if (data.rate_type == "Distric-Wise") {
+            fecthDistrictRate()
+          }
+          else if (data.rate_type == "Incometax-Wise") {
+            fecthANDcalcualteincomerate()
+          }
+          else if (data.rate_type == "Cumulative-Wise") {
+            fecthCumRate()
+          }
+        } else {
+          document.getElementById('district').value = '';
+          document.getElementById('taluka').value = '';
+          document.getElementById('km').value = '';
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching Contract details:');
+      });
+  }
+
+  function fecthrate(km) {
+    let contract_no = document.getElementById("contract_id").value
+    fetch(`/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.rate && data.rate_calculation && data.how_calculation) {
+
+          document.getElementById('rate').value = data.rate;
+          document.getElementById('rate').setAttribute('readonly', true);
+          document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+          document.getElementById('i_rate_calculation').value = data.rate_calculation;
+        } else {
+          document.getElementById('rate').removeAttribute('readonly', true);
+          document.getElementById('rate').value = '';
+          document.getElementById('rate_calculation').innerHTML = ``;
+          document.getElementById('i_rate_calculation').value = "";
+        }
+
+      })
+      .catch(err => {
+        console.error('Error fetching TRUCK details:', err);
+      });
+
+  }
+
+  function fecthCumRate() {
+    let contract_no = document.getElementById("contract_id").value
+    let km = document.getElementById("km").value
+    fetch(`/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.amount) {
+          document.getElementById('rate').value = data.amount;
+          document.getElementById('rate').setAttribute('readonly', true);
+          document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+
+
+        } else {
+          document.getElementById('rate').removeAttribute('readonly', true);
+          document.getElementById('rate').value = '';
+          document.getElementById('i_rate_calculation').value = "";
+
+        }
+
+      })
+      .catch(err => {
+        console.error('Error fetching TRUCK details:', err);
+      });
+
+  }
+
+  function fecthANDcalcualteincomerate() {
+    let contract_no = document.getElementById("contract_id").value
+    let ton = document.getElementById("weight").value
+    let km = document.getElementById("km").value
+    fetch(`/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.amount) {
+          document.getElementById('rate').value = data.amount;
+          document.getElementById('rate').setAttribute('readonly', true);
+          let income_slab = document.getElementById('income-slab')
+          income_slab.classList.remove('d-none')
+          document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+        } else {
+          document.getElementById('rate').removeAttribute('readonly', true);
+          document.getElementById('rate').value = '';
+        }
+        if (data.slab) {
+          const tbody = document.getElementById("rate-table");
+          tbody.innerHTML = ""; // clear old rows
+
+          data.slab.forEach(row => {
+            const tr = document.createElement("tr");
+
+            // Determine which value to show
+            let choice = "";
+            let value = "";
+            if (row.mt > 0) {
+              choice = "MT";
+              value = row.mt;
+            } else {
+              choice = "MT/KM";
+              value = row.mt_per_km;
+            }
+
+            tr.innerHTML = `
+          <td>${row.from_km}</td>
+          <td>${row.to_km}</td>
+          <td>${choice}</td>
+          <td>${value}</td>
+        `;
+
+            tbody.appendChild(tr);
+          })
+        }
+      })
+
+      .catch(err => {
+        console.error('Error fetching incometax slabwise rate details :', err);
+      });
+
+  }
+
+  function fecthTalukaRate() {
+    let contract_no = document.getElementById("contract_id").value
+    let taluka_name = document.getElementById("taluka").value
+    let district = document.getElementById("district").value
+    if (taluka_name.length > 0 && district.length > 0) {
+      fetch(`/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.rate && data.rate_calculation && data.how_calculation) {
+
+            document.getElementById('rate').value = data.rate;
+            document.getElementById('rate').setAttribute('readonly', true);
+            document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+            document.getElementById('i_rate_calculation').value = data.rate_calculation;
+          } else {
+            document.getElementById('rate').removeAttribute('readonly', true);
+            document.getElementById('rate').value = '';
+            document.getElementById('rate_calculation').innerHTML = ``;
+            document.getElementById('i_rate_calculation').value = "";
+          }
+
+        })
+        .catch(err => {
+          console.error('Error fetching Talukarate details:', err);
+        });
+    }
+
+  }
+  function fecthDistrictRate() {
+    let contract_no = document.getElementById("contract_id").value
+    let taluka_name = document.getElementById("taluka").value
+    let district = document.getElementById("district").value
+    if (district.length > 0) {
+      fetch(`get-district-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.rate && data.rate_calculation && data.how_calculation) {
+
+            document.getElementById('rate').value = data.rate;
+            document.getElementById('rate').setAttribute('readonly', true);
+            document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+            document.getElementById('i_rate_calculation').value = data.rate_calculation;
+          } else {
+            document.getElementById('rate').removeAttribute('readonly', true);
+            document.getElementById('rate').value = '';
+            document.getElementById('rate_calculation').innerHTML = ``;
+            document.getElementById('i_rate_calculation').value = "";
+          }
+
+        })
+        .catch(err => {
+          console.error('Error fetching TRUCK details:', err);
+        });
+    }
+
+  }
+
+  function calculate_rent() {
+    let weight = document.getElementById('weight').value
+    let rate = document.getElementById('rate').value
+    let rate_calculation = document.getElementById('i_rate_calculation').innerHTML
+    let totalfreight = document.getElementById('totalfreight')
+    let km = document.getElementById('km').value
+    let unloading_charge_1 = document.getElementById("i_unloading_charge_1").value
+    let unloading_charge_2 = document.getElementById("i_unloading_charge_2").value
+    let loading_charge = document.getElementById("i_loading_charge").value
+    let unload_amount_1 = document.getElementById("unloading_charge_1")
+    let unload_amount_2 = document.getElementById("unloading_charge_2")
+    let load_amount = document.getElementById("loading_charge")
+    let grand_total = document.getElementById('grand_total')
+
+
+    if (rate_calculation == "MT/KM") {
+      totalfreight.value = (weight * rate * km).toFixed(2);
+      totalfreight.setAttribute("readonly", true)
+    }
+    else {
+      totalfreight.value = (weight * rate).toFixed(2);
+      totalfreight.setAttribute("readonly", true)
+
+    }
+    unload_amount_1.value = (unloading_charge_1 * weight).toFixed(2);
+    unload_amount_1.setAttribute('readonly', true)
+
+    unload_amount_2.value = (unloading_charge_2 * weight).toFixed(2);
+    unload_amount_2.setAttribute('readonly', true)
+
+
+    load_amount.value = (loading_charge * weight).toFixed(2);
+    load_amount.setAttribute('readonly', true)
+
+
+    grand_total.value = parseFloat(totalfreight.value).toFixed(2);
+    grand_total.setAttribute("readonly", true)
+
+  }
+  function calculate_profite() {
+    let weight = document.getElementById('weight').value
+    let truck_booking_rate = document.getElementById('truck_booking_rate')
+    let total_paid_truck_onwer = document.getElementById('total_paid_truck_onwer')
+    let net_profit = document.getElementById('net_profit')
+    let totalfreight = document.getElementById('totalfreight')
+
+    total_paid_truck_onwer.value = (truck_booking_rate.value * weight).toFixed(2);
+    total_paid_truck_onwer.setAttribute("readonly", true)
+    net_profit.value = (totalfreight.value - total_paid_truck_onwer.value).toFixed(2);
+    net_profit.setAttribute("readonly", true)
+
+  }
+  function calculate_panding_amount() {
+    let total_paid_truck_onwer = document.getElementById('total_paid_truck_onwer')
+    let advance_paid = document.getElementById('advance_paid').value
+    let panding_amount = document.getElementById('panding_amount')
+
+    panding_amount.value = (total_paid_truck_onwer.value - advance_paid).toFixed(2);
+    panding_amount.setAttribute("readonly", true)
+
+  }
+
+  function add_extra_cost() {
+    const totalfreight = parseFloat(document.getElementById('totalfreight').value) || 0;
+
+    let grand_total = totalfreight;
+
+    if (document.getElementById("unloadingYes_1").checked) {
+      const unload_amount_1 = parseFloat(document.getElementById("unloading_charge_1").value) || 0;
+      grand_total += unload_amount_1;
+    }
+
+    if (document.getElementById("unloadingYes_2").checked) {
+      const unload_amount_2 = parseFloat(document.getElementById("unloading_charge_2").value) || 0;
+      grand_total += unload_amount_2;
+    }
+    if (document.getElementById("loadingYes").checked) {
+      const load_amount = parseFloat(document.getElementById("loading_charge").value) || 0;
+      grand_total += load_amount;
+    }
+
+    document.getElementById('grand_total').value = grand_total.toFixed(2);
+
+  }
+
+
+
+  // function fecthkm() {
+  //     const from = document.getElementById('from').value;
+  //     const to = document.getElementById('village_name').value;
+  //     if (!from && !to) return;
+
+  //     fetch(`/get-km-details?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+  //       .then(response => response.json())
+  //       .then(data => {
+  //         if (data.km) {
+  //           document.getElementById('km').value = data.km;
+  //           document.getElementById('km').setAttribute('readonly', true);
+  //         } else {
+  //           document.getElementById('km').removeAttribute('readonly', true);
+  //           document.getElementById('km').value = '';
+  //         }
+  //       })
+  //       .catch(err => {
+  //         console.error('Error fetching TRUCK details:', err);
+  //       });
+  //   }
+
+  // function fetchDriverDetails() {
+  //   const truck_d = document.getElementById('truck_d').value;
+  //   if (!truck_d) return;
+
+  //   fetch(`/get-licence-details?licence=${encodeURIComponent(truck_d)}`)
+  //     .then(response => response.json())
+  //     .then(data => {
+  //       if (data.licence) {
+  //         document.getElementById('licence').value = data.licence;
+  //         document.getElementById('licence').setAttribute('readonly', true);
+  //       } else {
+  //         document.getElementById('licence').value = '';
+  //       }
+  //     })
+  //     .catch(err => {
+  //       console.error('Error fetching TRUCK details:', err);
+  //     });
+  // }
+  //  function fetchLocationDetails() {
+  //   const village = document.getElementById('village_name').value;
+  //   if (!village) return;
+
+  //   fetch(`/get-contract-details/?village=${encodeURIComponent(village)}`)
+  //     .then(response => response.json())
+  //     .then(data => {
+  //       if (data.taluka && data.district) {
+  //         document.getElementById('taluka').value = data.taluka;
+  //         document.getElementById('district').value = data.district;
+  //       } else {
+  //         document.getElementById('taluka').value = '';
+  //         document.getElementById('district').value = 0;
+  //       }
+  //     })
+  //     .catch(err => {
+  //       console.error('Error fetching location details:', err);
+  //     });
+  // }
+</script>
+
+{% endblock %}

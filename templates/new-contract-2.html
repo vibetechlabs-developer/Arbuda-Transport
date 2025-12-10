@@ -1,0 +1,493 @@
+{% extends 'masterpage.html' %}
+{% load static %}
+<!-- Content -->
+
+{% block title %}
+<title>ARBUDA | Add New Contract </title>
+{% endblock %}
+
+
+{% block content %}
+
+<div class="container-xxl">
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Add New Contract</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <!-- Register Card -->
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST" enctype="multipart/form-data"
+            onsubmit="return client_profile_validation(this)">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Company Information</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="company_name" class="form-label">Company Name</label>
+                <input type="text" class="form-control" id="company_name" name="company_name"
+                  placeholder="Enter Company Name" oninput="this.classList.remove('invalid')" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="company_name" class="form-label">GST Number</label>
+                <input type="text" class="form-control" id="gst_number" name="gst_number" placeholder="Enter gst number"
+                  value="" oninput="this.classList.remove('invalid')" required />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="gstin" class="form-label">Pan Number</label>
+                <input type="text" class="form-control" id="pan_number" name="pan_number" placeholder="Enter pan number"
+                  autofocus required
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="from_center" class="form-label">From Center</label>
+                <input type="text" class="form-control" id="from_center" name="from_center"
+                  placeholder="Enter From Center" autofocus
+                  oninput="this.classList.remove('invalid'),this.value =  this.value.toUpperCase()" required />
+              </div>
+            </div>
+            <!-- <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="cin_number" class="form-label">Cin (registration) Number </label>
+                <input type="text" class="form-control" id="cin_number" name="cin_number" placeholder="Enter cin number"
+                  autofocus oninput="this.classList.remove('invalid'),this.value =  this.value.toUpperCase()" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="tan_number" class="form-label">Tan Number</label>
+                <input type="text" class="form-control" id="tan_number" name="tan_number" placeholder="Enter tan number"
+                  oninput="this.classList.remove('invalid') ,this.value =  this.value.toUpperCase()" required />
+              </div>
+            </div> -->
+            <h5 class="text-primary fw-semibold mb-3">Contract Information</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_no" class="form-label">Contract Number</label>
+                <input type="text" class="form-control" id="contract_no" name="contract_no"
+                  placeholder="Enter contract number" autofocus
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="bill_start_date" class="form-label">Bill Serise</label>
+                <div class="d-flex gap-2">
+                  <div class="col-sm-6">
+                    <input type="text" class="form-control " id="bill_start_date" name="bill_start_date"
+                      placeholder="From" autofocus
+                      oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" required />
+                  </div>
+                  <div class="col-sm-6">
+                    <input type="text" class="form-control" id="bill_end_date" name="bill_end_date" placeholder="To"
+                      autofocus oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')"
+                      required />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="c_start_date" class="form-label">Contract Start Date</label>
+                <input type="date" class="form-control" id="c_start_date" name="c_start_date"
+                  placeholder="Enter pan number" autofocus
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="c_date" class="form-label">Contract End Date</label>
+                <input type="date" class="form-control" id="c_end_date" name="c_end_date" placeholder="Enter tan number"
+                  oninput="this.classList.remove('invalid') ,this.value =  this.value.toUpperCase()" required />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="dc_field" class="form-label">DC Field Name</label>
+                <input type="name" class="form-control" id="dc_field" name="dc_field" placeholder="Enter DC Field Name"
+                  autofocus oninput=" this.classList.remove('invalid')" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="gc_note_required" class="form-label">GC Note required ?</label>
+
+                <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="yes"
+                  id="gc_note_required_yes" onchange="toggleGcinput()" onclick="">
+                <label class="form-check-label" for="gc_note_required_yes">Yes</label>
+
+                <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="no"
+                  id="gc_note_required_no" checked onchange="toggleGcinput()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="gc_note_required_no">No</label>
+
+                <div class=" gap-2" id="gc_note_required" style="display: none;">
+                  <div class="col-sm-6">
+                    <input type="text" class="form-control " id="gc_start" name="gc_start" placeholder="From" autofocus
+                      oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+                  </div>
+                  <script>
+                    function toggleGcinput() {
+                      const yesRadio = document.getElementById("gc_note_required_yes");
+                      const inputWrapper = document.getElementById("gc_note_required");
+                      if (yesRadio.checked) {
+                        inputWrapper.style.display = "flex";
+                      } else {
+                        inputWrapper.style.display = "none";
+                      }
+                    } 
+                  </script>
+                </div>
+              </div>
+              <div class="row mt-2">
+                <h5 class="text-primary fw-semibold mb-3">Contact Person</h5>
+                <div class="col-sm-6">
+                  <div class="mb-3">
+                    <label for="address" class="form-label">Contact Person Name</label>
+                    <input type="text" class="form-control" id="cp_name" name="cp_name"
+                      placeholder="Enter contact person name" autofocus oninput="this.classList.remove('invalid')"
+                      required />
+                  </div>
+                  <div class="mb-3">
+                    <label for="address" class="form-label">Contact Email</label>
+                    <input type="text" class="form-control" id="c_email" name="c_email"
+                      placeholder="Enter contact email" autofocus oninput="this.classList.remove('invalid')" required />
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="mb-3">
+                    <label for="c_designation" class="form-label">Contact Person Designation</label>
+                    <input type="text" class="form-control" id="c_designation" name="c_designation"
+                      placeholder="Enter contact person designation" autofocus
+                      oninput="this.classList.remove('invalid')" required />
+                  </div>
+                  <div class="mb-3">
+                    <label for="address" class="form-label">Contact Number</label>
+                    <input type="text" class="form-control" id="c_number" name="c_number"
+                      placeholder="Enter contact number" autofocus oninput="this.classList.remove('invalid')"
+                      required />
+                  </div>
+                </div>
+              </div>
+
+              <!-- <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Office Address</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="address" class="form-label">Adress</label>
+                  <input type="text" class="form-control" id="office_address" name="office_address"
+                    placeholder="Enter office address" autofocus oninput="this.classList.remove('invalid')" required />
+                </div>
+                <div class="mb-3">
+                  <label for="state" class="form-label">State</label>
+                  <input type="text" class="form-control" id="office_state" name="office_state"
+                    placeholder="Enter office state" oninput="this.classList.remove('invalid') " required />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="city" class="form-label">City</label>
+                  <input type="text" class="form-control" id="office_city" name="office_city"
+                    placeholder="Enter office city" autofocus oninput=" this.classList.remove('invalid')" required />
+                </div>
+                <div class="mb-3">
+                  <label for="pin" class="form-label">Pin code</label>
+                  <input type="text" class="form-control" id="office_pin" name="office_pin"
+                    placeholder="Enter office pin-code" maxlength="6" autofocus
+                    oninput="this.classList.remove('invalid')" required />
+                </div>
+              </div>
+            </div> -->
+              <div class="row mt-2">
+                <h5 class="text-primary fw-semibold mb-3">Address</h5>
+                <div class="col-sm-6">
+                  <div class="mb-3">
+                    <label for="address" class="form-label">Adress</label>
+                    <input type="text" class="form-control" id="billing_address" name="billing_address"
+                      placeholder="Enter billing address" autofocus oninput="this.classList.remove('invalid')"
+                      required />
+                  </div>
+                  <div class="mb-3">
+                    <label for="state" class="form-label">State</label>
+                    <input type="text" class="form-control" id="billing_state" name="billing_state"
+                      placeholder="Enter biiling state" oninput="this.classList.remove('invalid') " />
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="mb-3">
+                    <label for="city" class="form-label">City</label>
+                    <input type="text" class="form-control" id="billing_city" name="billing_city"
+                      placeholder="Enter billing city" autofocus oninput=" this.classList.remove('invalid')" required />
+                  </div>
+                  <div class="mb-3">
+                    <label for="pin" class="form-label">Pin code</label>
+                    <input type="text" class="form-control" id="billing_pin" name="billing_pin"
+                      placeholder="Enter billing pin-code" maxlength="6" autofocus
+                      oninput="this.classList.remove('invalid')" required />
+                  </div>
+                </div>
+              </div>
+              <h5 class="text-primary fw-semibold mb-3">Rate Information</h5>
+              <div class="row">
+                <div class="mb-3 col-sm-6">
+                  <label for="rate_type" class="form-label">Select Rate Type</label>
+                  <select name="rate_type" id="rate_type" class="form-select form-control" onchange="toggleRateType()"
+                    required>
+                    <option value="" selected disabled>Select Rate Type</option>
+                    <option value="Kilometer-Wise">Kilometer-Wise</option>
+                    <option value="Taluka-Wise">Taluka-Wise</option>
+                    <option value="Incometax-Wise">Incometax-Wise</option>
+                    <option value="Distric-Wise">Distric-Wise</option>
+                    <option value="Cumulative-Wise">Cumulative-Wise</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Kilometer/Slab table -->
+              <div class="row" id="kmWiseTable" style="display:none;">
+                <div class="mb-3 col-sm-12">
+                  <label class="form-label">Add Rate</label>
+                  <table class="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>From Km</th>
+                        <th>To Km</th>
+                        <th>Choice</th>
+                        <th>Value</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="rate-table"></tbody>
+                  </table>
+                  <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
+                </div>
+              </div>
+              <!-- District-Wise Table -->
+              <div id="districtWiseTable" style="display:none;">
+                <div class="row">
+                  <div class="mb-3 col-sm-12">
+                    <label class="form-label">District-Based Rates</label>
+                    <table class="table table-bordered" id="districtTable">
+                      <thead>
+                        <tr>
+                          <th>District Name</th>
+                          <th>Choice</th>
+                          <th>Rate</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="district-table-body"></tbody>
+                    </table>
+                    <button type="button" class="btn btn-success mt-2" onclick="addDistrictRow()">+ Add
+                      District</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Taluka-Wise table -->
+              <div class="row" id="talukaWiseTable" style="display:none;">
+                <div class="mb-3 col-sm-12">
+                  <label class="form-label">Add Districts & Talukas</label>
+                  <div id="district-container"></div>
+                  <button type="button" class="btn btn-primary mt-2" onclick="addDistrict()">+ Add District</button>
+                </div>
+              </div>
+
+
+
+
+              <!-- Loading rate  -->
+              <div class="row">
+                <div class="mb-3 col-sm-6">
+                  <label class="form-label">loading Rate</label>
+                  <div class="d-flex gap-3">
+                    <div class="form-check">
+                      <input name="loading_rate" class="form-check-input" type="radio" value="yes" id="loadingYes"
+                        onchange="toggleloadingInput()">
+                      <label class="form-check-label" for="loadingYes">Yes</label>
+                    </div>
+                    <div class="form-check">
+                      <input name="loading_rate" class="form-check-input" type="radio" value="no" id="loadingNo" checked
+                        onchange="toggleloadingInput()">
+                      <label class="form-check-label" for="loadingNo">No</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mb-3 col-sm-6" id="loadingChargeWrapper" style="display: none;">
+                  <input type="number" id="loadingCharge" name="loading_charge" class="form-control"
+                    placeholder="Enter loading rate">
+                </div>
+                <script>
+                  function toggleloadingInput() {
+                    const yesRadio = document.getElementById("loadingYes");
+                    const inputWrapper = document.getElementById("loadingChargeWrapper");
+
+                    if (yesRadio.checked) {
+                      inputWrapper.style.display = "block";  // Show input
+                    } else {
+                      inputWrapper.style.display = "none";   // Hide input
+                    }
+                  }
+                </script>
+              </div>
+              <!-- end of loading rate -->
+
+              <div class="row">
+                <div class="mb-3 col-sm-6">
+                  <label class="form-label">Unloading Rate 1</label>
+                  <div class="d-flex gap-3">
+                    <div class="form-check">
+                      <input name="unloading_rate_1" class="form-check-input" type="radio" value="yes"
+                        id="unloadingYes_1" onchange="toggleUnloadingInput_1()">
+                      <label class="form-check-label" for="unloadingYes_1">Yes</label>
+                    </div>
+                    <div class="form-check">
+                      <input name="unloading_rate_1" class="form-check-input" type="radio" value="no" id="unloadingNo_1"
+                        checked onchange="toggleUnloadingInput_1()">
+                      <label class="form-check-label" for="unloadingNo_1">No</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_1" style="display: none;">
+                  <input type="number" id="unloadingCharge_1" name="unloading_charge_1" class="form-control"
+                    placeholder="Enter unloading rate 1">
+                </div>
+                <script>
+                  function toggleUnloadingInput_1() {
+                    const yesRadio = document.getElementById("unloadingYes_1");
+                    const inputWrapper = document.getElementById("unloadingChargeWrapper_1");
+
+                    if (yesRadio.checked) {
+                      inputWrapper.style.display = "block";  // Show input
+                    } else {
+                      inputWrapper.style.display = "none";   // Hide input
+                    }
+                  }
+                </script>
+              </div>
+
+              <div class="row">
+                <div class="mb-3 col-sm-6">
+                  <label class="form-label">Unloading Rate 2</label>
+                  <div class="d-flex gap-3">
+                    <div class="form-check">
+                      <input name="unloading_rate_2" class="form-check-input" type="radio" value="yes"
+                        id="unloadingYes_2" onchange="toggleUnloadingInput_2()">
+                      <label class="form-check-label" for="unloadingYes_2">Yes</label>
+                    </div>
+                    <div class="form-check">
+                      <input name="unloading_rate_2" class="form-check-input" type="radio" value="no" id="unloadingNo_2"
+                        checked onchange="toggleUnloadingInput_2()">
+                      <label class="form-check-label" for="unloadingNo_2">No</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_2" style="display: none;">
+                  <input type="number" id="unloadingCharge" name="unloading_charge_2" class="form-control"
+                    placeholder="Enter unloading rate 2">
+                </div>
+                <script>
+                  function toggleUnloadingInput_2() {
+                    const yesRadio = document.getElementById("unloadingYes_2");
+                    const inputWrapper = document.getElementById("unloadingChargeWrapper_2");
+
+                    if (yesRadio.checked) {
+                      inputWrapper.style.display = "block";  // Show input
+                    } else {
+                      inputWrapper.style.display = "none";   // Hide input
+                    }
+                  }
+                </script>
+              </div>
+              <h5 class="text-primary fw-semibold mb-3">Select Field You Want To in Invoice</h5>
+              <div class="row">
+                <div class="col-sm-3">
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="sr_no" name="field" id="sr_no" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Sr. no.</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="dep_date" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Depature date</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="truck_no" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Truck no.</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="dc_field" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">DC Field</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="party_name" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Party name</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="destination" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Destination</label>
+                  </div>
+                </div>
+                <div class="col-sm-3">
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="taluka" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">taluka</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="district" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">District</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="product_name" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Product name</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="weight" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Weight</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="km" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Kilo meter</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="rate" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Rate</label>
+                  </div>
+                </div>
+                <div class="col-sm-3">
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="luggage" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Luggage</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="unloading_charge_1" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">unloading_charge 1</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="unloading_charge_2" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">unloading_charge 2</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="loading_charge" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">loading_charge</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="amount" name="field" checked="">
+                    <label class="form-check-label" for="defaultCheck1">Total Amount</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="gc_note" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">GC Note</label>
+                </div>
+                </div>
+              </div>
+
+              <div class="col-sm-6 mt-4">
+                <button class="btn btn-primary d-grid w-100">Save</button>
+              </div>
+          </form>
+
+
+        </div>
+      </div>
+    </div>
+    <!-- Register Card -->
+  </div>
+</div>
+</div>
+
+<script src="{% static 'js/rate-tabels.js' %} "></script>
+{% endblock %}

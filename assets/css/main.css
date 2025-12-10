@@ -1,0 +1,61 @@
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printableArea, #printableArea * {
+    visibility: visible;
+  }
+  #printableArea {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}
+.body{
+  background-color: #696cff;
+}
+.circle
+  {
+    width: 200px;
+    height: 200px;
+    border: #8183ed 10px solid;
+    border-radius: 50%;
+  }
+
+.ts-control
+{
+    border: none !important;
+    padding: 2.5px !important;
+}
+
+*::-webkit-scrollbar {
+    height: 5px;
+    width: 5px;
+  }
+  *::-webkit-scrollbar-track {
+    background-color:transparent;
+  }
+  
+  *::-webkit-scrollbar-track:hover {
+    background-color: transparent;
+  }
+  
+  *::-webkit-scrollbar-track:active {
+    background-color: transparent;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    border-radius: 5px;
+    background-color: rgba(101, 101, 101, 0.655);
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #696cff;
+  }
+  
+  *::-webkit-scrollbar-thumb:active {
+    background-color: #696cff;
+  }
+
+  
+ 

@@ -1,0 +1,314 @@
+{% extends 'masterpage.html' %}
+<!-- Content -->
+{% block title %}
+<title>ARBUDA | Client Reports </title>
+{% endblock %}
+
+{% block content %}
+<style>
+  mark {
+    background: yellow;
+    color: black;
+    font-weight: bold;
+    border-radius: 2px;
+  }
+</style>
+
+<div class="container-xxl">
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Create Report For US</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <!-- Register Card -->
+      <div class="card">
+        <div class="card-body">
+          <form id="" class="mb-3" method="POST" action="download-report">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Report Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_no" class="form-label">Contract no.</label>
+                <select class="form-select ts-select" name="contract_no" id="contract_no"
+                  placeholder="Select contract no" autocomplete="off" required>
+                  <option value="" disabled selected>Select contract no</option>
+                  {% for contract in allcontracts %}
+                  <option value="{{ contract.id }}">
+                    {{ contract.company_name }} -- {{ contract.contract_no }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="type_of_report" class="form-label">Select Type of Report</label>
+                <select class="form-select" name="type_of_report" id="type_of_report"
+                  placeholder="Select type of report" autocomplete="off" onchange="fecthproduct(this.value)">
+                  <option value="" disabled selected>Select type of report</option>
+                  <option value="date_wise">Dispatch Date-Wise</option>
+                  <option value="product_wise">Product-Wise</option>
+                </select>
+              </div>
+
+            </div>
+            <!-- Date Range Fields -->
+            <div id="date_range_fields" style="display:none; margin-top:10px;">
+              <div class="row">
+                <div class="col-sm-6">
+                  <label class="form-label">From Date</label>
+                  <input type="date" name="d_from_date" id="d_from_date" class="form-control">
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label">To Date</label>
+                  <input type="date" name="d_to_date" id="d_to_date" class="form-control">
+                </div>
+              </div>
+            </div>
+
+            <!-- Product Field -->
+            <div id="product_field" style="display:none; margin-top:10px;">
+              <div class="row">
+                <div class="col-sm-6">
+                  <label for="product_name" class="form-label">Product Name</label>
+                  <select id="select-beast" name="product_name" class="form-select" placeholder="Product Name">
+                  </select>
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-sm-6">
+                  <label class="form-label">From Date</label>
+                  <input type="date" name="p_from_date" id="p_from_date" class="form-control">
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label">To Date</label>
+                  <input type="date" name="p_to_date" id="p_to_date" class="form-control">
+                </div>
+              </div>
+            </div>
+
+            <script>
+              document.getElementById("type_of_report").addEventListener("change", function () {
+                const value = this.value;
+
+                document.getElementById("date_range_fields").style.display = (value === "date_wise") ? "block" : "none";
+                document.getElementById("product_field").style.display = (value === "product_wise") ? "block" : "none";
+
+                document.getElementById("d_from_date").required = (value === "date_wise");
+                document.getElementById("d_to_date").required = (value === "date_wise");
+
+                document.getElementById("p_from_date").required = (value === "product_wise");
+                document.getElementById("p_to_date").required = (value === "product_wise");
+                document.getElementsByName("product_name").required = (value === "product_wise");
+              });
+
+            </script>
+
+            <div class="row mt-3">
+              <div class="col-sm-6">
+                <label class="form-label">Enter Dispacthes Per Page</label>
+                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="10" required>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="table-responsive mb-3">
+                <table id="dispatchTable" class="table table-bordered ">
+                  <thead>
+                    <tr id="tableHeader" style="word-wrap: none;"></tr>
+                  </thead>
+                  <tbody id="tableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <button class="btn btn-primary d-grid w-100">Generate Report</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script>
+  document.querySelectorAll('.ts-select').forEach((el) => {
+    let settings = {};
+    new TomSelect(el, settings);
+  });
+
+  const tomSelectInstance = new TomSelect("#select-beast", {
+    create: false,
+    lableField: 'data_id',
+    sortField: {
+      field: "text",
+      direction: "asc"
+    },
+  });
+
+</script>
+<script>
+  function fecthproduct(opt) {
+    if (opt = "product_wise") {
+      let contract_id = document.getElementById("contract_no").value
+      fetch(`/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.product_list) {
+            updateDestinations(data.product_list)
+          }
+
+        })
+        .catch(err => {
+          console.error('Error fetching Slip details:', err);
+        });
+
+    }
+    else {
+      return
+    }
+
+
+  }
+
+  function updateDestinations(product_list) {
+    tomSelectInstance.clearOptions(); // remove old options
+    product_list.forEach(product => {
+      tomSelectInstance.addOption({
+        value: product,
+        text: product,
+      });
+    });
+    // tomSelectInstance.refreshOptions(); // refresh the dropdown
+    // if (destinations.length > 0) tomSelectInstance.setValue(destinations[0].id);
+  }
+
+  let allDispatches = []; // store fetched data globally
+  let allfield
+
+  function fetchDispacth() {
+    const contract_id = document.getElementById('contract_no').value;
+    if (!contract_id) return;
+
+    fetch(`/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.product_list) {
+          updateProduct(data.product_list)
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching Slip details:', err);
+      });
+  }
+  function updateProduct(product_list) {
+    tomSelectInstance.clearOptions(); // remove old options
+    product_list.forEach(product => {
+      tomSelectInstance.addOption({
+        value: product,
+        text: product,
+      });
+    });
+    // tomSelectInstance.refreshOptions(); // refresh the dropdown
+    // if (destinations.length > 0) tomSelectInstance.setValue(destinations[0].id);
+  }
+
+  let currentSearch = "";
+
+  function filterTable() {
+    const from = document.getElementById("fromDate").value;
+    const to = document.getElementById("toDate").value;
+
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+
+    currentSearch = document.getElementById("searchBox").value.toLowerCase();
+
+    const filtered = allDispatches.filter(item => {
+      // Text search
+      const matchesSearch =
+        (item.challan_no && item.challan_no.toLowerCase().includes(currentSearch)) ||
+        (item.product_name && item.product_name.toLowerCase().includes(currentSearch)) ||
+        (item.destination && item.destination.toLowerCase().includes(currentSearch)) ||
+        (item.party_name && item.party_name.toLowerCase().includes(currentSearch));
+
+      // Date filter (assuming your date field is `dep_date` in format "YYYY-MM-DD")
+      const itemDate = item.dep_date ? new Date(item.dep_date) : null;
+      const matchesDate =
+        (!fromDate || (itemDate && itemDate >= fromDate)) &&
+        (!toDate || (itemDate && itemDate <= toDate));
+
+      return matchesSearch && matchesDate; // must match both
+    });
+
+    renderTable(filtered, allfield);
+  }
+  function renderTable(dispatches, fields) {
+    const tableHeader = document.getElementById("tableHeader");
+    const tableBody = document.getElementById("tableBody");
+
+    tableHeader.innerHTML = "";
+    tableBody.innerHTML = "";
+
+    // Header
+    const th1 = document.createElement("th");
+    th1.textContent = "Select Challan";
+    tableHeader.appendChild(th1);
+
+    fields.forEach(field => {
+      const th = document.createElement("th");
+      th.textContent = field.replace(/_/g, " ");
+      th.style.whiteSpace = "nowrap";
+      tableHeader.appendChild(th);
+    });
+
+    // Rows
+    dispatches.forEach((dest, index) => {
+      const tr = document.createElement("tr");
+
+      // Checkbox
+      const checkboxTd = document.createElement("td");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "dispatch_ids";
+      checkbox.value = dest.id;
+      checkbox.classList.add("row-checkbox");
+      checkboxTd.appendChild(checkbox);
+      tr.appendChild(checkboxTd);
+
+      // Fields
+      fields.forEach(field => {
+        const td = document.createElement("td");
+        if (field === "sr_no") {
+          td.textContent = index + 1;
+        } else if (field === "depature_date" || field === "dep_date") {
+          td.style.whiteSpace = "nowrap";
+          td.textContent = dest.dep_date || "";
+        } else if (field === "dc_field") {
+          td.style.whiteSpace = "wrap"
+          td.innerHTML = highlightText(dest.challan_no?.toString() || "", currentSearch);
+        } else if (field === "luggage") {
+          td.textContent = dest.totalfreight || "";
+        } else if (field === "product") {
+          td.textContent = dest.product_name || "";
+        } else if (field === "amount") {
+          td.textContent = dest.grand_total;
+        } else if (field === "gc_note") {
+          td.textContent = dest.gc_note_no;
+        } else {
+          td.innerHTML = highlightText(dest[field]?.toString() || "", currentSearch);
+        }
+        tr.appendChild(td);
+      });
+
+      tableBody.appendChild(tr);
+    });
+  }
+  function highlightText(text, search) {
+    if (!search) return text; // if no search, return plain text
+    const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
+    return text.replace(regex, `<mark>$1</mark>`);
+  }
+
+</script>
+
+
+{% endblock %}

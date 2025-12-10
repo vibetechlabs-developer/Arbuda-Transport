@@ -1,0 +1,109 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Rate Master </title>
+{% endblock %}
+
+{% block content %}
+
+<div class="content-wrapper">
+    <!-- Content -->
+
+    <div class="container-xxl grow container-p-y ">
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Rate Master</h4>
+            <!-- <button type="button" class="btn btn-primary" style="height: 40px;"><a href="rate-master-form"
+                    class="text-white text-decoration-none">Add Rate</a></button> -->
+        </div>
+        <!-- <div class="filter-tab mb-4 d-flex align-items-center gap-2">
+            <h5 class="mb-0 me-2">Filters </h5>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="users"
+                    class="text-white text-decoration-none">All</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=admin"
+                    class="text-white text-decoration-none">admin</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=client"
+                    class="text-white text-decoration-none">client</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=distributor"
+                    class="text-white text-decoration-none">distributor</a></button>
+        </div> -->
+
+        <div class="card" style="overflow: auto; height: 345px;">
+            <div class="card-body">
+                <div class="row">
+                    <div class="mb-3 col-sm-6">
+                        <label for="contract_no" class="form-label">Select Contract no.</label>
+                        <select class="form-select ts-select" name="contract_no" id="contract_no"
+                            placeholder="Select contract no" autocomplete="off" onchange="loadRates()">
+                            <option value="" disabled selected>Select contract no</option>
+                            {% for contract in allcontract %}
+                            <option value="{{ contract.id }}">
+                                {{ contract.company_name }} -- {{ contract.contract_no }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="table-responsive text-nowrap">
+                        <table class="table table-bordered" id="rateTable">
+                            <thead>
+                                <tr>
+                                    <th>From Km</th>
+                                    <th>To Km</th>
+                                    <th>MT</th>
+                                    <th>MT/KM</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rate-table">
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+            <!--/ Responsive Table -->
+        </div>
+        <!-- / Content -->
+
+
+
+        <div class="content-backdrop fade"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+    <script>
+        document.querySelectorAll('.ts-select').forEach((el) => {
+
+            let settings = {};
+            new TomSelect(el, settings);
+        });
+    </script>
+    <script>
+        function loadRates() {
+            let clientId = document.getElementById("contract_no").value;
+
+            fetch(`/rates/${clientId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let tbody = document.getElementById("rate-table");
+                        tbody.innerHTML = "";  // clear old rows
+
+                        data.data.forEach(rate => {
+                            let row = `
+                    <tr>
+                        <td>${rate.from_km}</td>
+                        <td>${rate.to_km}</td>
+                        <td>${rate.mt}</td>
+                        <td>${rate.mt_per_km}</td>
+                    </tr>
+                `;
+                            tbody.innerHTML += row;
+                        });
+                    } else {
+                        alert("No data found!");
+                    }
+                })
+                .catch(err => console.error("Error fetching rates:", err));
+        }
+
+    </script>
+    {% endblock %}

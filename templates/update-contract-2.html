@@ -1,0 +1,952 @@
+{% extends 'masterpage.html' %}
+{% load static %}
+
+{% block title %}
+<title>ARBUDA | Update Contract </title>
+{% endblock %}
+<!-- Content -->
+
+
+{% block content %}
+
+<div class="container-xxl">
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Update Contract</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <!-- Register Card -->
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST" enctype="multipart/form-data"
+            onsubmit="return client_profile_validation(this)">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Company Information</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="company_name" class="form-label">Company Name</label>
+                <input type="text" class="form-control" id="company_name" name="company_name"
+                  placeholder="Enter Company Name" oninput="this.classList.remove('invalid')"
+                  value="{{ contract.company_name }}" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="company_name" class="form-label">GST Number</label>
+                <input type="text" class="form-control" id="gst_number" name="gst_number" placeholder="Enter gst number"
+                  value="{{ contract.gst_number}}" oninput="this.classList.remove('invalid')" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="gstin" class="form-label">Pan Number</label>
+                <input type="text" class="form-control" id="pan_number" name="pan_number" placeholder="Enter pan number"
+                  value="{{ contract.pan_number }}" autofocus
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+              </div>
+              <!-- <div class="mb-3 col-sm-6">
+                <label for="tan_number" class="form-label">Tan Number</label>
+                <input type="text" class="form-control" id="tan_number" name="tan_number" placeholder="Enter tan number"
+                  value="{{contract.tan_number}}"
+                  oninput="this.classList.remove('invalid') ,this.value =  this.value.toUpperCase()" />
+              </div> -->
+            </div>
+            <div class="row">
+              <!-- <div class="mb-3 col-sm-6">
+                <label for="cin_number" class="form-label">Cin (registration) Number </label>
+                <input type="text" class="form-control" id="cin_number" name="cin_number" placeholder="Enter cin number"
+                  value="{{contract.cin_number}}" autofocus
+                  oninput="this.classList.remove('invalid'),this.value =  this.value.toUpperCase()" />
+              </div> -->
+              <div class="mb-3 col-sm-6">
+                <label for="from_center" class="form-label">From Center</label>
+                <input type="text" class="form-control" id="from_center" name="from_center"
+                  placeholder="Enter From Center" autofocus value="{{contract.from_center}}"
+                  oninput="this.classList.remove('invalid'),this.value =  this.value.toUpperCase()" />
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3">Contract Information</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_no" class="form-label">Contract Number</label>
+                <input type="text" class="form-control" id="contract_no" name="contract_no"
+                  placeholder="Enter contract number" autofocus value="{{ contract.contract_no }}"
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="bill_start_date" class="form-label">Bill Serise</label>
+                <div class="d-flex gap-2">
+                  <div class="col-sm-6">
+                    <input type="text" class="form-control " id="bill_start_date" name="bill_start_date"
+                      placeholder="from" autofocus value="{{contract.bill_series_from}}"
+                      oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+                  </div>
+                  <div class="col-sm-6">
+                    <input type="text" class="form-control" id="bill_end_date" name="bill_end_date" placeholder="to"
+                      value="{{contract.bill_series_to}}" autofocus
+                      oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="c_start_date" class="form-label">Contract Start Date</label>
+                <input type="date" class="form-control" id="c_start_date" name="c_start_date"
+                  placeholder="Enter pan number" autofocus value="{{contract.c_start_date|date:'Y-m-d'}}"
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="c_date" class="form-label">Contract End Date</label>
+                <input type="date" class="form-control" id="c_end_date" name="c_end_date" placeholder="Enter tan number"
+                  value="{{ contract.c_end_date|date:'Y-m-d' }}"
+                  oninput="this.classList.remove('invalid') ,this.value =  this.value.toUpperCase()" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="dc_field" class="form-label">DC Field Name</label>
+                <input type="name" class="form-control" id="dc_field" name="dc_field" placeholder="Enter DC Field Name"
+                  autofocus value="{{ contract.dc_field }}" oninput=" this.classList.remove('invalid')" />
+              </div>
+              <div class="mb-3 col-sm-6">
+                {% if contract.gc_note_required %}
+
+                <label for="gc_note_required" class="form-label">GC Note required ?</label>
+
+                <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="yes"
+                  id="gc_note_required_yes" onchange="toggleGcinput()" onclick="" checked>
+                <label class="form-check-label" for="gc_note_required_yes"  >Yes</label>
+
+                <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="no"
+                  id="gc_note_required_no"  onchange="toggleGcinput()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="gc_note_required_no">No</label>
+
+                <div class=" gap-2" id="gc_note_required" style="display: flex;">
+                  <div class="col-sm-6">
+                    <input type="text" class="form-control " id="gc_start" name="gc_start" placeholder="From" autofocus
+                      oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" value="{{ contract.gc_series_from }}" />
+                  </div> 
+                  
+
+                  {% else %}
+                  <label for="gc_note_required" class="form-label">GC Note required ?</label>
+
+                <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="yes"
+                  id="gc_note_required_yes" onchange="toggleGcinput()" onclick="">
+                <label class="form-check-label" for="gc_note_required_yes">Yes</label>
+
+                <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="no"
+                  id="gc_note_required_no" checked onchange="toggleGcinput()" onclick="add_extra_cost()">
+                <label class="form-check-label" for="gc_note_required_no">No</label>
+
+                <div class=" gap-2" id="gc_note_required" style="display: none;">
+                  <div class="col-sm-6">
+                    <input type="text" class="form-control " id="gc_start" name="gc_start" placeholder="From" autofocus
+                      oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+                  </div>
+                  
+
+                  {% endif %}
+
+                  <script>
+                    function toggleGcinput() {
+                      const yesRadio = document.getElementById("gc_note_required_yes");
+                      const inputWrapper = document.getElementById("gc_note_required");
+                      if (yesRadio.checked) {
+                        inputWrapper.style.display = "flex";
+                      } else {
+                        inputWrapper.style.display = "none";
+                      }
+                    } 
+                  </script>
+                </div>
+            </div>
+
+            <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Contact Person</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="address" class="form-label">Contact Person Name</label>
+                  <input type="text" class="form-control" id="cp_name" name="cp_name" value="{{contract.cp_name}}"
+                    placeholder="Enter contact person name" autofocus oninput="this.classList.remove('invalid')" />
+                </div>
+                <div class="mb-3">
+                  <label for="address" class="form-label">Contact Email</label>
+                  <input type="text" class="form-control" id="c_email" name="c_email" placeholder="Enter contact email"
+                    value="{{contract.c_email}}" autofocus oninput="this.classList.remove('invalid')" />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="c_designation" class="form-label">Contact Person Designation</label>
+                  <input type="text" class="form-control" id="c_designation" name="c_designation"
+                    placeholder="Enter contact person designation" autofocus oninput="this.classList.remove('invalid')"
+                    value="{{contract.c_designation}}" />
+                </div>
+                <div class="mb-3">
+                  <label for="address" class="form-label">Contact Number</label>
+                  <input type="text" class="form-control" id="c_number" name="c_number"
+                    placeholder="Enter contact number" value="{{contract.c_number}}" autofocus
+                    oninput="this.classList.remove('invalid')" />
+                </div>
+              </div>
+            </div>
+
+            <!-- <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Office Address</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="address" class="form-label">Adress</label>
+                  <input type="text" class="form-control" id="office_address" name="office_address"
+                    placeholder="Enter office address" autofocus oninput="this.classList.remove('invalid')"
+                    value="{{contract.office_address}}" />
+                </div>
+                <div class="mb-3">
+                  <label for="state" class="form-label">State</label>
+                  <input type="text" class="form-control" id="office_state" name="office_state"
+                    placeholder="Enter office state" oninput="this.classList.remove('invalid') "
+                    value="{{contract.office_state}}" />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="city" class="form-label">City</label>
+                  <input type="text" class="form-control" id="office_city" name="office_city"
+                    placeholder="Enter office city" autofocus oninput=" this.classList.remove('invalid')"
+                    value="{{contract.office_city}}" />
+                </div>
+                <div class="mb-3">
+                  <label for="pin" class="form-label">Pin code</label>
+                  <input type="text" class="form-control" id="office_pin" name="office_pin"
+                    placeholder="Enter office pin-code" maxlength="6" autofocus
+                    oninput="this.classList.remove('invalid')" value="{{contract.office_pin}}" />
+                </div>
+              </div>
+            </div> -->
+            <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Address</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="address" class="form-label">Adress</label>
+                  <input type="text" class="form-control" id="billing_address" name="billing_address"
+                    placeholder="Enter billing address" autofocus oninput="this.classList.remove('invalid')"
+                    value="{{contract.billing_address}}" />
+                </div>
+                <div class="mb-3">
+                  <label for="state" class="form-label">State</label>
+                  <input type="text" class="form-control" id="billing_state" name="billing_state"
+                    placeholder="Enter biiling state" oninput="this.classList.remove('invalid') "
+                    value="{{contract.billing_state}}" />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="city" class="form-label">City</label>
+                  <input type="text" class="form-control" id="billing_city" name="billing_city"
+                    placeholder="Enter billing city" autofocus oninput=" this.classList.remove('invalid')"
+                    value="{{contract.billing_city}}" />
+                </div>
+                <div class="mb-3">
+                  <label for="pin" class="form-label">Pin code</label>
+                  <input type="text" class="form-control" id="billing_pin" name="billing_pin"
+                    placeholder="Enter billing pin-code" maxlength="6" autofocus
+                    oninput="this.classList.remove('invalid')" value="{{ contract.billing_pin }}" />
+                </div>
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3">Rate Information</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="rate_type" class="form-label">Select Rate Type</label>
+                <select name="rate_type" id="rate_type" class="form-select form-control" onchange="toggleRateType()">
+                  <option value="" disabled>Select Rate Type</option>
+                  <option value="Taluka-Wise" {% if contract.rate_type == "Taluka-Wise" %} selected {% endif %}>
+                    Taluka-Wise </option>
+                  <option value="Kilometer-Wise" {% if contract.rate_type == "Kilometer-Wise" %} selected {%endif%}>
+                    Kilometer-Wise</option>
+                  <option value="Incometax-Wise" {% if contract.rate_type == "Incometax-Wise" %} selected {%endif%}>
+                    Slab-Wise</option>
+                  <option value="Distric-Wise" {% if contract.rate_type == "Distric-Wise" %} selected {% endif %}>
+                    Distric-Wise</option>
+                  <option value="Cumulative-Wise" {% if contract.rate_type == "Cumulative-Wise" %} selected {% endif %}>
+                    Cumulative-Wise</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Kilometer/Slab table -->
+            {% if rates %}
+            <div class="row" id="kmWiseTable" style="display: block;">
+              <div class="mb-3 col-sm-12">
+                <label class="form-label">Add Rate</label>
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>From Km</th>
+                      <th>To Km</th>
+                      <th>Choice</th>
+                      <th>Value</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rate-table">
+                    {% for rate in rates %}
+                    <tr id="slab_row_{{ forloop.counter }}">
+                      <td><input type="number" class="form-control" name="from_km[]" value="{{ rate.from_km }}"
+                          required></td>
+                      <td><input type="number" class="form-control" name="to_km[]" value="{{ rate.to_km }}" required>
+                      </td>
+                      {% if rate.mt > 0 %}
+                      <td>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                            onclick="updatePlaceholder(this)" checked>
+                          <label class="form-check-label">Fixed Rate</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                            value="mt_per_km" onclick="updatePlaceholder(this)">
+                          <label class="form-check-label">MT/KM</label>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt }}"
+                          placeholder="Enter MT" required step="any">
+                      </td>
+                      {% else %}
+                      <td>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                            onclick="updatePlaceholder(this)">
+                          <label class="form-check-label">Fixed Rate</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                            value="mt_per_km" onclick="updatePlaceholder(this)" checked>
+                          <label class="form-check-label">MT/KM</label>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt_per_km }}"
+                          placeholder="Enter MT per KM" required step="any">
+                      </td>
+                      {% endif %}
+
+                      <td>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">Delete</button>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
+              </div>
+            </div>
+            
+
+            {% endif %}
+
+            <!-- Taluka-Wise table -->
+            {% if taluka_rates %}
+            <div class="row" id="talukaWiseTable" style="display:block;">
+              <div class="mb-3 col-sm-12">
+                <label class="form-label">Add Districts & Talukas</label>
+                <div id="district-container">
+                  {% for district in taluka_district %}
+                  <div class="card p-3 mb-3" id="district_{{ forloop.counter }}">
+                    <div class="mb-2">
+                      <label>District Name</label>
+                      <input type="text" class="form-control" name="district_name[]" value="{{ district }}" required>
+                    </div>
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Taluka Name</th>
+                          <th>Rate</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="taluka_table_{{ forloop.counter }}">
+                        {% for taluka in taluka_rates %}
+                        {% if taluka.distric_name == district %}
+                        <tr>
+                          <td><input type="text" class="form-control"
+                              name="taluka_name_{{ forloop.parentloop.counter }}[]" value="{{ taluka.taluka_name }}"
+                              required></td>
+                          <td><input type="number" class="form-control"
+                              name="taluka_rate_{{ forloop.parentloop.counter }}[]" value="{{ taluka.mt }}" required step="any">
+                          </td>
+                          <td><button type="button" class="btn btn-danger btn-sm"
+                              onclick="removeRow(this)">Delete</button></td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                    <div class="d-flex gap-2 mt-2">
+                      <button type="button" class="btn btn-success" onclick="addTaluka('{{ forloop.counter }}')">+ Add
+                        Taluka</button>
+                      <button type="button" class="btn btn-danger"
+                        onclick="removeDistrict('{{ forloop.counter }}')">Remove District</button>
+                    </div>
+                  </div>
+                  {% endfor %}
+
+                </div>
+                <button type="button" class="btn btn-primary mt-2" onclick="addDistrict()">+ Add District</button>
+              </div>
+            </div>
+           
+
+            {% endif %}
+            <!-- distric table  -->
+            {% if rate_dist %}
+            <div id="districtWiseTable">
+              <div class="row">
+                <div class="mb-3 col-sm-12">
+                  <label class="form-label">District-Based Rates</label>
+                  <table class="table table-bordered" id="districtTable">
+                    <thead>
+                      <tr>
+                        <th>District Name</th>
+                        <th>Choice</th>
+                        <th>Rate</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="district-table-body">
+                      {% for dist in rate_dist %}
+                      <tr id="district_{{ forloop.counter }}">
+                        <td><input type="text" class="form-control" name="district_name[]" required
+                            value="{{ dist.distric_name }}"></td>
+                        {% if dist.mt > 0 %}
+                        <td>
+                          <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="district_choice_{{ forloop.counter }}"
+                              value="mt" checked onclick="updateDistrictPlaceholder(this)">
+                            <label class="form-check-label">MT</label>
+                          </div>
+                          <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="district_choice_{{ forloop.counter }}"
+                              value="mt_per_km" onclick="updateDistrictPlaceholder(this)">
+                            <label class="form-check-label">MT/KM</label>
+                          </div>
+                        </td>
+                        <td><input type="number" class="form-control" name="district_rate[]" placeholder="Enter MT"
+                            required value="{{ dist.mt }}" step="any"></td>
+
+                        {% else %}
+                        <td>
+                          <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="district_choice_{{ forloop.counter }}"
+                              value="mt" onclick="updateDistrictPlaceholder(this)">
+                            <label class="form-check-label">MT</label>
+                          </div>
+                          <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="district_choice_{{ forloop.counter }}"
+                              value="mt_per_km" checked onclick="updateDistrictPlaceholder(this)">
+                            <label class="form-check-label">MT/KM</label>
+                          </div>
+                        </td>
+                        <td><input type="number" class="form-control" name="district_rate[]" placeholder="Enter MT"
+                            required value="{{ dist.mt_per_km }}" step="any"></td>
+                        {% endif %}
+                        <td><button type="button" class="btn btn-danger btn-sm"
+                            onclick="removeRow(this)">Delete</button>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                  <button type="button" class="btn btn-success mt-2" onclick="addDistrictRow()">+ Add District</button>
+                </div>
+              </div>
+            </div>
+
+
+            {% endif %}
+
+            <!-- income tax -->
+            {% if rate_income %}
+            <div class="row" id="kmWiseTable" style="display: block;">
+              <div class="mb-3 col-sm-12">
+                <label class="form-label">Add Rate</label>
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>From Km</th>
+                      <th>To Km</th>
+                      <th>Choice</th>
+                      <th>Value</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rate-table">
+                    {% for rate in rate_income %}
+                    <tr id="slab_row_{{ forloop.counter }}">
+                      <td><input type="number" class="form-control" name="from_km[]" value="{{ rate.from_km }}"
+                          required></td>
+                      <td><input type="number" class="form-control" name="to_km[]" value="{{ rate.to_km }}" required>
+                      </td>
+                      {% if rate.mt > 0 %}
+                      <td>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                            onclick="updatePlaceholder(this)" checked>
+                          <label class="form-check-label">Fixed Rate</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                            value="mt_per_km" onclick="updatePlaceholder(this)">
+                          <label class="form-check-label">MT/KM</label>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt }}"
+                          placeholder="Enter MT" required step="any">
+                      </td>
+                      {% else %}
+                      <td>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                            onclick="updatePlaceholder(this)">
+                          <label class="form-check-label">Fixed Rate</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                            value="mt_per_km" onclick="updatePlaceholder(this)" checked>
+                          <label class="form-check-label">MT/KM</label>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt_per_km }}"
+                          placeholder="Enter MT per KM" required step="any">
+                      </td>
+                      {% endif %}
+
+                      <td>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">Delete</button>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
+              </div>
+            </div>
+            
+
+            {% endif %}
+
+            <!-- cumulative/Slab table -->
+            {% if rate_cumulative %}
+            <div class="row" id="kmWiseTable" style="display: block;">
+              <div class="mb-3 col-sm-12">
+                <label class="form-label">Add Rate</label>
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>From Km</th>
+                      <th>To Km</th>
+                      <th>Choice</th>
+                      <th>Value</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rate-table">
+                    {% for rate in rate_cumulative %}
+                    <tr id="slab_row_{{ forloop.counter }}">
+                      <td><input type="number" class="form-control" name="from_km[]" value="{{ rate.from_km }}"
+                          required></td>
+                      <td><input type="number" class="form-control" name="to_km[]" value="{{ rate.to_km }}" required>
+                      </td>
+                      {% if rate.mt > 0 %}
+                      <td>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                            onclick="updatePlaceholder(this)" checked>
+                          <label class="form-check-label">Fixed Rate</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                            value="mt_per_km" onclick="updatePlaceholder(this)">
+                          <label class="form-check-label">MT/KM</label>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt }}"
+                          placeholder="Enter MT" required step="any">
+                      </td>
+                      {% else %}
+                      <td>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                            onclick="updatePlaceholder(this)">
+                          <label class="form-check-label">Fixed Rate</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                            value="mt_per_km" onclick="updatePlaceholder(this)" checked>
+                          <label class="form-check-label">MT/KM</label>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt_per_km }}"
+                          placeholder="Enter MT per KM" required step="any">
+                      </td>
+                      {% endif %}
+
+                      <td>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">Delete</button>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
+              </div>
+            </div>
+            
+
+            {% endif %}
+
+
+            <!--  for js  -->
+            <!-- Kilometer/Slab table -->
+            <div class="row" id="kmWiseTable" style="display:none;">
+              <div class="mb-3 col-sm-12">
+                <label class="form-label">Add Rate</label>
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>From Km</th>
+                      <th>To Km</th>
+                      <th>Choice</th>
+                      <th>Value</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rate-table"></tbody>
+                </table>
+                <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
+              </div>
+            </div>
+
+            <!-- District-Wise Table -->
+            <div id="districtWiseTable" style="display:none;">
+              <div class="row">
+                <div class="mb-3 col-sm-12">
+                  <label class="form-label">District-Based Rates</label>
+                  <table class="table table-bordered" id="districtTable">
+                    <thead>
+                      <tr>
+                        <th>District Name</th>
+                        <th>Choice</th>
+                        <th>Rate</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="district-table-body"></tbody>
+                  </table>
+                  <button type="button" class="btn btn-success mt-2" onclick="addDistrictRow()">+ Add
+                    District</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Taluka-Wise table -->
+            <div class="row" id="talukaWiseTable" style="display:none;">
+              <div class="mb-3 col-sm-12">
+                <label class="form-label">Add Districts & Talukas</label>
+                <div id="district-container"></div>
+                <button type="button" class="btn btn-primary mt-2" onclick="addDistrict()">+ Add District</button>
+              </div>
+            </div>
+
+
+            <!-- loading rate / 1 unloading rate 1 / 2 unloading rate 2 -->
+
+            <!-- laoding rate -->
+            <div class="row">
+              {% if contract.loading_charge > 0 %}
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">loading Rate</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input name="loading_rate" class="form-check-input" type="radio" value="yes" id="loadingYes"
+                      onchange="toggleloadingInput()" checked>
+                    <label class="form-check-label" for="loadingYes">Yes</label>
+                  </div>
+                  <div class="form-check">
+                    <input name="loading_rate" class="form-check-input" type="radio" value="no" id="loadingNo"
+                       onchange="toggleloadingInput()">
+                    <label class="form-check-label" for="loadingNo">No</label>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3 col-sm-6" id="loadingChargeWrapper" style="display: block;">
+                <input type="number" id="loadingCharge" name="loading_charge" class="form-control"
+                  placeholder="Enter loading rate" value="{{ contract.loading_charge }}" >
+              </div>
+              {% else %}
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">loading Rate</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input name="loading_rate" class="form-check-input" type="radio" value="yes" id="loadingYes"
+                      onchange="toggleloadingInput()">
+                    <label class="form-check-label" for="loadingYes">Yes</label>
+                  </div>
+                  <div class="form-check">
+                    <input name="loading_rate" class="form-check-input" type="radio" value="no" id="loadingNo"
+                      checked onchange="toggleloadingInput()">
+                    <label class="form-check-label" for="loadingNo">No</label>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3 col-sm-6" id="loadingChargeWrapper" style="display: none;">
+                <input type="number" id="loadingCharge" name="loading_charge" class="form-control"
+                  placeholder="Enter loading rate">
+              </div>
+              {% endif %}
+            </div>
+            <!-- end loading rate -->
+
+
+
+            <!-- 1 -->
+            <div class="row">
+              {% if contract.unloading_charge_1 > 0 %}
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">Unloading Rate 1</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input name="unloading_rate_1" class="form-check-input" type="radio" value="yes" id="unloadingYes_1"
+                      onchange="toggleUnloadingInput_1()" checked>
+                    <label class="form-check-label" for="unloadingYes_1" >Yes</label>
+                  </div>
+                  <div class="form-check">
+                    <input name="unloading_rate_1" class="form-check-input" type="radio" value="no" id="unloadingNo_1"
+                       onchange="toggleUnloadingInput_1()">
+                    <label class="form-check-label" for="unloadingNo_1">No</label>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_1" style="display: block;">
+                <input type="number" id="unloadingCharge_1" name="unloading_charge_1" class="form-control"
+                  placeholder="Enter unloading rate 1" value="{{ contract.unloading_charge_1}}">
+              </div>
+              {% else %}
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">Unloading Rate 1</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input name="unloading_rate_1" class="form-check-input" type="radio" value="yes" id="unloadingYes_1"
+                      onchange="toggleUnloadingInput_1()">
+                    <label class="form-check-label" for="unloadingYes_1">Yes</label>
+                  </div>
+                  <div class="form-check">
+                    <input name="unloading_rate_1" class="form-check-input" type="radio" value="no" id="unloadingNo_1"
+                      checked onchange="toggleUnloadingInput_1()">
+                    <label class="form-check-label" for="unloadingNo_1">No</label>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_1" style="display: none;">
+                <input type="number" id="unloadingCharge_1" name="unloading_charge_1" class="form-control"
+                  placeholder="Enter unloading rate 1">
+              </div>
+              {% endif %}
+            </div>
+            <!-- end 1 -->
+
+            <!-- 2 -->
+
+            <div class="row">
+              {% if contract.unloading_charge_2 > 0 %}
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">Unloading Rate 2</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input name="unloading_rate_2" class="form-check-input" type="radio" value="yes" id="unloadingYes_2"
+                      onchange="toggleUnloadingInput_2()" checked>
+                    <label class="form-check-label" for="unloadingYes_2" >Yes</label>
+                  </div>
+                  <div class="form-check">
+                    <input name="unloading_rate_2" class="form-check-input" type="radio" value="no" id="unloadingNo_2"
+                       onchange="toggleUnloadingInput_2()">
+                    <label class="form-check-label" for="unloadingNo_2">No</label>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_2" style="display: block;">
+                <input type="number" id="unloadingCharge_2" name="unloading_charge_2" class="form-control"
+                  placeholder="Enter unloading rate 2" value="{{ contract.unloading_charge_2 }}">
+              </div>
+              {% else %}
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">Unloading Rate 2</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input name="unloading_rate_2" class="form-check-input" type="radio" value="yes" id="unloadingYes_2"
+                      onchange="toggleUnloadingInput_2()">
+                    <label class="form-check-label" for="unloadingYes_2">Yes</label>
+                  </div>
+                  <div class="form-check">
+                    <input name="unloading_rate_2" class="form-check-input" type="radio" value="no" id="unloadingNo_2"
+                      checked onchange="toggleUnloadingInput_2()">
+                    <label class="form-check-label" for="unloadingNo_2">No</label>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_2" style="display: none;">
+                <input type="number" id="unloadingCharge" name="unloading_charge_2" class="form-control"
+                  placeholder="Enter unloading rate 2">
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- end 2 -->
+
+            <script>
+              function toggleUnloadingInput_1() {
+                const yesRadio = document.getElementById("unloadingYes_1");
+                const inputWrapper = document.getElementById("unloadingChargeWrapper_1");
+
+                if (yesRadio.checked) {
+                  inputWrapper.style.display = "block";  // Show input
+                } else {
+                  inputWrapper.style.display = "none";   // Hide input
+                }
+              }
+
+              function toggleUnloadingInput_2() {
+                  const yesRadio = document.getElementById("unloadingYes_2");
+                  const inputWrapper = document.getElementById("unloadingChargeWrapper_2");
+
+                  if (yesRadio.checked) {
+                    inputWrapper.style.display = "block";  // Show input
+                  } else {
+                    inputWrapper.style.display = "none";   // Hide input
+                  }
+                }
+
+                function toggleloadingInput() {
+                  const yesRadio = document.getElementById("loadingYes");
+                  const inputWrapper = document.getElementById("loadingChargeWrapper");
+
+                  if (yesRadio.checked) {
+                    inputWrapper.style.display = "block";  // Show input
+                  } else {
+                    inputWrapper.style.display = "none";   // Hide input
+                  }
+                }
+
+            </script>
+            <h5 class="text-primary fw-semibold mb-3">Select Field You Want To in Invoice</h5>
+            <div class="row">
+              <div class="col-sm-3">
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="sr_no" name="field" id="sr_no" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Sr. no.</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="dep_date" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Depature date</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="truck_no" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Truck no.</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="dc_field" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Dc Field</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="party_name" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Party name</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="destination" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Destination</label>
+                </div>
+              </div>
+              <div class="col-sm-3">
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="taluka" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">taluka</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="district" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">District</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="product_name" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Product name</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="weight" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Weight</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="km" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Kilo meter</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="rate" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Rate</label>
+                </div>
+              </div>
+              <div class="col-sm-3">
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="luggage" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Luggage</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="unloading_charge_1" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">unloading_charge 1</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="unloading_charge_2" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">unloading_charge 2</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="loading_charge" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">loading_charge</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="amount" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">Total Amount</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="gc_note" name="field" checked="">
+                  <label class="form-check-label" for="defaultCheck1">GC Note</label>
+                </div>
+              </div>
+            </div>
+
+            <script>
+              let fields = "{{ contract.invoice_fields }}"
+              let f_fields = document.querySelectorAll('[name="field"]')
+              f_fields.forEach((field) => {
+                if (!fields.includes(field.value)) {
+                  field.removeAttribute('checked', true)
+                }
+              })
+            </script>
+
+            <div class="col-sm-6 mt-4">
+              <button class="btn btn-primary d-grid w-100">Save</button>
+            </div>
+          </form>
+
+
+        </div>
+      </div>
+    </div>
+    <!-- Register Card -->
+  </div>
+</div>
+</div>
+<script src="{% static 'js/rate-tabels.js' %} "></script>
+{% endblock %}

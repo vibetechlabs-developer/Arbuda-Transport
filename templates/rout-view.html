@@ -1,0 +1,119 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Rout Master </title>
+{% endblock %}
+
+{% block content %}
+
+<div class="content-wrapper">
+    <!-- Content -->
+
+    <div class="container-xxl grow container-p-y ">
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Routs</h4>
+        </div>
+        <!-- <div class="filter-tab mb-4 d-flex align-items-center gap-2">
+            <h5 class="mb-0 me-2">Filters </h5>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="users"
+                    class="text-white text-decoration-none">All</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=admin"
+                    class="text-white text-decoration-none">admin</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=client"
+                    class="text-white text-decoration-none">client</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=distributor"
+                    class="text-white text-decoration-none">distributor</a></button>
+        </div> -->
+        <!-- Responsive Table -->
+
+        <div class="card" style="overflow: auto;
+    height: 345px;">
+            <h5 class="card-header"></h5>
+            <div class="table-responsive text-nowrap">
+                <table class="table">
+                    <thead style="position: sticky;
+    top: 0px;
+    background: white;
+    outline: 2px solid #d9dee3;">
+                        <tr class="text-nowrap">
+                            <th class="d-flex align-items-center">ID</th>
+                            <th>Contract ID</th>
+                            <th class="">From Center</th>
+                            <th>Destination</th>
+                            <th>Dilevery Taluka</th>
+                            <th>Dilevery District</th>
+                            <th>KiloMiter</th>
+                        </tr>
+                    </thead>
+                    <tbody style="border-bottom: none;">
+                        {% for route in all_routes %}
+                        <tr>
+                            <td>{{ route.id }}</td>
+                            <td>{{ route.contract_id}}</td>
+                            <td>{{ route.from_center }}</td>
+                            <td>{{ route.destination }}</td>
+                            <td>{{ route.taluka }}</td>
+                            <td>{{ route.district }}</td>
+                            <td>{{ route.km }}</td>
+                            <!-- <td style="text-align: center; ">
+
+                                <a href="rout-form-update?update={{ route.id }}">
+                                    <button style="text-align: center; padding: 5px 10px;" type="button"
+                                        class="btn btn-outline-primary"><i class='bx  bx-edit'
+                                            style="font-size: 1rem;"></i>
+                                    </button>
+                                </a>
+                                <button style="text-align: center; padding: 5px 10px;" type="button"
+                                    class="btn btn-outline-primary" data-bs-toggle="modal"
+                                    data-bs-target="#modalCenter{{ route.id }}delete"><i class='bx  bx-trash'
+                                        style="font-size: 1rem;"></i></button>
+                                <div class="modal fade" id="modalCenter{{ route.id }}delete" tabindex="-1"
+                                    aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalCenterTitle">Delete
+                                                    {{ route.source }} to {{ route.destination }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body text-start">
+                                                Are you sure for deleting this rout ? <br>
+                                                if you delete this rout all entries linked with it will be deleted
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary"
+                                                    data-bs-dismiss="modal">
+                                                    Close
+                                                </button>
+                                                <a href="?delete={{ route.id }}"><button style="text-align: center;"
+                                                        type="button" class="btn btn-primary">Delete</button></a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td> -->
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!--/ Responsive Table -->
+    </div>
+    <!-- / Content -->
+
+
+
+    <div class="content-backdrop fade"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script>
+    document.querySelectorAll('.ts-select').forEach((el) => {
+
+        let settings = {};
+        new TomSelect(el, settings);
+    });
+</script>
+{% endblock %}

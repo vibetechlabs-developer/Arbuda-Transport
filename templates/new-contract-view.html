@@ -1,0 +1,158 @@
+{% extends 'masterpage.html' %}
+
+{% block content %}
+
+<div class="content-wrapper">
+    <!-- Content -->
+
+    <div class="container-xxl grow container-p-y">
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Contracts</h4>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="new-contract-form"
+                    class="text-white text-decoration-none">Add Contract</a></button>
+        </div>
+        <!-- <div class="filter-tab mb-4 d-flex align-items-center gap-2">
+            <h5 class="mb-0 me-2">Filters </h5>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="users"
+                    class="text-white text-decoration-none">All</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=admin"
+                    class="text-white text-decoration-none">admin</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=client"
+                    class="text-white text-decoration-none">client</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=distributor"
+                    class="text-white text-decoration-none">distributor</a></button>
+        </div> -->
+        <!-- Responsive Table -->
+        <div class="card" style="overflow: auto;
+    height: 345px;">
+            <h5 class="card-header"></h5>
+            <div class="table-responsive text-nowrap">
+                <table class="table">
+                    <thead style="position: sticky;
+    top: 0px;
+    background: white;
+    outline: 2px solid #d9dee3;">
+                        <tr class="text-nowrap">
+                            <th class="d-flex align-items-center">ID</th>
+                            <th >pdf</th>
+                            <th class="">Status</th>
+                            <th>Bill Number</th>
+                            <th>Bill Date</th>
+                            <th>Company name</th>
+                            <th>address</th>
+                            <th>GST No.</th>
+                            <th>Product</th>
+                            <th>Challan No.</th>
+                            <th>Loading Date</th>
+                            <th>Truck no</th>
+                            <th>Party Name</th>
+                            <th>hsn code</th>
+                            <th>rack name</th>
+                            <th>destination</th>
+                            <th>km</th>
+                            <th>rate</th>
+                            <th>qty</th>
+                            <th>Transportation Amount</th>
+                            <th>unload Amount</th>
+                            <th>load Amount</th>
+                            <th>destination load Amount</th>
+                            <th>grand total</th>
+                            <th>Due date</th>
+                            <th style="text-align: center;">Actions</th>
+
+                        </tr>
+                    </thead>
+                    <tbody style="border-bottom: none;">
+                        {% for contract in all_contract %}
+                        <tr>
+                            <td>{{ contract.id }}</td>
+                            <td><a href="generate-rake-bill-{{contract.id}}">
+                                    <button style="text-align: center; padding: 5px 10px;" type="button"
+                                        class="btn btn-outline-primary">
+                                        <i class='bx  bx-file' style="font-size: 1rem;"></i>
+                                    </button>
+                                </a> </td>
+                            <td>
+                                {% if contract.payment_status == 'paid' %}
+                                <span class="badge bg-label-success">Paid</span>
+                                {% else %}
+                                <span class="badge bg-label-danger">Unpaid</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ contract.bill_no }}</td>
+                            <td>{{ contract.bill_date }}</td>
+                            <td>{{ contract.client_name }}</td>
+                            <td>{{ contract.c_address }}</td>
+                            <td>{{ contract.c_gst }}</td>
+                            <td>{{ contract.product }}</td>
+                            <td>{{ contract.chalan_no }}</td>
+                            <td>{{ contract.loading_date }}</td>
+                            <td>{{ contract.truck_no }}</td>
+                            <td>{{ contract.party_name }}</td>
+                            <td>{{ contract.hsn_code }}</td>
+                            <td>{{ contract.rack_name }}</td>
+                            <td>{{ contract.destination }}</td>
+                            <td>{{ contract.km }}</td>
+                            <td>{{ contract.rate }}</td>
+                            <td>{{ contract.qty }}</td>
+                            <td>{{ contract.tra_amount }}</td>
+                            <td>{{ contract.unload_amount }}</td>
+                            <td>{{ contract.loading_amount }}</td>
+                            <td>{{ contract.de_unloading_amount }}</td>
+                            <td>{{ contract.grand_total }}</td>
+                            <td>{{ contract.due_date }}</td>
+                            <td style="text-align: center; ">
+
+                                <!-- <a href="contract-form-update?update={{ contract.id }}">
+                                    <button style="text-align: center; padding: 5px 10px;" type="button"
+                                        class="btn btn-outline-primary"><i class='bx  bx-edit'
+                                            style="font-size: 1rem;"></i>
+                                    </button>
+                                </a> -->
+                                <button style="text-align: center; padding: 5px 10px;" type="button"
+                                    class="btn btn-outline-primary" data-bs-toggle="modal"
+                                    data-bs-target="#modalCenter{{ contract.id }}delete"><i class='bx  bx-trash'
+                                        style="font-size: 1rem;"></i></button>
+                                <div class="modal fade" id="modalCenter{{ contract.id }}delete" tabindex="-1"
+                                    aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalCenterTitle">Delete
+                                                    {{ contract.tender_title }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body text-start">
+                                                Are you sure for deleting this User ? <br>
+                                                if you delete this contract all entries linked with it will be deleted
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary"
+                                                    data-bs-dismiss="modal">
+                                                    Close
+                                                </button>
+                                                <a href="?delete={{ contract.id }}"><button style="text-align: center;"
+                                                        type="button" class="btn btn-primary">Delete</button></a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!--/ Responsive Table -->
+    </div>
+    <!-- / Content -->
+
+
+
+    <div class="content-backdrop fade"></div>
+</div>
+
+
+{% endblock %}

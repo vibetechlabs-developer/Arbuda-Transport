@@ -1,0 +1,122 @@
+{% extends 'masterpage.html' %}
+<!-- Content -->
+{% block title %}
+<title>ARBUDA | Your Company Profile </title>
+{% endblock %}
+
+{% block content %}
+
+<div class="container-xxl">
+  <div class="authentication-wrapper authentication-basic container-p-y">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <!-- Register Card -->
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST" onsubmit="return company_profile_validation(this)" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row">
+              <h5 class="text-primary fw-semibold mb-3">Company Information</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="company_name" class="form-label">Company Name</label>
+                  <input type="text" class="form-control" id="company_name" name="company_name"
+                    placeholder="Enter your Company Name" oninput="this.classList.remove('invalid')"
+                    value="{{company.company_name}}" readonly />
+                </div>
+                
+              </div>
+            </div>
+            <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Legal Information</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="company_name" class="form-label">GST Number</label>
+                  <input type="text" class="form-control" id="gst_number" name="gst_number"
+                    placeholder="Enter your gst number" value="{{company.gst_number}}"
+                    oninput="this.classList.remove('invalid')" readonly />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="gstin" class="form-label">Pan Number</label>
+                  <input type="text" class="form-control" id="pan_number" name="pan_number"
+                    placeholder="Enter your pan number" autofocus
+                    oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" {% if profile.pan_number %} value="{{ profile.pan_number }}" readonly {% endif %} required/>
+                </div>
+              </div>
+            </div>
+            <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Address Information</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="address" class="form-label">Adress</label>
+                  <input type="text" class="form-control" id="address" name="address" placeholder="Enter your address"
+                    autofocus oninput="this.classList.remove('invalid')" {% if profile.address %}
+                    value="{{ profile.address }}" {% endif %} />
+                </div>
+                <div class="mb-3">
+                  <label for="state" class="form-label">State</label>
+                  <input type="text" class="form-control" id="state" name="state" placeholder="Enter your state"
+                    oninput="this.classList.remove('invalid') " {% if profile.state %} value="{{ profile.state }}" {% endif %} />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="city" class="form-label">City</label>
+                  <input type="text" class="form-control" id="city" name="city" placeholder="Enter your city" autofocus
+                    oninput=" this.classList.remove('invalid')" {% if profile.city %} value="{{ profile.city }}" {% endif %} />
+                </div>
+                <div class="mb-3">
+                  <label for="pin" class="form-label">Pin code</label>
+                  <input type="text" class="form-control" id="pin" name="pin" placeholder="Enter your pin code"
+                    maxlength="6" autofocus oninput="this.classList.remove('invalid')" {% if profile.pincode %} value="{{ profile.pincode }}" {% endif %} />
+                </div>
+              </div>
+            </div>
+            <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Conatct Information</h5>
+                <div class="mb-3 col-sm-6">
+                  <label for="email" class="form-label">Email</label>
+                  <input type="text" class="form-control" id="email" name="email" placeholder="Enter your email"
+                    autofocus oninput="this.classList.remove('invalid')" value="{{ company.email }}" readonly />
+                </div>
+                <div class="mb-3 col-sm-6">
+                  <label for="phone" class="form-label">Phone</label>
+                  <input type="text" class="form-control" id="phone" name="phone" placeholder="Enter your phone"
+                    oninput="this.classList.remove('invalid') " value="{{ company.mobile  }}" readonly />
+                </div>
+             
+            </div>
+            <div class="row mt-2">
+              <h5 class="text-primary fw-semibold mb-3">Branding</h5>
+              <div class="col-sm-6">
+                <div class="mb-3">
+                  <label for="logo" class="form-label">Logo</label>
+                  <div class="input-group">
+                    <input type="file" class="form-control" id="logo" name="logo" accept="image/*">
+                  </div>
+                </div>
+              </div>
+              
+            </div>
+
+            <div class="col-sm-6">
+              {% if company.company_profile_status %}
+              <input type="text" value="update" name="p_status" hidden>
+              <button class="btn btn-primary d-grid w-100">Update</button>
+              {%else%}
+              <button type="submit" class="btn btn-primary d-grid w-100">Save</button>
+              {% endif %}
+            </div>
+          </form>
+
+
+        </div>
+      </div>
+    </div>
+    <!-- Register Card -->
+  </div>
+</div>
+</div>
+
+{% endblock %}

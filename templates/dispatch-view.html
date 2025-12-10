@@ -1,0 +1,192 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Dispatch Register </title>
+{% endblock %}
+
+{% block content %}
+
+<div class="content-wrapper">
+    <!-- Content -->
+
+    <div class="container-xxl grow container-p-y">
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Dispatch Register</h4>
+            <div class="d-flex gap-3">
+                <!-- <button type="button" class="btn btn-primary" style="height: 40px;"><a href="download-excel"
+                        class="text-white text-decoration-none">Export To Excel</a></button> -->
+                <button type="button" class="btn btn-primary" style="height: 40px;"><a href="dispatch-form"
+                        class="text-white text-decoration-none">Add Dispatch</a></button>
+            </div>
+        </div>
+        <!-- <div class="filter-tab mb-4 d-flex align-items-center gap-2">
+            <h5 class="mb-0 me-2">Filters </h5>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="users"
+                    class="text-white text-decoration-none">All</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=admin"
+                    class="text-white text-decoration-none">admin</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=client"
+                    class="text-white text-decoration-none">client</a></button>
+            <button type="button" class="btn btn-primary" style="height: 40px;"><a href="?filter=distributor"
+                    class="text-white text-decoration-none">distributor</a></button>
+        </div> -->
+        <!-- Responsive Table -->
+        <div class="card" style="overflow: auto;
+    height: 345px;">
+            <form method="get" class="d-flex mb-3 mt-3 ms-1 me-3 justify-content-end gap-1 flex-wrap">
+                <div class="p-0 d-flex justify-content-center align-items-center gap-2">
+                    <label for="">FROM</label>
+                    <input type="date" class="form-control" name="start_date" value="{{ start_date }}" class="p-0">
+                    
+                </div>
+                <div class="p-0 ms-2 d-flex justify-content-center align-items-center gap-2">
+                    <label for="" >TO</label>
+                    <input type="date" class="form-control" name="end_date" value="{{ end_date }}" >
+                </div>
+                <div class="p-0">
+                    <input type="text" class="form-control" name="s_challan_no" value="{{ s_challan_no }}"
+                        id="searchBox" placeholder="Search by Challan No" />
+                </div>
+                <div class="p-0 ">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+                {% if s_challan_no or start_date or end_date %}
+                <div class="p-0">
+                    <a href="{% url 'dispatch-view' %}" class="btn btn-primary">
+                        Reset
+                    </a>
+                </div>
+                {% endif %}
+            </form>
+            <div class="table-responsive text-nowrap">
+                <table class="table">
+                    <thead style="position: sticky;
+                            top: 0px;
+                            background: white;
+                            outline: 2px solid #d9dee3;">
+                        <tr class="text-nowrap">
+                            <th class="">sr. NO.</th>
+                            <th style="text-align: center;">Actions</th>
+                            <th>Dep Date</th>
+                            <th>Challan No.</th>
+                            <th>Truck No</th>
+                            <th>Product Name</th>
+                            <th>Party Name</th>
+                            <th>From</th>
+                            <th>Destination</th>
+                            <th>Taluka</th>
+                            <th>District</th>
+                            <th>KM</th>
+                            <th>Weight</th>
+                            <th>Rate</th>
+                            <th>Total Freight</th>
+                            <th>Unloading 1</th>
+                            <th>Unloading 2</th>
+                            <th>loading </th>
+                            <th>Grand Total</th>
+                            <th>Truck Booking Rate</th>
+                            <th>Total Paid</th>
+                            <th>Advance Paid</th>
+                            <th>Pending Amount</th>
+                            <th>Net Profit</th>
+                            <th>Created At</th>
+
+                        </tr>
+                    </thead>
+                    <tbody style="border-bottom: none;">
+                        {% for dispatch in all_dispatch %}
+                        <tr>
+                            <td>{{ forloop.revcounter }}</td>
+                            <td style="text-align: center; ">
+                                <!-- <a href="dispatch-update?dispatch_id={{ dispatch.id }}">
+                                    <button style="text-align: center; padding: 5px 10px;" type="button"
+                                        class="btn btn-outline-primary"><i class='bx  bx-edit'
+                                            style="font-size: 1rem;"></i>
+                                    </button>
+                                </a> -->
+                                <button style="text-align: center; padding: 5px 10px;" type="button"
+                                    class="btn btn-outline-primary" data-bs-toggle="modal"
+                                    data-bs-target="#modalCenter{{ dispatch.id }}delete"><i class='bx  bx-trash'
+                                        style="font-size: 1rem;"></i></button>
+                                <div class="modal fade" id="modalCenter{{ dispatch.id }}delete" tabindex="-1"
+                                    aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalCenterTitle">Delete
+                                                    Record no. {{ dispatch.id }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body text-start">
+                                                Are you sure for deleting this User ? <br>
+                                                if you delete this contract all entries linked with it will be deleted
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary"
+                                                    data-bs-dismiss="modal">
+                                                    Close
+                                                </button>
+                                                <a href="?delete={{ dispatch.id }}"><button style="text-align: center;"
+                                                        type="button" class="btn btn-primary">Delete</button></a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ dispatch.dep_date|date:'d-m-Y' }}</td>
+                            <td>{{ dispatch.challan_no }}</td>
+                            <td>{{ dispatch.truck_no }}</td>
+                            <td>{{ dispatch.product_name }}</td>
+                            <td>{{ dispatch.party_name }}</td>
+                            <td>{{ dispatch.from_center }}</td>
+                            <td>{{ dispatch.destination }}</td>
+                            <td>{{ dispatch.taluka }}</td>
+                            <td>{{ dispatch.district }}</td>
+                            <td>{{ dispatch.km }}</td>
+                            <td>{{ dispatch.weight }}</td>
+                            <td>{{ dispatch.rate }}</td>
+                            <td>{{ dispatch.totalfreight }}</td>
+                            <td>{{ dispatch.unloading_charge_1 }}</td>
+                            <td>{{ dispatch.unloading_charge_2 }}</td>
+                            <td>{{ dispatch.loading_charge }}</td>
+                            <td>{{ dispatch.grand_total }}</td>
+                            <td>{{ dispatch.truck_booking_rate }}</td>
+                            <td>{{ dispatch.total_paid_truck_onwer }}</td>
+                            <td>{{ dispatch.advance_paid }}</td>
+                            <td>{{ dispatch.panding_amount }}</td>
+                            <td>{{ dispatch.net_profit }}</td>
+                            <td>{{ dispatch.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+            </div>
+
+        </div>
+    </div>
+    <!--/ Responsive Table -->
+</div>
+<!-- / Content -->
+
+
+
+<div class="content-backdrop fade"></div>
+</div>
+
+<script>
+    function filterTable(value) {
+        const params = new URLSearchParams(window.location.search);
+        addQuery("challan_no", value)
+    }
+
+    function addQuery(key, value) {
+        const url = new URL(window.location.href);
+        url.searchParams.set(key, value);
+        window.location.href = url.toString(); // refresh page
+    }
+</script>
+
+
+{% endblock %}

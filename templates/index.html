@@ -1,0 +1,148 @@
+{% extends 'masterpage.html' %}
+{% load humanize  %}
+{% block title %}
+<title>ARBUDA | Dashboard </title>
+{% endblock %}
+{% block content %}
+<style>
+    .bg-light-danger {
+        background-color: #ff3e1de8;
+    }
+</style>
+<div class="container-xxl mt-3">
+    <div class="row">
+        <div class="col-sm-3">
+            <div class="card">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title  fw-semibold fs-6">Total Contract <br> Signed</h5>
+                        <p class="mb-4 text-dark fs-1 fw-bold">
+                            {{ total_contracts }}
+                        </p>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card bg-secondary">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title text-white fw-semibold fs-6">Total Dispatch <br> Created</h5>
+                        <p class="mb-4 text-white fs-1 fw-bold">
+                            {{ total_dispatches }}
+                        </p>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card ">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title   fw-semibold fs-6">Total Invoice <br> Genreted</h5>
+                        <p class="mb-4 text-dark fs-1 fw-bold">
+                            {{ total_invoices }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card bg-secondary ">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title text-white  fw-semibold fs-6">Total GC Note <br> Created</h5>
+                        <p class="mb-4 text-white fs-1 fw-bold">
+                            {{ total_gc_notes }}
+                        </p>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-4">
+        <div class="col-sm-3">
+            <div class="card bg-primary">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title text-white fw-semibold fs-6">Total Amount <br> From Company</h5>
+                        <p class="mb-4 text-white fs-3 fw-bold">
+                            &#8377; {{ totals.total_amount|floatformat:0|intcomma }}
+                        </p>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card bg-light-danger">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title text-white fw-semibold fs-6">Total Advance Payment <br> To Truck Onwer
+                        </h5>
+                        <p class="mb-4 text-white fs-3 fw-bold">
+                            &#8377; {{ totals.total_paid_truck|floatformat:0|intcomma }}
+                        </p>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card bg-warning">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title text-white fw-semibold fs-6">Total Pandding Amount <br> Of Truck Onwer
+                        </h5>
+                        <p class="mb-4 text-white fs-3 fw-bold">
+                            &#8377; {{ totals.total_pending_amount|floatformat:0|intcomma }}
+                        </p>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card bg-success">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title text-white  fw-semibold fs-6">Total Profit <br> We Have</h5>
+                        <p class="mb-4 text-white fs-3 fw-bold">
+                            &#8377; {{ totals.total_profit|floatformat:0|intcomma }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3 mt-4 mb-4">
+            <div class="card bg-secondary">
+                <div class="d-flex align-items-end">
+                    <div class="p-3 card-body">
+                        <h5 class="card-title text-white fw-semibold fs-6">Total Charges <br> </h5>
+                        <p class=" text-white fs-3 fw-bold mb-1">
+                            &#8377; {{ sum_charges|floatformat:0|intcomma }}
+                        </p>
+                        <h3 class="card-title text-white fw-semibold fs-6 m-0">Total Loading <br> </h3>
+                        <p class=" text-white fs-5 fw-bold mb-1">
+                            &#8377; {{ total_charges.total_loading_charges|floatformat:0|intcomma }}
+                        </p>
+                        <h3 class="card-title text-white fw-semibold fs-6 m-0">Total Unloading <br> </h3>
+                        <p class=" text-white fs-5 fw-bold mb-1">
+                            &#8377; {{ total_charges.total_unloading_charges_1|floatformat:0|intcomma }}
+                        </p>
+                        <h3 class="card-title text-white fw-semibold fs-6 m-0">Total Unloading 2 <br> </h3>
+                        <p class=" text-white fs-5 fw-bold m-0">
+                            &#8377; {{ total_charges.total_unloading_charges_2|floatformat:0|intcomma }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>  
+</div>
+
+{% endblock %}
