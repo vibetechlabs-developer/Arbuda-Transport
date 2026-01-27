@@ -1,8 +1,18 @@
 from django.http import JsonResponse
 from erp.utils.decorators import session_required
-from transport.models import T_Contract, Destination , Dispatch, Invoice, GC_Note
+from transport.models import (
+    T_Contract,
+    Destination,
+    Dispatch,
+    Invoice,
+    GC_Note,
+    Rate,
+    Rate_IncomeTax,
+    Rate_Cumulative,
+    Rate_taluka,
+    Rate_District,
+)
 import re
-from transport.models import Rate, Rate_IncomeTax, Rate_Cumulative, Rate_taluka, Rate_District
 from decimal import Decimal
 
 ## CONTRACT DETAILS FETCHING ##
@@ -52,16 +62,71 @@ def get_destination_details(request):
         })
     except T_Contract.DoesNotExist:
         return JsonResponse({'error': 'not found'}, status=404)
+
+
+@session_required
+def check_challan_duplicate(request):
+    challan_no = request.GET.get('challan_no', '').strip()
+    dispatch_id = request.GET.get('dispatch_id')  # For update form, exclude current dispatch
+    company_id = request.session['company_info']['company_id']
+    
+    if not challan_no:
+        return JsonResponse({'exists': False, 'valid': False})
+    
+    # Check for duplicate challan_no (case-insensitive and trimmed)
+    query = Dispatch.objects.filter(challan_no__iexact=challan_no, company_id=company_id)
+    
+    # If updating, exclude the current dispatch
+    if dispatch_id:
+        query = query.exclude(id=dispatch_id)
+    
+    exists = query.exists()
+    
+    return JsonResponse({
+        'exists': exists,
+        'valid': not exists
+    })
     
 
 
 @session_required
-def get_dispacth(request):
+def get_districts(request):
+    """Fetch all unique districts for a given contract"""
     dcontract_id = request.GET.get('contract-id')
     try:
         contract = T_Contract.objects.get(id=dcontract_id)
+        # Get unique districts from dispatches for this contract
+        districts = Dispatch.objects.filter(
+            contract_id=dcontract_id,
+            company_id=request.session['company_info']['company_id']
+        ).values_list('district', flat=True).distinct().order_by('district')
+        
+        # Filter out empty/null districts
+        districts = [d for d in districts if d]
+        
+        return JsonResponse({
+            'districts': list(districts),
+        })
+    except T_Contract.DoesNotExist:
+        return JsonResponse({'error': 'contract not found'}, status=404)
+
+@session_required
+def get_dispacth(request):
+    dcontract_id = request.GET.get('contract-id')
+    district_filter = request.GET.get('district', '').strip()
+    try:
+        contract = T_Contract.objects.get(id=dcontract_id)
         try:
-            dispatch = Dispatch.objects.filter(contract_id=dcontract_id , company_id = request.session['company_info']['company_id'], inv_status = False).values().order_by('dep_date')
+            dispatch = Dispatch.objects.filter(
+                contract_id=dcontract_id,
+                company_id=request.session['company_info']['company_id']
+            )
+            
+            # Filter by district if provided
+            if district_filter:
+                dispatch = dispatch.filter(district=district_filter)
+            
+            dispatch = dispatch.values().order_by('dep_date')
 
             inv = Invoice.objects.filter(company_id = request.session['company_info']['company_id'], contract_id = dcontract_id).order_by('-id').first()
 
@@ -92,23 +157,23 @@ def get_dispacth(request):
 @session_required
 def get_ninv_dispacth(request):                  # ninv means not in invoice dispatch
     dbill_id = request.GET.get('bill-id')
+    if not dbill_id:
+        return JsonResponse({'error': 'bill-id is required'}, status=400)
+    
     try:
         invoice = Invoice.objects.get(id=dbill_id , company_id = request.session['company_info']['company_id'])
         contract = T_Contract.objects.get(id=invoice.contract_id.id)
-        try:
-            dispatch = Dispatch.objects.filter(contract_id=invoice.contract_id.id , company_id = request.session['company_info']['company_id'], inv_status = False).values().order_by('dep_date')
+        dispatch = Dispatch.objects.filter(contract_id=invoice.contract_id.id , company_id = request.session['company_info']['company_id'], inv_status = False).values().order_by('dep_date')
 
-            return JsonResponse({
-                'fields' : contract.invoice_fields,
-                'destinations': list(dispatch),
-            })
-        except Dispatch.DoesNotExist:
-            return JsonResponse({
-               'error': 'not dispatch found' 
-            })
+        return JsonResponse({
+            'fields' : contract.invoice_fields,
+            'destinations': list(dispatch),
+        })
 
+    except Invoice.DoesNotExist:
+        return JsonResponse({'error': 'invoice not found'}, status=404)
     except T_Contract.DoesNotExist:
-        return JsonResponse({'error': 'not con found'}, status=404)
+        return JsonResponse({'error': 'contract not found'}, status=404)
 
 
 
@@ -160,7 +225,8 @@ def get_invoice(request):
             return JsonResponse({
            'bill_date': invoice.Bill_date,  
             'contract_no' : contract.contract_no, 
-            'contract_id' : contract.id,     
+            'contract_id' : contract.id,
+            'rr_number' : invoice.rr_number or '',     
             'destinations' : list(dispatch),
             'fields' : contract.invoice_fields,
         })
@@ -417,4 +483,66 @@ def get_dispacth_product(request):
         })
 
     
+@session_required
+def get_last_dispatch_details(request):
+    """
+    Return the last dispatch entered for a given contract (optionally filtered by product_name)
+    so the dispatch form can be auto-filled.
+    """
+    contract_id = request.GET.get("contract-id")
+    product_name = request.GET.get("product_name")
+
+    if not contract_id:
+        return JsonResponse({"error": "contract-id is required"}, status=400)
+
+    qs = Dispatch.objects.filter(
+        contract_id_id=contract_id,
+        company_id_id=request.session["company_info"]["company_id"],
+    )
+
+    if product_name:
+        qs = qs.filter(product_name=product_name)
+
+    last_dispatch = qs.order_by("-dep_date", "-id").first()
+
+    if not last_dispatch:
+        return JsonResponse({"found": False})
+
+    # Try to resolve a matching Destination record so the frontend can select it in the dropdown
+    destination_obj = (
+        Destination.objects.filter(
+            contract_id_id=contract_id,
+            company_id_id=request.session["company_info"]["company_id"],
+            destination=last_dispatch.destination,
+        ).first()
+        if last_dispatch.destination
+        else None
+    )
+
+    data = {
+        "found": True,
+        "product_name": last_dispatch.product_name,
+        "party_name": last_dispatch.party_name,
+        "from_center": last_dispatch.from_center,
+        "destination": last_dispatch.destination,
+        "destination_id": destination_obj.id if destination_obj else None,
+        "taluka": last_dispatch.taluka,
+        "district": last_dispatch.district,
+        "km": last_dispatch.km,
+        "truck_no": last_dispatch.truck_no,
+        "weight": str(last_dispatch.weight),
+        "rate": str(last_dispatch.rate),
+        "totalfreight": str(last_dispatch.totalfreight),
+        "unloading_charge_1": str(last_dispatch.unloading_charge_1 or 0),
+        "unloading_charge_2": str(last_dispatch.unloading_charge_2 or 0),
+        "loading_charge": str(last_dispatch.loading_charge or 0),
+        "grand_total": str(last_dispatch.grand_total),
+        "truck_booking_rate": str(last_dispatch.truck_booking_rate),
+        "total_paid_truck_onwer": str(last_dispatch.total_paid_truck_onwer),
+        "advance_paid": str(last_dispatch.advance_paid),
+        "panding_amount": str(last_dispatch.panding_amount),
+        "net_profit": str(last_dispatch.net_profit),
+    }
+
+    return JsonResponse(data)
 

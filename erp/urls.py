@@ -5,11 +5,13 @@ from django.conf.urls.static import static
 from erp.views import *
 
 urlpatterns = [
-    path('admin/', admin.site.urls), 
-    path('',  include('erp.api.urls')),
+    path('admin/', admin.site.urls),
 
-    # dashboard
-    path('', dashboard_views.dashboard , name='dashboard'),
+    # API endpoints
+    path('api/', include('erp.api.urls')),
+
+    # dashboard (home)
+    path('', dashboard_views.dashboard, name='dashboard'),
     
     # login, logout, registraion, profile
     path('company-registraion', company_views.Company_registraion , name='company-registraion'),
@@ -41,10 +43,12 @@ urlpatterns = [
     path("download-gc-pdf", download_views.download_gc_pdf, name="download-gc-pdf"),
 
     path("download-report", report_view.download_report, name="download-report"),
+    path("download-distance-master-pdf", report_view.download_distance_master_pdf, name="download-distance-master-pdf"),
 
     # others master
     path('rate-master-view' , transport_views.Rate_master_view, name='rate-master-view'),
     path('rout-view', transport_views.rout_view , name='rout-view'), # destination view
+    path('product-master-view', transport_views.product_master_view , name='product-master-view'), # product list
 
 ]
 if settings.DEBUG:

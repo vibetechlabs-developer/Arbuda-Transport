@@ -1,5 +1,6 @@
 from django.shortcuts import render ,redirect 
 from django.contrib import messages
+from django.core.exceptions import MultipleObjectsReturned
 from company.models import Company_user , Company_profile
 from erp.utils.decorators import session_required, redirect_if_logged_in
 
@@ -17,6 +18,12 @@ def Company_login(request):
         except Company_user.DoesNotExist:
             messages.error(request, "Invalid email or password!")
             return redirect('company-login')
+        except MultipleObjectsReturned:
+            # If multiple companies have the same name, get the first one
+            company = Company_user.objects.filter(company_name=remail).first()
+            if not company:
+                messages.error(request, "Invalid email or password!")
+                return redirect('company-login')
         
 
         if company.check_password(raw_password):

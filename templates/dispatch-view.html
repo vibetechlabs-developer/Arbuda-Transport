@@ -98,12 +98,12 @@
                         <tr>
                             <td>{{ forloop.revcounter }}</td>
                             <td style="text-align: center; ">
-                                <!-- <a href="dispatch-update?dispatch_id={{ dispatch.id }}">
+                                <a href="dispatch-update?dispatch_id={{ dispatch.id }}">
                                     <button style="text-align: center; padding: 5px 10px;" type="button"
                                         class="btn btn-outline-primary"><i class='bx  bx-edit'
                                             style="font-size: 1rem;"></i>
                                     </button>
-                                </a> -->
+                                </a>
                                 <button style="text-align: center; padding: 5px 10px;" type="button"
                                     class="btn btn-outline-primary" data-bs-toggle="modal"
                                     data-bs-target="#modalCenter{{ dispatch.id }}delete"><i class='bx  bx-trash'
@@ -160,6 +160,25 @@
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot class="fw-bold">
+                        <tr>
+                            <td>Totals</td>
+                            <td colspan="11"></td>
+                            <td>{{ totals.total_weight }}</td>
+                            <td>{{ totals.total_rate }}</td>
+                            <td>{{ totals.total_freight }}</td>
+                            <td>{{ totals.total_unloading_1 }}</td>
+                            <td>{{ totals.total_unloading_2 }}</td>
+                            <td>{{ totals.total_loading }}</td>
+                            <td>{{ totals.total_grand_total }}</td>
+                            <td>-</td>
+                            <td>{{ totals.total_paid }}</td>
+                            <td>{{ totals.total_advance }}</td>
+                            <td>{{ totals.total_pending }}</td>
+                            <td>{{ totals.total_net_profit }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
                 </table>
 
             </div>

@@ -13,9 +13,29 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.units import mm
 from operator import attrgetter
 import math
+import re
 from itertools import groupby
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+
+def sort_dispatches_by_challan_desc(dispatches):
+    """
+    Sort dispatches by challan_no in descending order (numeric sorting).
+    Handles challan numbers like "0005", "0009", etc.
+    """
+    def get_numeric_value(challan_no):
+        """Extract numeric value from challan_no for sorting."""
+        if not challan_no:
+            return 0
+        # Try to extract numeric part from the string
+        num_match = re.search(r'\d+', str(challan_no))
+        return int(num_match.group(0)) if num_match else 0
+    
+    # Convert queryset to list if needed
+    dispatch_list = list(dispatches) if hasattr(dispatches, '__iter__') and not isinstance(dispatches, list) else dispatches
+    # Sort in descending order by challan_no numeric value
+    return sorted(dispatch_list, key=lambda d: get_numeric_value(d.challan_no), reverse=True)
 
 
 
@@ -30,6 +50,7 @@ def generate_invoice_pdf(request):
     i_bill_no = request.POST.get("bill_no")
     bill_date_str = request.POST.get("bill_date")
     bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else None
+    rr_number = request.POST.get("rr_number", "").strip()
 
     if not dispatch_ids:
         messages.error(request, "Please select at least one dispatch to generate invoice.")
@@ -61,11 +82,14 @@ def generate_invoice_pdf(request):
     invoice = Invoice.objects.create(
         Bill_no=i_bill_no,
         Bill_date=bill_date,
+        rr_number=rr_number if rr_number else None,
         company_id=i_company_id,
         contract_id=contract,
     )
 
     dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
+    # Sort by challan_no in descending order (will be re-sorted for district-wise contracts)
+    dispatches = sort_dispatches_by_challan_desc(dispatches)
     invoice.dispatch_list.add(*dispatches)
 
     # --- Create GC Notes ---
@@ -145,7 +169,7 @@ def generate_invoice_pdf(request):
         center_fields = ["sr_no", "gc_note"]
 
         # Initialize page totals
-        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = 0
+        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = total_rate = total_km = 0
 
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=1):
@@ -160,6 +184,8 @@ def generate_invoice_pdf(request):
             total_loading_sum += float(d.loading_charge or 0)
             total_amount_sum += total_amount
             total_weight += float(d.weight or 0)
+            total_rate += float(d.rate or 0)
+            total_km += float(d.km or 0)
 
             row = []
             for field in fields:
@@ -196,7 +222,7 @@ def generate_invoice_pdf(request):
 
         if add_total:
             # Calculate totals
-            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = 0
+            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
             for d in dispatches_to_sum:
                 total_amount = (float(d.totalfreight or 0) +
                                 float(d.unloading_charge_1 or 0) +
@@ -208,10 +234,16 @@ def generate_invoice_pdf(request):
                 total_loading_sum += float(d.loading_charge or 0)
                 total_amount_sum += total_amount
                 total_weight += float(d.weight or 0)
+                total_rate += float(d.rate or 0)
+                total_km += float(d.km or 0)
 
             for i, field in enumerate(fields):
                 if field == "weight":
                     total_row.append(f"{total_weight:.3f}")
+                elif field == "km":
+                    total_row.append(f"{total_km:.3f}")
+                elif field == "rate":
+                    total_row.append(f"{total_rate:.2f}")
                 elif field in ("luggage", "totalfreight"):
                     total_row.append(f"{total_freight_sum:.2f}")
                 elif field == "unloading_charge_1":
@@ -305,9 +337,17 @@ def generate_invoice_pdf(request):
     # --- Split dispatches per page ---
 
     if contract.rate_type == "Distric-Wise":
-        # Sort dispatches by district
+        # Sort dispatches by district, then by challan_no (descending) within each district
         page_no=1
-        dispatches_sorted = sorted(dispatches, key=attrgetter('district'))
+        def sort_key(d):
+            def get_numeric_value(challan_no):
+                if not challan_no:
+                    return 0
+                num_match = re.search(r'\d+', str(challan_no))
+                return int(num_match.group(0)) if num_match else 0
+            return (d.district or '', -get_numeric_value(d.challan_no))  # Negative for descending
+        
+        dispatches_sorted = sorted(dispatches, key=sort_key)
 
         # Group by district
         for district, district_dispatches_iter in groupby(dispatches_sorted, key=attrgetter('district')):
@@ -335,6 +375,7 @@ def generate_invoice_pdf(request):
                 bill_no_content = [
                     Paragraph(f"Bill No : {i_bill_no}", to_style),
                     Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
+                    Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                     Paragraph(f"From : {contract.from_center}", to_style),
                     Paragraph(f"District : {district}", to_style),
                     Paragraph(f"Page : {page_no} ", to_style)
@@ -397,6 +438,7 @@ def generate_invoice_pdf(request):
             bill_no_content = [
                 Paragraph(f"Bill No : {i_bill_no}", to_style),
                 Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
+                Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                 Paragraph(f"From : {contract.from_center}", to_style),
                 Paragraph(f"Page : {page_no} of {total_pages}", to_style)
             ]
@@ -467,6 +509,8 @@ def download_generate_invoice_pdf(request):
             return redirect("view-dispatch-invoice")
    
         dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
+        # Sort by challan_no in descending order
+        dispatches = sort_dispatches_by_challan_desc(dispatches)
    
         bill_date_str = request.POST.get("bill_date")
         bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else None
@@ -513,7 +557,7 @@ def download_generate_invoice_pdf(request):
         center_fields = ["sr_no", "gc_note"]
 
         # Initialize page totals
-        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = 0
+        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = total_rate = total_km = 0
 
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=1):
@@ -528,6 +572,8 @@ def download_generate_invoice_pdf(request):
             total_loading_sum += float(d.loading_charge or 0)
             total_amount_sum += total_amount
             total_weight += float(d.weight or 0)
+            total_rate += float(d.rate or 0)
+            total_km += float(d.km or 0)
 
             row = []
             for field in fields:
@@ -564,7 +610,7 @@ def download_generate_invoice_pdf(request):
 
         if add_total:
             # Calculate totals
-            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = 0
+            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
             for d in dispatches_to_sum:
                 total_amount = (float(d.totalfreight or 0) +
                                 float(d.unloading_charge_1 or 0) +
@@ -576,10 +622,16 @@ def download_generate_invoice_pdf(request):
                 total_loading_sum += float(d.loading_charge or 0)
                 total_amount_sum += total_amount
                 total_weight += float(d.weight or 0)
+                total_rate += float(d.rate or 0)
+                total_km += float(d.km or 0)
 
             for i, field in enumerate(fields):
                 if field == "weight":
                     total_row.append(f"{total_weight:.3f}")
+                elif field == "km":
+                    total_row.append(f"{total_km:.3f}")
+                elif field == "rate":
+                    total_row.append(f"{total_rate:.2f}")
                 elif field in ("luggage", "totalfreight"):
                     total_row.append(f"{total_freight_sum:.2f}")
                 elif field == "unloading_charge_1":
@@ -676,8 +728,16 @@ def download_generate_invoice_pdf(request):
     # --- Split dispatches per page ---
     if contract.rate_type == "Distric-Wise":
         page_no=1  
-        # Sort dispatches by district
-        dispatches_sorted = sorted(dispatches, key=attrgetter('district'))
+        # Sort dispatches by district, then by challan_no (descending) within each district
+        def sort_key(d):
+            def get_numeric_value(challan_no):
+                if not challan_no:
+                    return 0
+                num_match = re.search(r'\d+', str(challan_no))
+                return int(num_match.group(0)) if num_match else 0
+            return (d.district or '', -get_numeric_value(d.challan_no))  # Negative for descending
+        
+        dispatches_sorted = sorted(dispatches, key=sort_key)
     
         total_pages = len(list(groupby(dispatches_sorted, key=attrgetter('district'))))
         # Group by district
@@ -706,6 +766,7 @@ def download_generate_invoice_pdf(request):
                 bill_no_content = [
                     Paragraph(f"Bill No : {invoice.Bill_no}", to_style),
                     Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
+                    Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                     Paragraph(f"From : {contract.from_center}", to_style),
                     Paragraph(f"District : {district}", to_style),
                     Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
@@ -770,6 +831,7 @@ def download_generate_invoice_pdf(request):
             bill_no_content = [
                 Paragraph(f"Bill No : {invoice.Bill_no}", to_style),
                 Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
+                Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                 Paragraph(f"From : {contract.from_center}", to_style),
                 Paragraph(f"Page : {page_no} of {total_pages}", to_style)
             ]

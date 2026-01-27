@@ -96,7 +96,10 @@
 
                 document.getElementById("p_from_date").required = (value === "product_wise");
                 document.getElementById("p_to_date").required = (value === "product_wise");
-                document.getElementsByName("product_name").required = (value === "product_wise");
+                const productSelect = document.getElementById("select-beast");
+                if (productSelect) {
+                  productSelect.required = (value === "product_wise");
+                }
               });
 
             </script>
@@ -115,6 +118,9 @@
                     <tr id="tableHeader" style="word-wrap: none;"></tr>
                   </thead>
                   <tbody id="tableBody"></tbody>
+                  <tfoot>
+                    <tr id="tableFooterRow"></tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -147,7 +153,7 @@
 </script>
 <script>
   function fecthproduct(opt) {
-    if (opt = "product_wise") {
+    if (opt === "product_wise") {
       let contract_id = document.getElementById("contract_no").value
       fetch(`/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
         .then(response => response.json())
@@ -241,12 +247,34 @@
 
     renderTable(filtered, allfield);
   }
+  function isNumericValue(value) {
+    if (value === null || value === undefined || value === "") return false;
+    const num = parseFloat(value);
+    return !isNaN(num) && isFinite(num);
+  }
+
+  function formatNumber(value) {
+    return Number.isInteger(value) ? value : Number(value).toFixed(2);
+  }
+
   function renderTable(dispatches, fields) {
     const tableHeader = document.getElementById("tableHeader");
     const tableBody = document.getElementById("tableBody");
+    const tableFooterRow = document.getElementById("tableFooterRow");
 
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
+    if (tableFooterRow) tableFooterRow.innerHTML = "";
+
+    const totals = {};
+    const numericFields = new Set();
+
+    const recordTotal = (field, rawValue) => {
+      if (!isNumericValue(rawValue)) return;
+      const num = parseFloat(rawValue);
+      totals[field] = (totals[field] || 0) + num;
+      numericFields.add(field);
+    };
 
     // Header
     const th1 = document.createElement("th");
@@ -277,30 +305,59 @@
       // Fields
       fields.forEach(field => {
         const td = document.createElement("td");
+        let rawValue = dest[field];
         if (field === "sr_no") {
-          td.textContent = index + 1;
+          rawValue = index + 1;
+          td.textContent = rawValue;
         } else if (field === "depature_date" || field === "dep_date") {
           td.style.whiteSpace = "nowrap";
-          td.textContent = dest.dep_date || "";
+          rawValue = dest.dep_date || "";
+          td.textContent = rawValue;
         } else if (field === "dc_field") {
           td.style.whiteSpace = "wrap"
-          td.innerHTML = highlightText(dest.challan_no?.toString() || "", currentSearch);
+          rawValue = dest.challan_no?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
         } else if (field === "luggage") {
-          td.textContent = dest.totalfreight || "";
+          rawValue = dest.totalfreight || "";
+          td.textContent = rawValue;
         } else if (field === "product") {
-          td.textContent = dest.product_name || "";
+          rawValue = dest.product_name || "";
+          td.textContent = rawValue;
         } else if (field === "amount") {
-          td.textContent = dest.grand_total;
+          rawValue = dest.grand_total;
+          td.textContent = rawValue;
         } else if (field === "gc_note") {
-          td.textContent = dest.gc_note_no;
+          rawValue = dest.gc_note_no;
+          td.textContent = rawValue;
         } else {
-          td.innerHTML = highlightText(dest[field]?.toString() || "", currentSearch);
+          rawValue = dest[field]?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
+        }
+        if (field !== "sr_no") {
+          recordTotal(field, rawValue);
         }
         tr.appendChild(td);
       });
 
       tableBody.appendChild(tr);
     });
+
+    if (tableFooterRow) {
+      const labelTd = document.createElement("td");
+      labelTd.textContent = "Totals";
+      tableFooterRow.appendChild(labelTd);
+
+      fields.forEach(field => {
+        const td = document.createElement("td");
+        if (numericFields.has(field)) {
+          const totalValue = totals[field] || 0;
+          td.textContent = formatNumber(totalValue);
+        } else {
+          td.textContent = "";
+        }
+        tableFooterRow.appendChild(td);
+      });
+    }
   }
   function highlightText(text, search) {
     if (!search) return text; // if no search, return plain text

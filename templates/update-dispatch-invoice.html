@@ -53,6 +53,13 @@
                   <input type="hidden" class="form-control" id="contract_id" name="contract_id" 
                     />
                 </div>
+                <div class="mb-3 col-sm-6">
+                  <label for="rr_number" class="form-label">RR Number</label>
+                  <input type="text" class="form-control" id="rr_number" name="rr_number" autofocus
+                    oninput="this.classList.remove('invalid')" placeholder="Enter RR number" />
+                </div>
+              </div>
+              <div class="row">
                 <!-- <div class="mb-3 col-sm-6">
                   <label for="bill_no" class="form-label">Search</label>
                   <input type="text" class="form-control" id="searchBox" placeholder="Search by Party name,Challan no,destination and Product"
@@ -215,29 +222,55 @@
   let allDispatches = []; // store fetched data globally
   let allfield 
 
-  function fetchInvoice() {
-    const bill_no = document.getElementById('bill_no').value;
-    if (!bill_no) return;
+  function getBillNoValue() {
+    const billSelect = document.getElementById("bill_no");
+    if (billSelect.tomselect) {
+      return billSelect.tomselect.getValue();
+    }
+    return billSelect.value;
+  }
 
-    fetch(`/get-invoice?bill-id=${encodeURIComponent(bill_no)}`)
-      .then(response => response.json())
+  function fetchInvoice() {
+    const bill_no = getBillNoValue();
+    if (!bill_no) {
+      // Clear tables if no bill_no selected
+      document.getElementById("tableHeader").innerHTML = "";
+      document.getElementById("tableBody").innerHTML = "";
+      document.getElementById("tableHeader-ninv").innerHTML = "";
+      document.getElementById("tableBody-ninv").innerHTML = "";
+      return;
+    }
+
+    fetch(`/api/get-invoice?bill-id=${encodeURIComponent(bill_no)}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
       .then(data => {
-        if (data.destinations) {
-          document.getElementById("bill_date").value = data.bill_date;
-          document.getElementById("contract_no").value = data.contract_no;
-          document.getElementById("contract_id").value = data.contract_id;
+        if (data.error) {
+          console.error('API Error:', data.error);
+          return;
+        }
+        if (data.destinations !== undefined) {
+          document.getElementById("bill_date").value = data.bill_date || '';
+          document.getElementById("contract_no").value = data.contract_no || '';
+          document.getElementById("contract_id").value = data.contract_id || '';
+          document.getElementById("rr_number").value = data.rr_number || '';
           document.getElementById("bill_date").setAttribute("readonly", true);
           document.getElementById("contract_no").setAttribute("readonly", true);
-          allDispatches = data.destinations;
-          allfield = data.fields // save all data
+          allDispatches = data.destinations || [];
+          allfield = data.fields || [];
           
-          renderTable(allDispatches, data.fields); // render initially
+          renderTable(allDispatches, allfield); // render initially
         }
+        // Always call fetchDispacth after fetching invoice
+        fetchDispacth();
       })
       .catch(err => {
-        console.error('Error fetching Slip details:', err);
+        console.error('Error fetching invoice details:', err);
       });
-      fetchDispacth()
   }
   // function filterTable() {
   //   const search = document.getElementById("searchBox").value.toLowerCase();
@@ -302,6 +335,12 @@ function renderTable(dispatches, fields) {
       tableHeader.appendChild(th);
     });
 
+    // Action column header
+    const actionTh = document.createElement("th");
+    actionTh.textContent = "Action";
+    actionTh.style.whiteSpace = "nowrap";
+    tableHeader.appendChild(actionTh);
+
     // Rows
     dispatches.forEach((dest, index) => {
       const tr = document.createElement("tr");
@@ -342,6 +381,25 @@ function renderTable(dispatches, fields) {
         tr.appendChild(td);
       });
 
+      // Action column with Edit button
+      const actionTd = document.createElement("td");
+      actionTd.style.textAlign = "center";
+      actionTd.style.whiteSpace = "nowrap";
+      const editLink = document.createElement("a");
+      editLink.href = `/dispatch-update?dispatch_id=${dest.id}`;
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.style.textAlign = "center";
+      editBtn.style.padding = "5px 10px";
+      editBtn.className = "btn btn-outline-primary";
+      const editIcon = document.createElement("i");
+      editIcon.className = "bx bx-edit";
+      editIcon.style.fontSize = "1rem";
+      editBtn.appendChild(editIcon);
+      editLink.appendChild(editBtn);
+      actionTd.appendChild(editLink);
+      tr.appendChild(actionTd);
+
       tableBody.appendChild(tr);
     });
   }
@@ -355,22 +413,37 @@ function renderTable(dispatches, fields) {
   let allfieldninv
 
   function fetchDispacth(contract_id) {
-    const bill_id = document.getElementById("bill_no").value
-    if (!bill_id) return;
+    const bill_id = getBillNoValue();
+    if (!bill_id) {
+      // Clear the table if no bill_id
+      document.getElementById("tableHeader-ninv").innerHTML = "";
+      document.getElementById("tableBody-ninv").innerHTML = "";
+      return;
+    }
 
-    fetch(`/get-ninv-dispacth?bill-id=${encodeURIComponent(bill_id)}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.destinations) {
-          allDispatchesninv = data.destinations;
-          allfieldninv = data.fields // save all data
-          document.getElementById('bill_no').value = ""
-          renderninvTable(allDispatchesninv, data.fields); // render initially
+    fetch(`/api/get-ninv-dispacth?bill-id=${encodeURIComponent(bill_id)}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
         }
-      
+        return response.json();
+      })
+      .then(data => {
+        if (data.error) {
+          console.error('API Error:', data.error);
+          document.getElementById("tableHeader-ninv").innerHTML = "";
+          document.getElementById("tableBody-ninv").innerHTML = "";
+          return;
+        }
+        // Always render table, even if destinations is empty array
+        allDispatchesninv = data.destinations || [];
+        allfieldninv = data.fields || [];
+        renderninvTable(allDispatchesninv, allfieldninv);
       })
       .catch(err => {
-        console.error('Error fetching Slip details:', err);
+        console.error('Error fetching Not In Invoice dispatches:', err);
+        document.getElementById("tableHeader-ninv").innerHTML = "";
+        document.getElementById("tableBody-ninv").innerHTML = "";
       });
   }
 
@@ -392,6 +465,12 @@ function renderTable(dispatches, fields) {
       th.style.whiteSpace = "nowrap";
       tableHeader.appendChild(th);
     });
+
+    // Action column header
+    const actionTh = document.createElement("th");
+    actionTh.textContent = "Action";
+    actionTh.style.whiteSpace = "nowrap";
+    tableHeader.appendChild(actionTh);
 
     // Rows
     dispatches.forEach((dest, index) => {
@@ -431,6 +510,25 @@ function renderTable(dispatches, fields) {
         }
         tr.appendChild(td);
       });
+
+      // Action column with Edit button
+      const actionTd = document.createElement("td");
+      actionTd.style.textAlign = "center";
+      actionTd.style.whiteSpace = "nowrap";
+      const editLink = document.createElement("a");
+      editLink.href = `/dispatch-update?dispatch_id=${dest.id}`;
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.style.textAlign = "center";
+      editBtn.style.padding = "5px 10px";
+      editBtn.className = "btn btn-outline-primary";
+      const editIcon = document.createElement("i");
+      editIcon.className = "bx bx-edit";
+      editIcon.style.fontSize = "1rem";
+      editBtn.appendChild(editIcon);
+      editLink.appendChild(editBtn);
+      actionTd.appendChild(editLink);
+      tr.appendChild(actionTd);
 
       tableBody.appendChild(tr);
     });

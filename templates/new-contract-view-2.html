@@ -39,6 +39,7 @@
                             <th>sr. no.</th>
                             <th style="text-align: center;">Actions</th>
                             <th>Contract No.</th>
+                            <th>Vendor Code</th>
                             <th>Company Name</th>
                             <th>Gst no.</th>
                             <th>pan no.</th>
@@ -64,16 +65,16 @@
                             <td>{{ forloop.revcounter }}</td>
                             <td style="text-align: center; ">
 
-                                <a href="update-contract-form?contract_id={{ contract.id }}">
+                              <a href="update-contract-form?contract_id={{ contract.id }}">
                                     <button style="text-align: center; padding: 5px 10px;" type="button"
                                         class="btn btn-outline-primary"><i class='bx  bx-edit'
                                             style="font-size: 1rem;"></i>
                                     </button>
                                 </a>
-                                <button style="text-align: center; padding: 5px 10px;" type="button"
+                                <!-- <button style="text-align: center; padding: 5px 10px;" type="button"
                                     class="btn btn-outline-primary" data-bs-toggle="modal"
                                     data-bs-target="#modalCenter{{ contract.id }}delete"><i class='bx  bx-trash'
-                                        style="font-size: 1rem;"></i></button>
+                                        style="font-size: 1rem;"></i></button> -->
                                 <div class="modal fade" id="modalCenter{{ contract.id }}delete" tabindex="-1"
                                     aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -101,6 +102,7 @@
                                 </div>
                             </td>
                             <td>{{ contract.contract_no }}</td>
+                            <td>{{ contract.vendor_code }}</td>
                             <td>{{ contract.company_name }}</td>
                             <td>{{ contract.gst_number }}</td>
                             <td>{{ contract.pan_number }}</td>

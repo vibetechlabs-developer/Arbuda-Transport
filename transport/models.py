@@ -1,5 +1,9 @@
 from django.db import models
 from client.models import Client_profile , Company_user
+from datetime import date
+
+def get_today():
+    return date.today()
 
 ## Contract Model  ##
 
@@ -8,6 +12,7 @@ class T_Contract(models.Model):
 
     # Company Information
     company_name = models.CharField(max_length=255)
+    vendor_code = models.CharField(max_length=100, blank=True, null=True)
     gst_number = models.CharField(max_length=50, blank=True, null=True)
     pan_number = models.CharField(max_length=20, blank=True, null=True)
     tan_number = models.CharField(max_length=20, blank=True, null=True)
@@ -67,7 +72,7 @@ class T_Contract(models.Model):
 class Dispatch(models.Model):
     contract_id = models.ForeignKey(T_Contract, on_delete=models.CASCADE ,default=None)
     company_id = models.ForeignKey(Company_user , on_delete=models.CASCADE , default=None)
-    dep_date = models.DateField(default=None)
+    dep_date = models.DateField(default=get_today)
     challan_no = models.CharField(max_length=100)
     truck_no = models.CharField(max_length=50)
     product_name = models.CharField(max_length=150)
@@ -237,6 +242,7 @@ class Invoice(models.Model):
     dispatch_list = models.ManyToManyField(Dispatch, related_name="invoices")
     Bill_no = models.CharField(max_length=50)
     Bill_date = models.DateField(null=True, blank=True)
+    rr_number = models.CharField(max_length=50, blank=True, null=True)
     company_id = models.ForeignKey(Company_user , on_delete=models.CASCADE , default=None)
     contract_id = models.ForeignKey(T_Contract, on_delete=models.CASCADE ,default=None)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -17,6 +17,7 @@ urlpatterns = [
 
     # dispatch fecthing for invoice
     path("get-dispacth", views.get_dispacth, name="get-dispacth"), # from invoice
+    path("get-districts", views.get_districts, name="get-districts"), # fetch districts for contract
     path("get-ninv-dispacth", views.get_ninv_dispacth, name="get-dispacth"), # from invoice here ninv means not in invoice dispatch
 
     # invoice gc note fecthing
@@ -25,9 +26,13 @@ urlpatterns = [
 
 
     path("get-dispacth-product", views.get_dispacth_product, name="get-dispacth-product"), # from invoice
+    path("get-last-dispatch-details", views.get_last_dispatch_details, name="get-last-dispatch-details"),
 
      
     # others master
     path("get-destination-details", views.get_destination_details, name="get-destination-details"),
+    
+    # validation
+    path("check-challan-duplicate", views.check_challan_duplicate, name="check-challan-duplicate"),
 
 ]

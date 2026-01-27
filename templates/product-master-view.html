@@ -1,0 +1,56 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Product Master</title>
+{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+  <div class="container-xxl grow container-p-y">
+    <div class="header d-flex justify-content-between align-items-center mb-4">
+      <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Product Master</h4>
+    </div>
+
+    <div class="card" style="overflow: auto; height: 345px;">
+      <div class="table-responsive text-nowrap">
+        <table class="table">
+          <thead style="position: sticky; top: 0px; background: white; outline: 2px solid #d9dee3;">
+            <tr class="text-nowrap">
+              <th class="d-flex align-items-center">#</th>
+              <th>Product Name</th>
+              <th>Contracts Used In</th>
+              <th>Total Dispatches</th>
+              <th>Last Dispatch Date</th>
+            </tr>
+          </thead>
+          <tbody style="border-bottom: none;">
+            {% if products %}
+            {% for product in products %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ product.product_name }}</td>
+              <td>{{ product.contract_count }}</td>
+              <td>{{ product.total_dispatches }}</td>
+              <td>
+                {% if product.last_dispatch_date %}
+                {{ product.last_dispatch_date|date:"d-m-Y" }}
+                {% else %}
+                -
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="4" class="text-center text-muted">No products available</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-backdrop fade"></div>
+</div>
+{% endblock %}

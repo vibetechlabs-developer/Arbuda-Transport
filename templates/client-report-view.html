@@ -98,6 +98,18 @@
                 document.getElementById("p_from_date").required = (value === "product_wise");
                 document.getElementById("p_to_date").required = (value === "product_wise");
                 document.getElementsByName("product_name").required = (value === "product_wise");
+                
+                // Reinitialize TomSelect when product field becomes visible
+                if (value === "product_wise") {
+                  setTimeout(() => {
+                    initializeProductSelect();
+                    // Fetch products if contract is already selected
+                    const contract_id = contractTomSelect ? contractTomSelect.getValue() : document.getElementById("contract_no").value;
+                    if (contract_id) {
+                      fecthproduct("product_wise");
+                    }
+                  }, 200);
+                }
               });
 
             </script>
@@ -116,6 +128,9 @@
                     <tr id="tableHeader" style="word-wrap: none;"></tr>
                   </thead>
                   <tbody id="tableBody"></tbody>
+                  <tfoot>
+                    <tr id="tableFooterRow"></tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -131,65 +146,188 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script>
+  let contractTomSelect = null;
+  let tomSelectInstance = null;
+
+  // Initialize contract dropdown with TomSelect and store reference
+  const contractSelect = document.getElementById("contract_no");
+  if (contractSelect) {
+    contractTomSelect = new TomSelect(contractSelect, {
+      onChange: function(value) {
+        // Call onContractChange when contract changes
+        onContractChange();
+      }
+    });
+  }
+
+  // Initialize other ts-select elements
   document.querySelectorAll('.ts-select').forEach((el) => {
-    let settings = {};
-    new TomSelect(el, settings);
+    // Skip contract_no as we already initialized it
+    if (el.id !== 'contract_no') {
+      let settings = {};
+      new TomSelect(el, settings);
+    }
   });
 
-  const tomSelectInstance = new TomSelect("#select-beast", {
-    create: false,
-    lableField: 'data_id',
-    sortField: {
-      field: "text",
-      direction: "asc"
-    },
-  });
+  // Initialize TomSelect for product dropdown
+  function initializeProductSelect() {
+    const selectElement = document.getElementById("select-beast");
+    if (!selectElement) {
+      console.warn('select-beast element not found');
+      return;
+    }
+    
+    // Destroy existing instance if any
+    if (tomSelectInstance) {
+      try {
+        tomSelectInstance.destroy();
+      } catch(e) {
+        console.warn('Error destroying TomSelect:', e);
+      }
+      tomSelectInstance = null;
+    }
+    
+    // Create new instance
+    try {
+      tomSelectInstance = new TomSelect("#select-beast", {
+        create: false,
+        sortField: {
+          field: "text",
+          direction: "asc"
+        },
+        placeholder: "Select Product Name",
+      });
+      console.log('TomSelect initialized successfully');
+    } catch(e) {
+      console.error('Error initializing TomSelect:', e);
+      tomSelectInstance = null;
+    }
+  }
+
+  // Initialize when page loads (element might be hidden but that's okay)
+  // Wait a bit for DOM to be ready
+  setTimeout(() => {
+    initializeProductSelect();
+  }, 100);
 
 </script>
 <script>
   function fecthproduct(opt) {
-    if (opt = "product_wise") {
-      let contract_id = document.getElementById("contract_no").value
-      fetch(`/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
-        .then(response => response.json())
-        .then(data => {
-          if (data.product_list) {
-            updateDestinations(data.product_list)
+    if (opt == "product_wise") {
+      // Get contract ID from TomSelect instance or fallback to element value
+      let contract_id = contractTomSelect ? contractTomSelect.getValue() : document.getElementById("contract_no").value;
+      if (!contract_id) {
+        // Clear products if no contract is selected
+        if (tomSelectInstance) {
+          tomSelectInstance.clearOptions();
+        }
+        return;
+      }
+      
+      // Ensure TomSelect is initialized
+      if (!tomSelectInstance) {
+        initializeProductSelect();
+      }
+      
+      fetch(`/api/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
           }
-
+          return response.json();
+        })
+        .then(data => {
+          console.log('Fetched product data:', data); // Debug log
+          if (data.product_list && Array.isArray(data.product_list)) {
+            updateDestinations(data.product_list);
+          } else {
+            console.warn('No product list in response:', data);
+            if (tomSelectInstance) {
+              tomSelectInstance.clearOptions();
+            }
+          }
         })
         .catch(err => {
-          console.error('Error fetching Slip details:', err);
+          console.error('Error fetching product details:', err);
+          if (tomSelectInstance) {
+            tomSelectInstance.clearOptions();
+          }
         });
 
     }
     else {
+      // Clear products if not product_wise
+      if (tomSelectInstance) {
+        tomSelectInstance.clearOptions();
+      }
       return
     }
 
 
   }
 
+  function onContractChange() {
+    // When contract changes, update products if Product-wise is selected
+    const reportType = document.getElementById("type_of_report").value;
+    if (reportType == "product_wise") {
+      // Small delay to ensure TomSelect value is updated
+      setTimeout(() => {
+        fecthproduct("product_wise");
+      }, 50);
+    }
+  }
+
   function updateDestinations(product_list) {
-    tomSelectInstance.clearOptions(); // remove old options
-    product_list.forEach(product => {
-      tomSelectInstance.addOption({
-        value: product,
-        text: product,
+    console.log('updateDestinations called with:', product_list);
+    
+    // Ensure TomSelect is initialized
+    if (!tomSelectInstance) {
+      console.log('Initializing TomSelect...');
+      initializeProductSelect();
+    }
+    
+    if (!tomSelectInstance) {
+      console.error('TomSelect instance not available after initialization');
+      return;
+    }
+    
+    // Clear old options
+    tomSelectInstance.clearOptions();
+    tomSelectInstance.clear();
+    
+    // Add new options
+    if (product_list && product_list.length > 0) {
+      console.log('Adding', product_list.length, 'products to dropdown');
+      const options = [];
+      product_list.forEach(product => {
+        if (product) { // Ensure product is not null/undefined
+          options.push({
+            value: product,
+            text: product,
+          });
+        }
       });
-    });
-    // tomSelectInstance.refreshOptions(); // refresh the dropdown
-    // if (destinations.length > 0) tomSelectInstance.setValue(destinations[0].id);
+      
+      // Add all options at once
+      tomSelectInstance.addOptions(options);
+      
+      // Refresh the dropdown to show new options
+      tomSelectInstance.refreshOptions(false);
+      
+      console.log('Products added successfully. Options count:', tomSelectInstance.options.length);
+    } else {
+      console.warn('No products to add');
+    }
   }
 
   let allDispatches = []; // store fetched data globally
   let allfield
 
   function fetchDispacth() {
-    const contract_id = document.getElementById('contract_no').value;
+    const contract_id = contractTomSelect ? contractTomSelect.getValue() : document.getElementById('contract_no').value;
     if (!contract_id) return;
 
-    fetch(`/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
+    fetch(`/api/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
       .then(response => response.json())
       .then(data => {
         if (data.product_list) {
@@ -242,12 +380,34 @@
 
     renderTable(filtered, allfield);
   }
+  function isNumericValue(value) {
+    if (value === null || value === undefined || value === "") return false;
+    const num = parseFloat(value);
+    return !isNaN(num) && isFinite(num);
+  }
+
+  function formatNumber(value) {
+    return Number.isInteger(value) ? value : Number(value).toFixed(2);
+  }
+
   function renderTable(dispatches, fields) {
     const tableHeader = document.getElementById("tableHeader");
     const tableBody = document.getElementById("tableBody");
+    const tableFooterRow = document.getElementById("tableFooterRow");
 
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
+    if (tableFooterRow) tableFooterRow.innerHTML = "";
+
+    const totals = {};
+    const numericFields = new Set();
+
+    const recordTotal = (field, rawValue) => {
+      if (!isNumericValue(rawValue)) return;
+      const num = parseFloat(rawValue);
+      totals[field] = (totals[field] || 0) + num;
+      numericFields.add(field);
+    };
 
     // Header
     const th1 = document.createElement("th");
@@ -278,30 +438,59 @@
       // Fields
       fields.forEach(field => {
         const td = document.createElement("td");
+        let rawValue = dest[field];
         if (field === "sr_no") {
-          td.textContent = index + 1;
+          rawValue = index + 1;
+          td.textContent = rawValue;
         } else if (field === "depature_date" || field === "dep_date") {
           td.style.whiteSpace = "nowrap";
-          td.textContent = dest.dep_date || "";
+          rawValue = dest.dep_date || "";
+          td.textContent = rawValue;
         } else if (field === "dc_field") {
           td.style.whiteSpace = "wrap"
-          td.innerHTML = highlightText(dest.challan_no?.toString() || "", currentSearch);
+          rawValue = dest.challan_no?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
         } else if (field === "luggage") {
-          td.textContent = dest.totalfreight || "";
+          rawValue = dest.totalfreight || "";
+          td.textContent = rawValue;
         } else if (field === "product") {
-          td.textContent = dest.product_name || "";
+          rawValue = dest.product_name || "";
+          td.textContent = rawValue;
         } else if (field === "amount") {
-          td.textContent = dest.grand_total;
+          rawValue = dest.grand_total;
+          td.textContent = rawValue;
         } else if (field === "gc_note") {
-          td.textContent = dest.gc_note_no;
+          rawValue = dest.gc_note_no;
+          td.textContent = rawValue;
         } else {
-          td.innerHTML = highlightText(dest[field]?.toString() || "", currentSearch);
+          rawValue = dest[field]?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
+        }
+        if (field !== "sr_no") {
+          recordTotal(field, rawValue);
         }
         tr.appendChild(td);
       });
 
       tableBody.appendChild(tr);
     });
+
+    if (tableFooterRow) {
+      const labelTd = document.createElement("td");
+      labelTd.textContent = "Totals";
+      tableFooterRow.appendChild(labelTd);
+
+      fields.forEach(field => {
+        const td = document.createElement("td");
+        if (numericFields.has(field)) {
+          const totalValue = totals[field] || 0;
+          td.textContent = formatNumber(totalValue);
+        } else {
+          td.textContent = "";
+        }
+        tableFooterRow.appendChild(td);
+      });
+    }
   }
   function highlightText(text, search) {
     if (!search) return text; // if no search, return plain text

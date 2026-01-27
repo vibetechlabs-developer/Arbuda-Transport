@@ -23,7 +23,7 @@
       <!-- Register Card -->
       <div class="card">
         <div class="card-body">
-          <form id="formAuthentication" class="mb-3" method="POST" action="download-generate-invoice-pdf">
+          <form id="formAuthentication" class="mb-3" method="POST" action="{% url 'download-generate-invoice-pdf' %}">
             {% csrf_token %}
             <h5 class="text-primary fw-semibold mb-3">Invoice Details</h5>
             <div class="row">
@@ -41,7 +41,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="bill_date" class="form-label">Bill Date</label>
                 <input type="date" class="form-control" id="bill_date" name="bill_date" autofocus
-                  oninput="this.classList.remove('invalid')" required />
+                  oninput="this.classList.remove('invalid')" required readonly />
               </div>
 
             </div>
@@ -49,7 +49,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="contract_no" class="form-label">Contract No.</label>
                 <input type="text" class="form-control" id="contract_no" name="contract_no" autofocus
-                  oninput="this.classList.remove('invalid')" placeholder="Enter contract no" required />
+                  oninput="this.classList.remove('invalid')" placeholder="Enter contract no" required readonly />
                 <input type="hidden" class="form-control" id="contract_id" name="contract_id" 
                    />
               </div>
@@ -83,6 +83,9 @@
                     <tr id="tableHeader" style="word-wrap: none;"></tr>
                   </thead>
                   <tbody id="tableBody"></tbody>
+                  <tfoot>
+                    <tr id="tableFooterRow"></tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -264,20 +267,43 @@
   let allDispatches = []; // store fetched data globally
   let allfield 
 
+  // Helper function to sort dispatches by challan_no in descending order
+  function sortByChallanNoDesc(dispatches) {
+    return dispatches.sort((a, b) => {
+      // Extract numeric value from challan_no (handle cases like "0005", "0009", etc.)
+      const getNumericValue = (challan) => {
+        if (!challan) return 0;
+        // Try to extract numeric part
+        const numMatch = challan.toString().match(/\d+/);
+        return numMatch ? parseInt(numMatch[0], 10) : 0;
+      };
+      const numA = getNumericValue(a.challan_no);
+      const numB = getNumericValue(b.challan_no);
+      return numB - numA; // Descending order
+    });
+  }
+
+  function getBillNoValue() {
+    const billSelect = document.getElementById("bill_no");
+    if (billSelect && billSelect.tomselect) {
+      return billSelect.tomselect.getValue();
+    }
+    return billSelect ? billSelect.value : "";
+  }
+
   function fetchInvoice() {
-    const bill_no = document.getElementById('bill_no').value;
+    const bill_no = getBillNoValue();
     if (!bill_no) return;
 
-    fetch(`/get-invoice?bill-id=${encodeURIComponent(bill_no)}`)
+    fetch(`/api/get-invoice?bill-id=${encodeURIComponent(bill_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.destinations) {
           document.getElementById("bill_date").value = data.bill_date;
           document.getElementById("contract_no").value = data.contract_no;
           document.getElementById("contract_id").value = data.contract_id;
-          document.getElementById("bill_date").setAttribute("readonly", true);
-          document.getElementById("contract_no").setAttribute("readonly", true);
-          allDispatches = data.destinations;
+          // Sort by challan_no in descending order
+          allDispatches = sortByChallanNoDesc(data.destinations);
           allfield = data.fields // save all data
           
           renderTable(allDispatches, data.fields); // render initially
@@ -329,14 +355,36 @@ function filterTable() {
     return matchesSearch && matchesDate; // must match both
   });
 
-  renderTable(filtered, allfield);
+  // Sort filtered results by challan_no in descending order
+  const sortedFiltered = sortByChallanNoDesc([...filtered]);
+  renderTable(sortedFiltered, allfield);
+}
+function isNumericValue(value) {
+  if (value === null || value === undefined || value === "") return false;
+  const num = parseFloat(value);
+  return !isNaN(num) && isFinite(num);
+}
+function formatNumber(value) {
+  return Number.isInteger(value) ? value : Number(value).toFixed(2);
 }
 function renderTable(dispatches, fields) {
     const tableHeader = document.getElementById("tableHeader");
     const tableBody = document.getElementById("tableBody");
+    const tableFooterRow = document.getElementById("tableFooterRow");
 
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
+    if (tableFooterRow) tableFooterRow.innerHTML = "";
+
+    const totals = {};
+    const numericFields = new Set();
+
+    const recordTotal = (field, rawValue) => {
+      if (!isNumericValue(rawValue)) return;
+      const num = parseFloat(rawValue);
+      totals[field] = (totals[field] || 0) + num;
+      numericFields.add(field);
+    };
 
     // Header
     const th1 = document.createElement("th");
@@ -370,30 +418,71 @@ function renderTable(dispatches, fields) {
       // Fields
       fields.forEach(field => {
         const td = document.createElement("td");
+        let rawValue = dest[field];
         if (field === "sr_no") {
-          td.textContent = index + 1;
+          rawValue = index + 1;
+          td.textContent = rawValue;
         } else if (field === "depature_date" || field === "dep_date" ) {
           td.style.whiteSpace = "nowrap";
-          td.textContent = dest.dep_date || "";
+          rawValue = dest.dep_date || "";
+          td.textContent = rawValue;
         } else if (field === "dc_field") {
           td.style.whiteSpace = "wrap"
-          td.innerHTML = highlightText(dest.challan_no?.toString() || "", currentSearch);
+          rawValue = dest.challan_no?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
         } else if (field === "luggage") {
-          td.textContent = dest.totalfreight || "";
+          rawValue = dest.totalfreight || "";
+          td.textContent = rawValue;
         } else if (field === "product") {
-          td.textContent = dest.product_name || "";
+          rawValue = dest.product_name || "";
+          td.textContent = rawValue;
         } else if (field === "amount") {
-          td.textContent = dest.grand_total;
+          rawValue = dest.grand_total;
+          td.textContent = rawValue;
         } else if (field === "gc_note") {
-          td.textContent = dest.gc_note_no;
+          rawValue = dest.gc_note_no;
+          td.textContent = rawValue;
         } else {
-          td.innerHTML = highlightText(dest[field]?.toString() || "", currentSearch);
+          rawValue = dest[field]?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
+        }
+        // Avoid totalling dc_field so it does not appear in the footer summary
+        if (
+          field !== "sr_no" &&
+          field !== "depature_date" &&
+          field !== "dep_date" &&
+          field !== "dc_field"
+        ) {
+          recordTotal(field, rawValue);
         }
         tr.appendChild(td);
       });
 
       tableBody.appendChild(tr);
     });
+    if (tableFooterRow) {
+      const hiddenTd = document.createElement("td");
+      hiddenTd.style.display = "none";
+      tableFooterRow.appendChild(hiddenTd);
+
+      fields.forEach((field, index) => {
+        const td = document.createElement("td");
+        if (
+          numericFields.has(field) &&
+          field !== "depature_date" &&
+          field !== "dep_date" &&
+          field !== "dc_field"
+        ) {
+          const totalValue = totals[field] || 0;
+          td.textContent = formatNumber(totalValue);
+        } else if (index === 0) {
+          td.textContent = "Totals";
+        } else {
+          td.textContent = "";
+        }
+        tableFooterRow.appendChild(td);
+      });
+    }
   }
   function highlightText(text, search) {
   if (!search) return text; // if no search, return plain text
@@ -401,6 +490,16 @@ function renderTable(dispatches, fields) {
   return text.replace(regex, `<mark>$1</mark>`);
 }
 
+</script>
+
+<script>
+// Ensure TomSelect-selected bill_no is submitted in the native <select> value
+document.getElementById("formAuthentication").addEventListener("submit", function () {
+  const billSelect = document.getElementById("bill_no");
+  if (billSelect && billSelect.tomselect) {
+    billSelect.value = billSelect.tomselect.getValue();
+  }
+});
 </script>
 
 

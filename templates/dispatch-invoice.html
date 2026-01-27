@@ -31,7 +31,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="contract_no" class="form-label">Contract no.</label>
                 <select class="form-select ts-select" name="contract_no" id="contract_no"
-                  placeholder="Select contract no" autocomplete="off" onchange="fetchDispacth()" required>
+                  placeholder="Select contract no" autocomplete="off" onchange="fetchDistricts()" required>
                   <option value="" disabled selected>Select contract no</option>
                   {% for contract in allcontract %}
                   <option value="{{ contract.id }}">
@@ -51,6 +51,11 @@
                 <label for="bill_no" class="form-label">Bill No.</label>
                 <input type="text" class="form-control" id="bill_no" name="bill_no" autofocus
                   oninput="this.classList.remove('invalid')" placeholder="Enter bill no" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="rr_number" class="form-label">RR Number</label>
+                <input type="text" class="form-control" id="rr_number" name="rr_number" autofocus
+                  oninput="this.classList.remove('invalid')" placeholder="Enter RR number" />
               </div>
             </div>
 
@@ -78,6 +83,13 @@
                 <input type="text" class="form-control" id="searchBox"
                   placeholder="Search by Party name,Challan no,destination and Product" oninput="filterTable()" />
               </div>
+              <div class="mb-3 col-sm-6">
+                <label for="district" class="form-label">District</label>
+                <select class="form-select ts-select" name="district" id="district"
+                  placeholder="Select district" autocomplete="off" onchange="filterTable()">
+                  <option value="" selected>All Districts</option>
+                </select>
+              </div>
             </div>
             <div class="row">
               <div class="mb-3 col-sm-6">
@@ -97,6 +109,9 @@
                     <tr id="tableHeader" style="word-wrap: none;"></tr>
                   </thead>
                   <tbody id="tableBody"></tbody>
+                  <tfoot>
+                    <tr id="tableFooterRow"></tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -111,9 +126,15 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script>
+  let districtTomSelect = null;
+  
   document.querySelectorAll('.ts-select').forEach((el) => {
     let settings = {};
-    new TomSelect(el, settings);
+    if (el.id === 'district') {
+      districtTomSelect = new TomSelect(el, settings);
+    } else {
+      new TomSelect(el, settings);
+    }
   });
 </script>
 <script>
@@ -278,15 +299,107 @@
   let allDispatches = []; // store fetched data globally
   let allfield
 
+  // Helper function to sort dispatches by challan_no in descending order
+  function sortByChallanNoDesc(dispatches) {
+    return dispatches.sort((a, b) => {
+      // Extract numeric value from challan_no (handle cases like "0005", "0009", etc.)
+      const getNumericValue = (challan) => {
+        if (!challan) return 0;
+        // Try to extract numeric part
+        const numMatch = challan.toString().match(/\d+/);
+        return numMatch ? parseInt(numMatch[0], 10) : 0;
+      };
+      const numA = getNumericValue(a.challan_no);
+      const numB = getNumericValue(b.challan_no);
+      return numB - numA; // Descending order
+    });
+  }
+
+  function fetchDistricts() {
+    const contract_id = document.getElementById('contract_no').value;
+    const districtSelect = document.getElementById('district');
+    
+    // Clear district dropdown
+    if (districtTomSelect) {
+      districtTomSelect.clear();
+      districtTomSelect.clearOptions();
+    }
+    districtSelect.innerHTML = '<option value="" selected>All Districts</option>';
+    
+    if (!contract_id) {
+      // Clear dispatch table if no contract selected
+      document.getElementById("tableHeader").innerHTML = "";
+      document.getElementById("tableBody").innerHTML = "";
+      allDispatches = [];
+      if (districtTomSelect) {
+        districtTomSelect.addOption({value: '', text: 'All Districts'});
+        districtTomSelect.setValue('');
+      }
+      return;
+    }
+
+    // Fetch districts for the selected contract
+    fetch(`/api/get-districts?contract-id=${encodeURIComponent(contract_id)}`)
+      .then(response => response.json())
+      .then(data => {
+        // Add "All Districts" option
+        if (districtTomSelect) {
+          districtTomSelect.addOption({value: '', text: 'All Districts'});
+        }
+        
+        if (data.districts && data.districts.length > 0) {
+          // Populate district dropdown
+          data.districts.forEach(district => {
+            const option = document.createElement('option');
+            option.value = district;
+            option.textContent = district;
+            districtSelect.appendChild(option);
+            
+            // Also add to TomSelect
+            if (districtTomSelect) {
+              districtTomSelect.addOption({value: district, text: district});
+            }
+          });
+        }
+        
+        // Set default to "All Districts"
+        if (districtTomSelect) {
+          districtTomSelect.setValue('');
+        }
+        
+        // Fetch dispatches after districts are loaded
+        fetchDispacth();
+      })
+      .catch(err => {
+        console.error('Error fetching districts:', err);
+        // Still try to fetch dispatches even if districts fail
+        fetchDispacth();
+      });
+  }
+
   function fetchDispacth() {
     const contract_id = document.getElementById('contract_no').value;
-    if (!contract_id) return;
+    // Get district value from TomSelect if available, otherwise from select element
+    const district = districtTomSelect ? districtTomSelect.getValue() : document.getElementById('district').value;
+    
+    if (!contract_id) {
+      document.getElementById("tableHeader").innerHTML = "";
+      document.getElementById("tableBody").innerHTML = "";
+      allDispatches = [];
+      return;
+    }
 
-    fetch(`/get-dispacth?contract-id=${encodeURIComponent(contract_id)}`)
+    let url = `/api/get-dispacth?contract-id=${encodeURIComponent(contract_id)}`;
+    if (district) {
+      url += `&district=${encodeURIComponent(district)}`;
+    }
+
+    fetch(url)
       .then(response => response.json())
       .then(data => {
         if (data.destinations) {
-          allDispatches = data.destinations;
+          // Sort by challan_no in descending order
+          allDispatches = sortByChallanNoDesc(data.destinations);
           allfield = data.fields // save all data
           document.getElementById('bill_no').value = ""
           renderTable(allDispatches, data.fields); // render initially
@@ -296,7 +409,7 @@
         }
       })
       .catch(err => {
-        console.error('Error fetching Slip details:', err);
+        console.error('Error fetching dispatch details:', err);
       });
   }
   // function filterTable() {
@@ -318,6 +431,8 @@
   function filterTable() {
     const from = document.getElementById("fromDate").value;
     const to = document.getElementById("toDate").value;
+    // Get district value from TomSelect if available, otherwise from select element
+    const district = districtTomSelect ? districtTomSelect.getValue() : document.getElementById("district").value;
 
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to) : null;
@@ -338,17 +453,42 @@
         (!fromDate || (itemDate && itemDate >= fromDate)) &&
         (!toDate || (itemDate && itemDate <= toDate));
 
-      return matchesSearch && matchesDate; // must match both
+      // District filter
+      const matchesDistrict = !district || (item.district && item.district === district);
+
+      return matchesSearch && matchesDate && matchesDistrict; // must match all
     });
 
-    renderTable(filtered, allfield);
+    // Sort filtered results by challan_no in descending order
+    const sortedFiltered = sortByChallanNoDesc([...filtered]);
+    renderTable(sortedFiltered, allfield);
+  }
+  function isNumericValue(value) {
+    if (value === null || value === undefined || value === "") return false;
+    const num = parseFloat(value);
+    return !isNaN(num) && isFinite(num);
+  }
+  function formatNumber(value) {
+    return Number.isInteger(value) ? value : Number(value).toFixed(2);
   }
   function renderTable(dispatches, fields) {
     const tableHeader = document.getElementById("tableHeader");
     const tableBody = document.getElementById("tableBody");
+    const tableFooterRow = document.getElementById("tableFooterRow");
 
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
+    if (tableFooterRow) tableFooterRow.innerHTML = "";
+
+    const totals = {};
+    const numericFields = new Set();
+
+    const recordTotal = (field, rawValue) => {
+      if (!isNumericValue(rawValue)) return;
+      const num = parseFloat(rawValue);
+      totals[field] = (totals[field] || 0) + num;
+      numericFields.add(field);
+    };
 
     // Header
     const th1 = document.createElement("th");
@@ -379,30 +519,69 @@
       // Fields
       fields.forEach(field => {
         const td = document.createElement("td");
+        let rawValue = dest[field];
         if (field === "sr_no") {
-          td.textContent = index + 1;
+          rawValue = index + 1;
+          td.textContent = rawValue;
         } else if (field === "depature_date" || field === "dep_date") {
           td.style.whiteSpace = "nowrap";
-          td.textContent = dest.dep_date || "";
+          rawValue = dest.dep_date || "";
+          td.textContent = rawValue;
         } else if (field === "dc_field") {
           td.style.whiteSpace = "wrap"
-          td.innerHTML = highlightText(dest.challan_no?.toString() || "", currentSearch);
+          rawValue = dest.challan_no?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
         } else if (field === "luggage") {
-          td.textContent = dest.totalfreight || "";
+          rawValue = dest.totalfreight || "";
+          td.textContent = rawValue;
         } else if (field === "product") {
-          td.textContent = dest.product_name || "";
+          rawValue = dest.product_name || "";
+          td.textContent = rawValue;
         } else if (field === "amount") {
-          td.textContent = dest.grand_total;
+          rawValue = dest.grand_total;
+          td.textContent = rawValue;
         } else if (field === "gc_note") {
-          td.textContent = dest.gc_note_no;
+          rawValue = dest.gc_note_no;
+          td.textContent = rawValue;
         } else {
-          td.innerHTML = highlightText(dest[field]?.toString() || "", currentSearch);
+          rawValue = dest[field]?.toString() || "";
+          td.innerHTML = highlightText(rawValue, currentSearch);
+        }
+        // Skip dc_field from totals to avoid showing its aggregate in footer
+        if (
+          field !== "sr_no" &&
+          field !== "depature_date" &&
+          field !== "dep_date" &&
+          field !== "dc_field"
+        ) {
+          recordTotal(field, rawValue);
         }
         tr.appendChild(td);
       });
 
       tableBody.appendChild(tr);
     });
+    if (tableFooterRow) {
+      const labelTd = document.createElement("td");
+      labelTd.textContent = "Totals";
+      tableFooterRow.appendChild(labelTd);
+
+      fields.forEach(field => {
+        const td = document.createElement("td");
+        if (
+          numericFields.has(field) &&
+          field !== "depature_date" &&
+          field !== "dep_date" &&
+          field !== "dc_field"
+        ) {
+          const totalValue = totals[field] || 0;
+          td.textContent = formatNumber(totalValue);
+        } else {
+          td.textContent = "";
+        }
+        tableFooterRow.appendChild(td);
+      });
+    }
   }
   function highlightText(text, search) {
     if (!search) return text; // if no search, return plain text

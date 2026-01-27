@@ -37,25 +37,19 @@
             </div>
             <div class="row">
               <div class="mb-3 col-sm-6">
+                <label for="vendor_code" class="form-label">Vendor Code</label>
+                <input type="text" class="form-control" id="vendor_code" name="vendor_code"
+                  placeholder="Enter vendor code" value="{{ contract.vendor_code }}"
+                  oninput="this.classList.remove('invalid')" />
+              </div>
+              <div class="mb-3 col-sm-6">
                 <label for="gstin" class="form-label">Pan Number</label>
                 <input type="text" class="form-control" id="pan_number" name="pan_number" placeholder="Enter pan number"
                   value="{{ contract.pan_number }}" autofocus
                   oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
               </div>
-              <!-- <div class="mb-3 col-sm-6">
-                <label for="tan_number" class="form-label">Tan Number</label>
-                <input type="text" class="form-control" id="tan_number" name="tan_number" placeholder="Enter tan number"
-                  value="{{contract.tan_number}}"
-                  oninput="this.classList.remove('invalid') ,this.value =  this.value.toUpperCase()" />
-              </div> -->
             </div>
             <div class="row">
-              <!-- <div class="mb-3 col-sm-6">
-                <label for="cin_number" class="form-label">Cin (registration) Number </label>
-                <input type="text" class="form-control" id="cin_number" name="cin_number" placeholder="Enter cin number"
-                  value="{{contract.cin_number}}" autofocus
-                  oninput="this.classList.remove('invalid'),this.value =  this.value.toUpperCase()" />
-              </div> -->
               <div class="mb-3 col-sm-6">
                 <label for="from_center" class="form-label">From Center</label>
                 <input type="text" class="form-control" id="from_center" name="from_center"

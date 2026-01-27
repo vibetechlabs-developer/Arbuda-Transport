@@ -33,6 +33,16 @@
                 <label for="dep_date" class="form-label">Dispatch date</label>
                 <input type="date" class="form-control" id="dep_date" name="dep_date" autofocus
                   oninput="this.classList.remove('invalid')" required />
+                <script>
+                  // Set default date to today
+                  document.addEventListener('DOMContentLoaded', function() {
+                    const depDateInput = document.getElementById('dep_date');
+                    if (depDateInput && !depDateInput.value) {
+                      const today = new Date().toISOString().split('T')[0];
+                      depDateInput.value = today;
+                    }
+                  });
+                </script>
               </div>
             </div>
 
@@ -40,8 +50,15 @@
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="challan_no" class="form-label">Challan No. ( Shipment no. )</label>
-                <input type="text" class="form-control" id="challan_no" name="challan_no" placeholder="Enter challan no"
-                  oninput="this.classList.remove('invalid')" required />
+                <input type="text" class="form-control {% if challan_error %}is-invalid{% endif %}" id="challan_no" name="challan_no" placeholder="Enter challan no"
+                  onfocus="clearChallanError()" oninput="clearChallanError(); validateChallanNo(this.value)" required />
+                {% if challan_error %}
+                <div class="invalid-feedback d-block" id="challan_error">
+                  {{ challan_error }}
+                </div>
+                {% else %}
+                <div class="invalid-feedback d-none" id="challan_error"></div>
+                {% endif %}
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="truck_no" class="form-label">Truck No.</label>
@@ -52,8 +69,10 @@
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="product_name" class="form-label">Product Name</label>
-                <input type="text" class="form-control" id="product_name" name="product_name"
-                  placeholder="Enter product name" autofocus oninput=" this.classList.remove('invalid')" required />
+                <select class="form-select" id="product_name" name="product_name"
+                  placeholder="Select product name" autocomplete="off" required>
+                  <option value="" selected disabled>Select product</option>
+                </select>
               </div>
             </div>
             <h5 class="text-primary fw-semibold mb-3">Destination Details</h5>
@@ -90,8 +109,12 @@
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="km" class="form-label">KM</label>
-                <input type="text" class="form-control" id="km" name="km" placeholder="Enter km" autofocus
-                  oninput=" this.classList.remove('invalid') , fecthrate(this.value)" required />
+                <input type="text" class="form-control {% if errors.km %}is-invalid{% endif %}" id="km" name="km" placeholder="Enter km" autofocus
+                  value="{% if form_data.km %}{{ form_data.km }}{% endif %}"
+                  oninput=" this.classList.remove('invalid'); this.classList.remove('is-invalid'); fecthrate(this.value)" required />
+                {% if errors.km %}
+                <div class="invalid-feedback d-block">{{ errors.km }}</div>
+                {% endif %}
               </div>
             </div>
 
@@ -297,39 +320,215 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script>
-  document.querySelectorAll('.ts-select').forEach((el) => {
+  let contractTomSelect = null;
+  let destinationTomSelect = null;
+  let productTomSelect = null;
+  let isAutoFillingDispatch = false;
 
-    let settings = {};
-    new TomSelect(el, settings);
+  document.addEventListener('DOMContentLoaded', function () {
+    // Initialize TomSelect for contract dropdowns
+    document.querySelectorAll('.ts-select').forEach((el) => {
+      let settings = {};
+      const tsInstance = new TomSelect(el, settings);
+      if (el.id === 'contract_id') {
+        contractTomSelect = tsInstance;
+      }
+    });
+
+    // Destination dropdown
+    destinationTomSelect = new TomSelect("#select-beast", {
+      create: true,
+      lableField: 'data_id',
+      sortField: {
+        field: "text",
+        direction: "asc"
+      },
+    });
+
+    // Product dropdown (TomSelect, like Contract ID)
+    const productEl = document.getElementById('product_name');
+    if (productEl) {
+      productTomSelect = new TomSelect(productEl, {
+        create: true,              // allow adding new product
+        createOnBlur: true,
+        persist: false,
+        allowEmptyOption: true,
+        maxItems: 1,
+        closeAfterSelect: true,
+        placeholder: "Select product",
+        sortField: {
+          field: "text",
+          direction: "asc"
+        },
+        onChange: function (value) {
+          if (!value) return;
+          if (isAutoFillingDispatch) return;
+          // When product is changed, auto-fill using last dispatch for this contract + product
+          autoFillFromLastDispatch();
+        }
+      });
+    }
   });
-  const tomSelectInstance = new TomSelect("#select-beast", {
-    create: true,
-    lableField: 'data_id', 
-    sortField: {
-      field: "text",
-      direction: "asc"
-    },
-  });
+
+  // Real-time challan number validation
+  let challanValidationTimeout;
+  
+  // Function to clear error immediately on focus or input
+  function clearChallanError() {
+    const challanInput = document.getElementById('challan_no');
+    const errorDiv = document.getElementById('challan_error');
+    
+    if (challanInput) {
+      challanInput.classList.remove('invalid', 'is-invalid');
+    }
+    if (errorDiv) {
+      errorDiv.style.display = 'none';
+    }
+    // Clear any pending validation
+    clearTimeout(challanValidationTimeout);
+  }
+  
+  function validateChallanNo(challanNo) {
+    const challanInput = document.getElementById('challan_no');
+    const errorDiv = document.getElementById('challan_error');
+    
+    // Clear previous timeout
+    clearTimeout(challanValidationTimeout);
+    
+    // If empty, don't validate
+    if (!challanNo || challanNo.trim() === '') {
+      return;
+    }
+    
+    // Debounce: wait 500ms after user stops typing
+    challanValidationTimeout = setTimeout(function() {
+      fetch(`/api/check-challan-duplicate?challan_no=${encodeURIComponent(challanNo)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.exists) {
+            // Show error
+            challanInput.classList.add('is-invalid');
+            if (errorDiv) {
+              errorDiv.textContent = `Challan No. '${challanNo}' already exists. Please use a different challan number.`;
+              errorDiv.style.display = 'block';
+            }
+          } else {
+            // Remove error
+            challanInput.classList.remove('is-invalid');
+            if (errorDiv) {
+              errorDiv.style.display = 'none';
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Error checking challan number:', err);
+        });
+    }, 500);
+  }
 
 </script>
 <script>
   function updateDestinations(destinations) {
-    tomSelectInstance.clearOptions(); // remove old options
+    if (!destinationTomSelect) return;
+    destinationTomSelect.clearOptions(); // remove old options
     destinations.forEach(dest => {
-      tomSelectInstance.addOption({
+      destinationTomSelect.addOption({
         value: dest.id,
-        text: `${dest.destination} -- ${dest.km}` ,
+        text: `${dest.destination} -- ${dest.km}`,
         data_id: dest.id
       });
     });
+  }
 
+  function updateProducts(product_list) {
+    if (!productTomSelect) return;
+
+    // Clear current selection and options
+    productTomSelect.clear();
+    productTomSelect.clearOptions();
+
+    // Add new options from product_list
+    if (product_list && product_list.length > 0) {
+      const options = [];
+      product_list.forEach(product => {
+        if (!product) return;
+        options.push({
+          value: product,
+          text: product,
+        });
+      });
+      if (options.length) {
+        productTomSelect.addOptions(options);
+      }
+    }
+
+    // Ensure placeholder and empty state
+    productTomSelect.refreshOptions(false);
+  }
+
+  function applyLastDispatchDetails(data) {
+    if (!data || !data.found) return;
+
+    if (data.party_name) document.getElementById('party_name').value = data.party_name;
+    if (data.from_center) document.getElementById('from_center').value = data.from_center;
+    if (data.truck_no) document.getElementById('truck_no').value = data.truck_no;
+
+    // Destination – prefer selecting via Destination ID so existing km/rate logic works
+    if (data.destination_id && destinationTomSelect) {
+      destinationTomSelect.setValue(String(data.destination_id), true);
+      if (typeof fecthDestinationDetails === 'function') {
+        fecthDestinationDetails(String(data.destination_id));
+      }
+    }
+
+    if (data.taluka) document.getElementById('taluka').value = data.taluka;
+    if (data.district) document.getElementById('district').value = data.district;
+    if (data.km !== undefined && data.km !== null) document.getElementById('km').value = data.km;
+
+    if (data.weight) document.getElementById('weight').value = data.weight;
+    if (data.rate) document.getElementById('rate').value = data.rate;
+    if (data.totalfreight) document.getElementById('totalfreight').value = data.totalfreight;
+
+    if (data.unloading_charge_1) document.getElementById('unloading_charge_1').value = data.unloading_charge_1;
+    if (data.unloading_charge_2) document.getElementById('unloading_charge_2').value = data.unloading_charge_2;
+    if (data.loading_charge) document.getElementById('loading_charge').value = data.loading_charge;
+
+    if (data.grand_total) document.getElementById('grand_total').value = data.grand_total;
+    if (data.truck_booking_rate) document.getElementById('truck_booking_rate').value = data.truck_booking_rate;
+    if (data.total_paid_truck_onwer) document.getElementById('total_paid_truck_onwer').value = data.total_paid_truck_onwer;
+    if (data.advance_paid) document.getElementById('advance_paid').value = data.advance_paid;
+    if (data.panding_amount) document.getElementById('panding_amount').value = data.panding_amount;
+    if (data.net_profit) document.getElementById('net_profit').value = data.net_profit;
+  }
+
+  function autoFillFromLastDispatch() {
+    const contract_id = document.getElementById('contract_id').value;
+    if (!contract_id) return;
+
+    const selectedProduct = productTomSelect ? productTomSelect.getValue() : '';
+    const params = new URLSearchParams();
+    params.append('contract-id', contract_id);
+    if (selectedProduct) {
+      params.append('product_name', selectedProduct);
+    }
+
+    fetch(`/api/get-last-dispatch-details?${params.toString()}`)
+      .then(response => response.json())
+      .then(data => {
+        // Auto-fill other fields based on last dispatch.
+        // We do NOT change the selected product here; selection is controlled by user.
+        applyLastDispatchDetails(data);
+      })
+      .catch(err => {
+        console.error('Error fetching last dispatch details:', err);
+      });
   }
 
   function fecthContractDetails() {
     const contract_id = document.getElementById('contract_id').value;
     if (!contract_id) return;
 
-    fetch(`get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
+    fetch(`/api/get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
       .then(response => response.json())
       .then(data => {
         if (data.from) {
@@ -347,6 +546,33 @@
         if (data.destinations) {
           updateDestinations(data.destinations);
         }
+        // Fetch product list for this contract to populate product dropdown
+        fetch(`/api/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
+          .then(response => response.json())
+          .then(pdata => {
+            if (pdata.product_list) {
+              updateProducts(pdata.product_list);
+              // Auto-fill with last dispatch details after products are updated
+              // Use a small delay to ensure dropdown is ready
+              setTimeout(function() {
+                autoFillFromLastDispatch();
+              }, 100);
+            } else {
+              // Clear products if no list returned
+              if (productTomSelect) {
+                productTomSelect.clear();
+                productTomSelect.clearOptions();
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Error fetching product list:', err);
+            // Clear products on error
+            if (productTomSelect) {
+              productTomSelect.clear();
+              productTomSelect.clearOptions();
+            }
+          });
         if (data.rate_type == "Taluka-Wise") {
           document.getElementById("km").removeAttribute("oninput", true)
           console.log("removed");
@@ -381,7 +607,7 @@
 
     if (!did) return;
     console.log(did);
-    fetch(`get-destination-details?did=${encodeURIComponent(did)}`)
+    fetch(`/api/get-destination-details?did=${encodeURIComponent(did)}`)
       .then(response => response.json())
       .then(data => {
         if (data.district && data.km) {
@@ -416,7 +642,7 @@
 
   function fecthrate(km) {
     let contract_no = document.getElementById("contract_id").value
-    fetch(`/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -442,7 +668,7 @@
   function fecthCumRate() {
     let contract_no = document.getElementById("contract_id").value
     let km = document.getElementById("km").value
-    fetch(`/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.amount) {
@@ -469,7 +695,7 @@
     let contract_no = document.getElementById("contract_id").value
     let ton = document.getElementById("weight").value
     let km = document.getElementById("km").value
-    fetch(`/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.amount) {
@@ -523,7 +749,7 @@
     let taluka_name = document.getElementById("taluka").value
     let district = document.getElementById("district").value
     if (taluka_name.length > 0 && district.length > 0) {
-      fetch(`/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}`)
+      fetch(`/api/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}`)
         .then(response => response.json())
         .then(data => {
           if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -551,7 +777,7 @@
     let taluka_name = document.getElementById("taluka").value
     let district = document.getElementById("district").value
     if (district.length > 0) {
-      fetch(`get-district-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}`)
+      fetch(`/api/get-district-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}`)
         .then(response => response.json())
         .then(data => {
           if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -720,6 +946,136 @@
   //       console.error('Error fetching location details:', err);
   //     });
   // }
+</script>
+
+<script>
+  // Repopulate form fields if validation error occurred
+  {% if form_data %}
+  // Wait for TomSelect to be initialized
+  window.addEventListener('load', function() {
+    // Additional delay to ensure TomSelect is ready
+    setTimeout(function() {
+      const formData = {
+        {% for key, value in form_data.items %}
+        '{{ key }}': '{{ value|escapejs }}',
+        {% endfor %}
+      };
+
+      // Populate text inputs
+      if (formData['contract_id']) {
+        // Handle TomSelect for contract_id
+        const contractSelect = document.getElementById('contract_id');
+        if (contractSelect) {
+          // Set the native select value first
+          contractSelect.value = formData['contract_id'];
+          
+          // Try to get TomSelect instance from the element or global variable
+          let tsInstance = null;
+          if (contractSelect.tomselect) {
+            tsInstance = contractSelect.tomselect;
+          } else if (typeof contractTomSelect !== 'undefined' && contractTomSelect) {
+            tsInstance = contractTomSelect;
+          }
+          
+          // Update TomSelect if instance is available
+          if (tsInstance) {
+            tsInstance.setValue(formData['contract_id'], true);
+          }
+          
+          // Trigger contract details fetch to populate dependent fields
+          if (typeof fecthContractDetails === 'function') {
+            setTimeout(function() {
+              fecthContractDetails();
+            }, 150);
+          } else {
+            // Fallback: trigger change event manually
+            const changeEvent = new Event('change', { bubbles: true });
+            contractSelect.dispatchEvent(changeEvent);
+          }
+        }
+      }
+    if (formData['dep_date']) document.getElementById('dep_date').value = formData['dep_date'];
+    if (formData['challan_no']) {
+      document.getElementById('challan_no').value = formData['challan_no'];
+      {% if challan_error %}
+      document.getElementById('challan_no').classList.add('is-invalid');
+      document.getElementById('challan_error').style.display = 'block';
+      document.getElementById('challan_error').textContent = '{{ challan_error|escapejs }}';
+      {% endif %}
+    }
+    if (formData['truck_no']) document.getElementById('truck_no').value = formData['truck_no'];
+    if (formData['product_name']) {
+      const productSelectEl = document.getElementById('product_name');
+      if (productSelectEl) {
+        // If TomSelect is initialized, use it; otherwise fall back to native select
+        const ts = productSelectEl.tomselect || productTomSelect;
+        if (ts) {
+          ts.addOption({ value: formData['product_name'], text: formData['product_name'] });
+          ts.setValue(formData['product_name'], true);
+        } else {
+          productSelectEl.value = formData['product_name'];
+        }
+      }
+    }
+    if (formData['party_name']) document.getElementById('party_name').value = formData['party_name'];
+    if (formData['from_center']) document.getElementById('from_center').value = formData['from_center'];
+    if (formData['taluka']) document.getElementById('taluka').value = formData['taluka'];
+    if (formData['district']) document.getElementById('district').value = formData['district'];
+    if (formData['km']) document.getElementById('km').value = formData['km'];
+    if (formData['weight']) document.getElementById('weight').value = formData['weight'];
+    if (formData['rate']) document.getElementById('rate').value = formData['rate'];
+    if (formData['totalfreight']) document.getElementById('totalfreight').value = formData['totalfreight'];
+    if (formData['grand_total']) document.getElementById('grand_total').value = formData['grand_total'];
+    if (formData['truck_booking_rate']) document.getElementById('truck_booking_rate').value = formData['truck_booking_rate'];
+    if (formData['total_paid_truck_onwer']) document.getElementById('total_paid_truck_onwer').value = formData['total_paid_truck_onwer'];
+    if (formData['advance_paid']) document.getElementById('advance_paid').value = formData['advance_paid'];
+    if (formData['panding_amount']) document.getElementById('panding_amount').value = formData['panding_amount'];
+    if (formData['net_profit']) document.getElementById('net_profit').value = formData['net_profit'];
+
+    // Handle destination dropdown (TomSelect)
+    if (formData['destination']) {
+      setTimeout(function() {
+        if (typeof tomSelectInstance !== 'undefined') {
+          if (formData['destination'].match(/^\d+$/)) {
+            // It's an ID
+            tomSelectInstance.setValue(formData['destination']);
+          } else {
+            // It's a text value, add it as option and select
+            tomSelectInstance.addOption({
+              value: formData['destination'],
+              text: formData['destination']
+            });
+            tomSelectInstance.setValue(formData['destination']);
+          }
+        }
+      }, 500);
+    }
+
+    // Handle radio buttons and conditional inputs
+    if (formData['loading_rate'] === 'yes') {
+      document.getElementById('loadingYes').checked = true;
+      if (typeof toggleloadingInput === 'function') toggleloadingInput();
+      if (formData['loading_charge']) {
+        document.getElementById('loading_charge').value = formData['loading_charge'];
+      }
+    }
+    if (formData['unloading_rate_1'] === 'yes') {
+      document.getElementById('unloadingYes_1').checked = true;
+      if (typeof toggleunloadingInput_1 === 'function') toggleunloadingInput_1();
+      if (formData['unloading_charge_1']) {
+        document.getElementById('unloading_charge_1').value = formData['unloading_charge_1'];
+      }
+    }
+    if (formData['unloading_rate_2'] === 'yes') {
+      document.getElementById('unloadingYes_2').checked = true;
+      if (typeof toggleunloadingInput_2 === 'function') toggleunloadingInput_2();
+      if (formData['unloading_charge_2']) {
+        document.getElementById('unloading_charge_2').value = formData['unloading_charge_2'];
+      }
+    }
+    }, 300); // Wait for TomSelect initialization
+  });
+  {% endif %}
 </script>
 
 {% endblock %}

@@ -5,7 +5,7 @@ from transport.models import Rate , T_Contract ,Dispatch ,Destination ,Rate_talu
 from datetime import datetime
 from django.db import transaction
 from erp.utils.decorators import session_required
-from django.db.models import Func
+from django.db.models import Func, Sum, Count, Max
 
 
 
@@ -34,6 +34,7 @@ def add_contract(request):
             contract = T_Contract.objects.create( 
                 company_id = i_comapany_id,
                 company_name=request.POST.get("company_name"),
+                vendor_code=request.POST.get("vendor_code"),
                 gst_number=request.POST.get("gst_number"),
                 pan_number=request.POST.get("pan_number"),
                 tan_number=request.POST.get("tan_number"),
@@ -230,6 +231,7 @@ def update_contract(request, ):
         try:
             # Update contract fields
             contract.company_name = request.POST.get("company_name")
+            contract.vendor_code = request.POST.get("vendor_code")
             contract.gst_number = request.POST.get("gst_number")
             contract.pan_number = request.POST.get("pan_number")
             contract.from_center = request.POST.get("from_center")
@@ -435,7 +437,7 @@ def new_contract_view_2(request):
 
 @session_required
 def dispatch_form(request):
-    alldata = {}
+    alldata = {"errors": {}}
     try:
         allcontract = T_Contract.objects.all().filter(company_id=request.session['company_info']['company_id'])
         alldata['allcontract'] = allcontract
@@ -444,6 +446,36 @@ def dispatch_form(request):
         return redirect('rent-slip')
     
     if request.method == "POST":
+        form_data = request.POST
+        errors = {}
+        # Ensure km is numeric before attempting to save
+        km_raw = request.POST.get("km")
+        try:
+            km_value = int(km_raw) if km_raw not in [None, ""] else 0
+        except (TypeError, ValueError):
+            errors["km"] = "KM must be a number."
+
+        if errors:
+            alldata["errors"] = errors
+            alldata["form_data"] = form_data
+            return render(request, 'dispatch-form.html', alldata)
+
+        # Check for duplicate challan_no
+        challan_no = request.POST.get("challan_no", "").strip()
+        company_id = request.session['company_info']['company_id']
+        
+        # Validate challan_no is not empty
+        if not challan_no:
+            alldata['form_data'] = request.POST
+            alldata['challan_error'] = "Challan No. is required."
+            return render(request, 'dispatch-form.html', alldata)
+        
+        # Check for duplicate challan_no (case-insensitive and trimmed)
+        if Dispatch.objects.filter(challan_no__iexact=challan_no, company_id=company_id).exists():
+            # Pass POST data back to repopulate form
+            alldata['form_data'] = request.POST
+            alldata['challan_error'] = f"Challan No. '{challan_no}' already exists. Please use a different challan number."
+            return render(request, 'dispatch-form.html', alldata)
 
         i_destination = request.POST.get("destination")
 
@@ -456,11 +488,16 @@ def dispatch_form(request):
         else:
             save_destination = i_destination
 
+        from datetime import date
+        dep_date_value = request.POST.get("dep_date")
+        if not dep_date_value:
+            dep_date_value = date.today()
+        
         dispatch = Dispatch.objects.create(
             company_id = Company_user.objects.get(id=request.session['company_info']['company_id']),
             contract_id= T_Contract.objects.get(id=request.POST.get("contract_id")),
-            dep_date=request.POST.get("dep_date"),
-            challan_no=request.POST.get("challan_no"),    
+            dep_date=dep_date_value,
+            challan_no=challan_no,    
             truck_no=request.POST.get("truck_no"),
             product_name=request.POST.get("product_name"),
             party_name=request.POST.get("party_name"),
@@ -468,7 +505,6 @@ def dispatch_form(request):
             destination=save_destination,
             taluka=request.POST.get("taluka"),
             district=request.POST.get("district"),
-            km=request.POST.get("km") or 0,
             weight=request.POST.get("weight") or 0,
             rate=request.POST.get("rate") or 0,
             totalfreight=request.POST.get("totalfreight") or 0,
@@ -481,6 +517,7 @@ def dispatch_form(request):
             advance_paid=request.POST.get("advance_paid") or 0,
             panding_amount=request.POST.get("panding_amount") or 0,
             net_profit=request.POST.get("net_profit") or 0,
+            km=km_value,
         )
 
         # Save Destination if not exists
@@ -491,7 +528,7 @@ def dispatch_form(request):
             destination=save_destination ,
             district=request.POST.get("district"),
             taluka=request.POST.get("taluka"),
-            km=request.POST.get("km") or 0,
+            km=km_value,
         )
         messages.success(request, "Dispatch Added successfully")
         return redirect("dispatch-view")
@@ -501,7 +538,11 @@ def dispatch_form(request):
 
 @session_required
 def dispatch_update(request):
-    dispatch_id = request.GET.get('dispatch_id') or 3
+    dispatch_id = request.GET.get('dispatch_id')
+    if not dispatch_id:
+        messages.error(request, "Dispatch ID is required")
+        return redirect("dispatch-view")
+    
     alldata = {}
     # Fetch all contracts for dropdown or display
     allcontract = T_Contract.objects.filter(company_id=request.session['company_info']['company_id'])
@@ -512,26 +553,117 @@ def dispatch_update(request):
 
     alldestination = Destination.objects.filter(company_id=request.session['company_info']['company_id'] , contract_id=dispatch.contract_id)
     alldata['alldestination'] = alldestination
+    
+    # Find matching destination ID for current dispatch destination
+    current_destination_id = None
+    if dispatch.destination:
+        try:
+            matching_dest = Destination.objects.filter(
+                company_id=request.session['company_info']['company_id'],
+                contract_id=dispatch.contract_id,
+                destination=dispatch.destination
+            ).first()
+            if matching_dest:
+                current_destination_id = matching_dest.id
+        except:
+            pass
+    alldata['current_destination_id'] = current_destination_id
 
     if request.method == "POST":
         try:
-            # Update fields from POST
-            dispatch.contract_id = T_Contract.objects.get(id=request.POST.get("contract_id"))
+            # Check for duplicate challan_no (excluding current dispatch)
+            challan_no = request.POST.get("challan_no", "").strip()
+            company_id = request.session['company_info']['company_id']
+            
+            # Validate challan_no is not empty
+            if not challan_no:
+                alldata['challan_error'] = "Challan No. is required."
+                alldata['dispatch'] = dispatch
+                return render(request, 'dispatch-update.html', alldata)
+            
+            # Check for duplicate challan_no (case-insensitive and trimmed, excluding current dispatch)
+            if Dispatch.objects.filter(challan_no__iexact=challan_no, company_id=company_id).exclude(id=dispatch.id).exists():
+                # Update dispatch object with POST data to preserve form values
+                alldata['challan_error'] = f"Challan No. '{challan_no}' already exists. Please use a different challan number."
+                dispatch.challan_no = challan_no
+                dispatch.dep_date = request.POST.get("dep_date")
+                dispatch.truck_no = request.POST.get("truck_no")
+                dispatch.product_name = request.POST.get("product_name")
+                dispatch.party_name = request.POST.get("party_name")
+                dispatch.from_center = request.POST.get("from_center")
+                dispatch.taluka = request.POST.get("taluka")
+                dispatch.district = request.POST.get("district")
+                dispatch.km = request.POST.get("km") or 0
+                dispatch.weight = request.POST.get("weight") or 0
+                dispatch.rate = request.POST.get("rate") or 0
+                dispatch.totalfreight = request.POST.get("totalfreight") or 0
+                # Handle conditional charges based on radio button selections
+                if request.POST.get("unloading_rate_1") == 'yes':
+                    dispatch.unloading_charge_1 = request.POST.get("unloading_charge_1") or 0
+                else:
+                    dispatch.unloading_charge_1 = 0
+                if request.POST.get("unloading_rate_2") == 'yes':
+                    dispatch.unloading_charge_2 = request.POST.get("unloading_charge_2") or 0
+                else:
+                    dispatch.unloading_charge_2 = 0
+                if request.POST.get("loading_rate") == 'yes':
+                    dispatch.loading_charge = request.POST.get("loading_charge") or 0
+                else:
+                    dispatch.loading_charge = 0
+                dispatch.grand_total = request.POST.get("grand_total") or 0
+                dispatch.truck_booking_rate = request.POST.get("truck_booking_rate") or 0
+                dispatch.total_paid_truck_onwer = request.POST.get("total_paid_truck_onwer") or 0
+                dispatch.advance_paid = request.POST.get("advance_paid") or 0
+                dispatch.panding_amount = request.POST.get("panding_amount") or 0
+                dispatch.net_profit = request.POST.get("net_profit") or 0
+                # Handle destination
+                i_destination = request.POST.get("destination")
+                if i_destination and i_destination.isdigit():
+                    try:
+                        d_destination = Destination.objects.get(id=i_destination, company_id=request.session['company_info']['company_id'])
+                        dispatch.destination = d_destination.destination
+                    except Destination.DoesNotExist:
+                        dispatch.destination = i_destination
+                else:
+                    dispatch.destination = i_destination or ""
+                alldata['dispatch'] = dispatch
+                # Update current_destination_id if needed
+                if i_destination and i_destination.isdigit():
+                    alldata['current_destination_id'] = int(i_destination)
+                return render(request, 'dispatch-update.html', alldata)
+            
+            # Handle destination - same logic as dispatch_form
+            i_destination = request.POST.get("destination")
+            if i_destination and i_destination.isdigit():    
+                try: 
+                    d_destination = Destination.objects.get(id=i_destination, company_id=request.session['company_info']['company_id'])
+                    save_destination = d_destination.destination
+                except Destination.DoesNotExist:
+                    save_destination = i_destination
+            else:
+                save_destination = i_destination or ""
+
+            # Update contract if changed
+            if request.POST.get("contract_id"):
+                dispatch.contract_id = T_Contract.objects.get(id=request.POST.get("contract_id"))
+            
+            # Update all fields from POST
             dispatch.dep_date = request.POST.get("dep_date")
-            dispatch.challan_no = request.POST.get("challan_no")
-            dispatch.date = request.POST.get("date")
+            dispatch.challan_no = challan_no
             dispatch.truck_no = request.POST.get("truck_no")
             dispatch.product_name = request.POST.get("product_name")
             dispatch.party_name = request.POST.get("party_name")
             dispatch.from_center = request.POST.get("from_center")
-            dispatch.destination = request.POST.get("destination")
+            dispatch.destination = save_destination
             dispatch.taluka = request.POST.get("taluka")
             dispatch.district = request.POST.get("district")
             dispatch.km = request.POST.get("km") or 0
             dispatch.weight = request.POST.get("weight") or 0
             dispatch.rate = request.POST.get("rate") or 0
             dispatch.totalfreight = request.POST.get("totalfreight") or 0
-            dispatch.unloading_charge = request.POST.get("unloading_charge") or 0
+            dispatch.unloading_charge_1 = request.POST.get("unloading_charge_1") or 0
+            dispatch.unloading_charge_2 = request.POST.get("unloading_charge_2") or 0
+            dispatch.loading_charge = request.POST.get("loading_charge") or 0
             dispatch.grand_total = request.POST.get("grand_total") or 0
             dispatch.truck_booking_rate = request.POST.get("truck_booking_rate") or 0
             dispatch.total_paid_truck_onwer = request.POST.get("total_paid_truck_onwer") or 0
@@ -546,18 +678,18 @@ def dispatch_update(request):
                 company_id = Company_user.objects.get(id=request.session['company_info']['company_id']),
                 contract_id= dispatch.contract_id,
                 from_center=request.POST.get("from_center"),
-                destination=request.POST.get("destination"),
+                destination=save_destination,
                 district=request.POST.get("district"),
                 taluka=request.POST.get("taluka"),
                 defaults={"km": request.POST.get("km") or 0},
             )
 
             messages.success(request, "Dispatch updated successfully")
-            return redirect("dispatch-form")
+            return redirect("dispatch-view")
 
         except Exception as e:
             messages.error(request, f"Error updating dispatch: {str(e)}")
-            return redirect("dispatch-form")
+            return redirect(f"/dispatch-update?dispatch_id={dispatch_id}")
 
     return render(request, 'dispatch-update.html', alldata)
 
@@ -590,6 +722,23 @@ def dispatch_view(request):
         dispatch_qs = dispatch_qs.filter(dep_date__lte=end_date).order_by('dep_date')
 
     alldata["all_dispatch"] = dispatch_qs
+
+    # Totals for visible rows (respecting filters)
+    totals = dispatch_qs.aggregate(
+        total_weight=Sum('weight'),
+        total_rate=Sum('rate'),
+        total_freight=Sum('totalfreight'),
+        total_unloading_1=Sum('unloading_charge_1'),
+        total_unloading_2=Sum('unloading_charge_2'),
+        total_loading=Sum('loading_charge'),
+        total_grand_total=Sum('grand_total'),
+        total_paid=Sum('total_paid_truck_onwer'),
+        total_advance=Sum('advance_paid'),
+        total_pending=Sum('panding_amount'),
+        total_net_profit=Sum('net_profit'),
+    )
+    # replace None with 0 for display
+    alldata["totals"] = {k: v or 0 for k, v in totals.items()}
 
     # Keep filter values in template
     alldata["s_challan_no"] = s_challan_no
@@ -647,6 +796,7 @@ def update_dispatch_Invoice(request):
         dispatch_ids = [int(i) for i in request.POST.getlist("dispatch_ids")]
         i_bill_no = request.POST.get("bill_no")
         bill_date_str = request.POST.get("bill_date")
+        rr_number = request.POST.get("rr_number", "").strip()
         # Validation    
         if not dbill_id or not dcontract_no:
             messages.error(request, "Invalid request: missing invoice or contract.")
@@ -688,6 +838,7 @@ def update_dispatch_Invoice(request):
             # --- Update invoice fields ---
             invoice.Bill_no = invoice.Bill_no
             invoice.Bill_date = bill_date
+            invoice.rr_number = rr_number if rr_number else None
             invoice.contract_id = contract
             invoice.company_id = company
             invoice.save()
@@ -780,3 +931,21 @@ def rout_view(request):
     except Destination.DoesNotExist:
         messages.error(request , 'Route not fonded')
     return render(request , 'rout-view.html' , alldata)
+
+@session_required
+def product_master_view(request):
+    """List unique products created through dispatches for the current company."""
+    products = (
+        Dispatch.objects.filter(company_id=request.session["company_info"]["company_id"])
+        .exclude(product_name__isnull=True)
+        .exclude(product_name__exact="")
+        .values("product_name")
+        .annotate(
+            total_dispatches=Count("id"),
+            contract_count=Count("contract_id", distinct=True),
+            last_dispatch_date=Max("dep_date"),
+        )
+        .order_by("product_name")
+    )
+
+    return render(request, "product-master-view.html", {"products": products})
