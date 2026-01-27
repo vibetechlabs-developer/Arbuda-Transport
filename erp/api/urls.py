@@ -27,10 +27,13 @@ urlpatterns = [
 
     path("get-dispacth-product", views.get_dispacth_product, name="get-dispacth-product"), # from invoice
     path("get-last-dispatch-details", views.get_last_dispatch_details, name="get-last-dispatch-details"),
+    path("get-dispatch-list", views.get_dispatch_list_for_contract, name="get-dispatch-list"),
+    path("get-dispatch-details", views.get_dispatch_details, name="get-dispatch-details"),
 
      
     # others master
     path("get-destination-details", views.get_destination_details, name="get-destination-details"),
+    path("get-taluka-district", views.get_taluka_district, name="get-taluka-district"),
     
     # validation
     path("check-challan-duplicate", views.check_challan_duplicate, name="check-challan-duplicate"),

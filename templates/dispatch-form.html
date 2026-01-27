@@ -98,7 +98,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="taluka" class="form-label">Taluka</label>
                 <input type="text" class="form-control" id="taluka" name="taluka" placeholder="Enter taluka" autofocus
-                  oninput="this.classList.remove('invalid');" />
+                  oninput="this.classList.remove('invalid');" onblur="fetchDistrictByTaluka()" />
               </div>
             </div>
             <div class="row">
@@ -466,8 +466,45 @@
     productTomSelect.refreshOptions(false);
   }
 
-  function applyLastDispatchDetails(data) {
+  function applyLastDispatchDetails(data, includeProductAndChallan) {
     if (!data || !data.found) return;
+
+    // Optionally copy challan_no and product from last dispatch
+    if (includeProductAndChallan) {
+      if (data.challan_no) {
+        const challanInput = document.getElementById('challan_no');
+        if (challanInput) {
+          challanInput.value = data.challan_no;
+          // Clear any previous validation error state – backend will still enforce uniqueness
+          clearChallanError();
+        }
+      }
+
+      if (data.product_name) {
+        const productEl = document.getElementById('product_name');
+        if (productTomSelect) {
+          productTomSelect.addOption({
+            value: data.product_name,
+            text: data.product_name,
+          });
+          productTomSelect.setValue(data.product_name, true);
+        } else if (productEl) {
+          let found = false;
+          Array.from(productEl.options).forEach(opt => {
+            if (opt.value === data.product_name) {
+              found = true;
+            }
+          });
+          if (!found) {
+            const opt = document.createElement('option');
+            opt.value = data.product_name;
+            opt.textContent = data.product_name;
+            productEl.appendChild(opt);
+          }
+          productEl.value = data.product_name;
+        }
+      }
+    }
 
     if (data.party_name) document.getElementById('party_name').value = data.party_name;
     if (data.from_center) document.getElementById('from_center').value = data.from_center;
@@ -501,7 +538,7 @@
     if (data.net_profit) document.getElementById('net_profit').value = data.net_profit;
   }
 
-  function autoFillFromLastDispatch() {
+  function autoFillFromLastDispatch(includeProductAndChallan) {
     const contract_id = document.getElementById('contract_id').value;
     if (!contract_id) return;
 
@@ -515,9 +552,9 @@
     fetch(`/api/get-last-dispatch-details?${params.toString()}`)
       .then(response => response.json())
       .then(data => {
-        // Auto-fill other fields based on last dispatch.
-        // We do NOT change the selected product here; selection is controlled by user.
-        applyLastDispatchDetails(data);
+        // Auto-fill fields based on last dispatch.
+        // includeProductAndChallan tells whether to also copy challan_no + product_name.
+        applyLastDispatchDetails(data, !!includeProductAndChallan);
       })
       .catch(err => {
         console.error('Error fetching last dispatch details:', err);
@@ -552,10 +589,10 @@
           .then(pdata => {
             if (pdata.product_list) {
               updateProducts(pdata.product_list);
-              // Auto-fill with last dispatch details after products are updated
+              // Auto-fill with last dispatch details (including challan and product) after products are updated
               // Use a small delay to ensure dropdown is ready
               setTimeout(function() {
-                autoFillFromLastDispatch();
+                autoFillFromLastDispatch(true);
               }, 100);
             } else {
               // Clear products if no list returned
@@ -606,13 +643,20 @@
   function fecthDestinationDetails(did) {
 
     if (!did) return;
-    console.log(did);
-    fetch(`/api/get-destination-details?did=${encodeURIComponent(did)}`)
+    const contract_id = document.getElementById('contract_id') ? document.getElementById('contract_id').value : '';
+    const params = new URLSearchParams();
+    params.append('did', did);
+    if (contract_id) {
+      params.append('contract_id', contract_id);
+    }
+
+    fetch(`/api/get-destination-details?${params.toString()}`)
       .then(response => response.json())
       .then(data => {
-        if (data.district && data.km) {
-          document.getElementById('district').value = data.district;
-          document.getElementById('taluka').value = data.taluka;
+        // When backend explicitly says "not found", allow manual entry
+        if (data && (data.found === undefined || data.found) && data.km) {
+          document.getElementById('district').value = data.district || '';
+          document.getElementById('taluka').value = data.taluka || '';
           document.getElementById('km').value = data.km;
           if (data.rate_type == "Kilometer-Wise") {
             fecthrate(data.km)
@@ -630,13 +674,14 @@
             fecthCumRate()
           }
         } else {
+          // Clear so user can manually enter for a brand new destination
           document.getElementById('district').value = '';
           document.getElementById('taluka').value = '';
           document.getElementById('km').value = '';
         }
       })
       .catch(err => {
-        console.error('Error fetching Contract details:');
+        console.error('Error fetching Destination details:', err);
       });
   }
 
@@ -799,6 +844,36 @@
         });
     }
 
+  }
+
+  function fetchDistrictByTaluka() {
+    const talukaInput = document.getElementById('taluka');
+    const districtInput = document.getElementById('district');
+    const contractSelect = document.getElementById('contract_id');
+
+    if (!talukaInput || !districtInput || !contractSelect) return;
+
+    const taluka = talukaInput.value.trim();
+    const currentDistrict = districtInput.value.trim();
+    const contractId = contractSelect.value;
+
+    // Only try auto-fill when we have a taluka, a contract and district is still blank
+    if (!taluka || !contractId || currentDistrict) return;
+
+    const params = new URLSearchParams();
+    params.append('taluka', taluka);
+    params.append('contract-id', contractId);
+
+    fetch(`/api/get-taluka-district?${params.toString()}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data && data.found && data.district && !districtInput.value.trim()) {
+          districtInput.value = data.district;
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching district by taluka:', err);
+      });
   }
 
   function calculate_rent() {

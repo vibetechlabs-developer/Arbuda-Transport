@@ -704,7 +704,7 @@ def dispatch_view(request):
     delete_id = request.GET.get('delete')
 
     # Base Query
-    dispatch_qs = Dispatch.objects.filter(company_id=company['company_id']).order_by('-id')
+    dispatch_qs = Dispatch.objects.filter(company_id=company['company_id'])
 
     # ✅ Search by Challan No
     if s_challan_no:
@@ -714,12 +714,18 @@ def dispatch_view(request):
 
     # ✅ Search by Date Range
     if start_date and end_date:
-        dispatch_qs = dispatch_qs.filter(dep_date__range=[start_date, end_date]).order_by('dep_date')
+        dispatch_qs = dispatch_qs.filter(dep_date__range=[start_date, end_date])
 
     elif start_date:
-        dispatch_qs = dispatch_qs.filter(dep_date=start_date).order_by('dep_date')
+        dispatch_qs = dispatch_qs.filter(dep_date=start_date)
     elif end_date:
-        dispatch_qs = dispatch_qs.filter(dep_date__lte=end_date).order_by('dep_date')
+        dispatch_qs = dispatch_qs.filter(dep_date__lte=end_date)
+
+    # ✅ Final ordering: Challan number in descending numeric series (e.g., 24, 23, 22)
+    # Cast challan_no to a number for correct ordering if it contains numeric values
+    dispatch_qs = dispatch_qs.annotate(
+        challan_int=Func('challan_no', function='CAST', template='CAST(%(expressions)s AS UNSIGNED)')
+    ).order_by('-challan_int')
 
     alldata["all_dispatch"] = dispatch_qs
 

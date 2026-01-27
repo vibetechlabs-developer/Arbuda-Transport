@@ -51,17 +51,110 @@ def get_contract_details(request):
 
 @session_required
 def get_destination_details(request):
-    did = request.GET.get('did')
-    try:
-        destination = Destination.objects.get(id=did)
-        return JsonResponse({
-            'district' : destination.district,
-            'taluka' : destination.taluka,
-            'km' : destination.km,
-            'rate_type' : destination.contract_id.rate_type,
-        })
-    except T_Contract.DoesNotExist:
-        return JsonResponse({'error': 'not found'}, status=404)
+    """
+    Fetch destination details for the dispatch form.
+
+    Behaviour:
+    - If `did` is a valid Destination primary key, return that record.
+    - Otherwise, treat `did` as a destination name and try to resolve it
+      within the current contract + company so that:
+        * Typing/creating a destination that already exists will still
+          auto-fill taluka, district and km.
+    """
+    did = (request.GET.get("did") or "").strip()
+    contract_id = request.GET.get("contract_id")
+    company_id = request.session["company_info"]["company_id"]
+
+    if not did:
+        return JsonResponse({"error": "did is required"}, status=400)
+
+    destination = None
+
+    # 1) Try to resolve by primary key ID (existing select option)
+    if did.isdigit():
+        destination = Destination.objects.filter(id=did, company_id=company_id).first()
+
+    # 2) If not found, resolve by destination name for given contract+company
+    if destination is None and contract_id:
+        destination = (
+            Destination.objects.filter(
+                company_id=company_id,
+                contract_id=contract_id,
+                destination__iexact=did,
+            ).first()
+        )
+
+    # 3) Fallback: by name within company (any contract)
+    if destination is None:
+        destination = (
+            Destination.objects.filter(
+                company_id=company_id,
+                destination__iexact=did,
+            ).first()
+        )
+
+    if destination is None:
+        # Let the frontend know nothing was found so user can enter manually
+        return JsonResponse({"found": False})
+
+    return JsonResponse(
+        {
+            "found": True,
+            "district": destination.district,
+            "taluka": destination.taluka or "",
+            "km": destination.km,
+            "rate_type": destination.contract_id.rate_type,
+        }
+    )
+
+
+@session_required
+def get_taluka_district(request):
+    """
+    Given a taluka and contract, try to infer the district automatically.
+
+    We first look at Destination records, then fall back to past Dispatch
+    records for the same contract + company.
+    """
+    taluka = (request.GET.get("taluka") or "").strip()
+    contract_id = request.GET.get("contract-id")
+    company_id = request.session["company_info"]["company_id"]
+
+    if not taluka or not contract_id:
+        return JsonResponse(
+            {"found": False, "error": "taluka and contract-id are required"},
+            status=400,
+        )
+
+    # 1) Prefer Destination mappings
+    district = (
+        Destination.objects.filter(
+            company_id=company_id,
+            contract_id=contract_id,
+            taluka__iexact=taluka,
+        )
+        .values_list("district", flat=True)
+        .distinct()
+        .first()
+    )
+
+    # 2) Fallback to previous Dispatch entries
+    if not district:
+        district = (
+            Dispatch.objects.filter(
+                company_id=company_id,
+                contract_id=contract_id,
+                taluka__iexact=taluka,
+            )
+            .values_list("district", flat=True)
+            .distinct()
+            .first()
+        )
+
+    if not district:
+        return JsonResponse({"found": False})
+
+    return JsonResponse({"found": True, "district": district})
 
 
 @session_required
@@ -508,41 +601,113 @@ def get_last_dispatch_details(request):
     if not last_dispatch:
         return JsonResponse({"found": False})
 
+    data = _serialize_dispatch_details(
+        last_dispatch,
+        request.session["company_info"]["company_id"],
+    )
+
+    return JsonResponse(data)
+
+
+def _serialize_dispatch_details(dispatch_obj, company_id):
+    """
+    Helper to serialize a Dispatch instance into the structure expected by
+    the frontend (used for both last-dispatch and specific-dispatch fetch).
+    """
     # Try to resolve a matching Destination record so the frontend can select it in the dropdown
     destination_obj = (
         Destination.objects.filter(
-            contract_id_id=contract_id,
-            company_id_id=request.session["company_info"]["company_id"],
-            destination=last_dispatch.destination,
+            contract_id_id=dispatch_obj.contract_id_id,
+            company_id_id=company_id,
+            destination=dispatch_obj.destination,
         ).first()
-        if last_dispatch.destination
+        if dispatch_obj.destination
         else None
     )
 
-    data = {
+    return {
         "found": True,
-        "product_name": last_dispatch.product_name,
-        "party_name": last_dispatch.party_name,
-        "from_center": last_dispatch.from_center,
-        "destination": last_dispatch.destination,
+        "id": dispatch_obj.id,
+        "challan_no": dispatch_obj.challan_no,
+        "product_name": dispatch_obj.product_name,
+        "party_name": dispatch_obj.party_name,
+        "from_center": dispatch_obj.from_center,
+        "destination": dispatch_obj.destination,
         "destination_id": destination_obj.id if destination_obj else None,
-        "taluka": last_dispatch.taluka,
-        "district": last_dispatch.district,
-        "km": last_dispatch.km,
-        "truck_no": last_dispatch.truck_no,
-        "weight": str(last_dispatch.weight),
-        "rate": str(last_dispatch.rate),
-        "totalfreight": str(last_dispatch.totalfreight),
-        "unloading_charge_1": str(last_dispatch.unloading_charge_1 or 0),
-        "unloading_charge_2": str(last_dispatch.unloading_charge_2 or 0),
-        "loading_charge": str(last_dispatch.loading_charge or 0),
-        "grand_total": str(last_dispatch.grand_total),
-        "truck_booking_rate": str(last_dispatch.truck_booking_rate),
-        "total_paid_truck_onwer": str(last_dispatch.total_paid_truck_onwer),
-        "advance_paid": str(last_dispatch.advance_paid),
-        "panding_amount": str(last_dispatch.panding_amount),
-        "net_profit": str(last_dispatch.net_profit),
+        "taluka": dispatch_obj.taluka,
+        "district": dispatch_obj.district,
+        "km": dispatch_obj.km,
+        "truck_no": dispatch_obj.truck_no,
+        "weight": str(dispatch_obj.weight),
+        "rate": str(dispatch_obj.rate),
+        "totalfreight": str(dispatch_obj.totalfreight),
+        "unloading_charge_1": str(dispatch_obj.unloading_charge_1 or 0),
+        "unloading_charge_2": str(dispatch_obj.unloading_charge_2 or 0),
+        "loading_charge": str(dispatch_obj.loading_charge or 0),
+        "grand_total": str(dispatch_obj.grand_total),
+        "truck_booking_rate": str(dispatch_obj.truck_booking_rate),
+        "total_paid_truck_onwer": str(dispatch_obj.total_paid_truck_onwer),
+        "advance_paid": str(dispatch_obj.advance_paid),
+        "panding_amount": str(dispatch_obj.panding_amount),
+        "net_profit": str(dispatch_obj.net_profit),
     }
 
+
+@session_required
+def get_dispatch_list_for_contract(request):
+    """
+    Return a list of previous dispatches for a contract so user can select
+    one challan and auto-fill the add-dispatch form.
+    """
+    contract_id = request.GET.get("contract-id")
+    if not contract_id:
+        return JsonResponse({"error": "contract-id is required"}, status=400)
+
+    company_id = request.session["company_info"]["company_id"]
+
+    qs = (
+        Dispatch.objects.filter(
+            contract_id_id=contract_id,
+            company_id_id=company_id,
+        )
+        .order_by("-dep_date", "-id")
+    )
+
+    dispatches = []
+    for d in qs:
+        dispatches.append(
+            {
+                "id": d.id,
+                "challan_no": d.challan_no,
+                "product_name": d.product_name,
+                "dep_date": d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "",
+                "destination": d.destination,
+            }
+        )
+
+    return JsonResponse({"dispatches": dispatches})
+
+
+@session_required
+def get_dispatch_details(request):
+    """
+    Return full details for a specific dispatch (by dispatch_id) so the add
+    dispatch form can be auto-filled from a selected previous challan.
+    """
+    dispatch_id = request.GET.get("dispatch_id")
+    if not dispatch_id:
+        return JsonResponse({"error": "dispatch_id is required"}, status=400)
+
+    company_id = request.session["company_info"]["company_id"]
+
+    try:
+        dispatch_obj = Dispatch.objects.get(
+            id=dispatch_id,
+            company_id_id=company_id,
+        )
+    except Dispatch.DoesNotExist:
+        return JsonResponse({"error": "dispatch not found"}, status=404)
+
+    data = _serialize_dispatch_details(dispatch_obj, company_id)
     return JsonResponse(data)
 
