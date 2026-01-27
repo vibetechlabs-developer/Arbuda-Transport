@@ -90,57 +90,78 @@
                 <div class="col-sm-6">
                   <div class="mb-3">
                     <label for="company_name" class="form-label">Company Name</label>
-                    <input type="text" class="form-control" id="company_name" name="company_name"
-                      placeholder="Enter your Company Name" autofocus oninput="this.classList.remove('invalid')" />
+                    <input type="text" class="form-control {% if errors.company_name %}invalid{% endif %}" id="company_name" name="company_name"
+                      placeholder="Enter your Company Name" value="{{ values.company_name|default:'' }}" autofocus oninput="clearFieldError(this)" />
+                    {% if errors.company_name %}
+                    <div class="invalid-feedback d-block">{{ errors.company_name }}</div>
+                    {% endif %}
                   </div>
                   <div class="mb-3">
                     <label for="gstin" class="form-label">GST Number</label>
-                    <input type="text" class="form-control" id="gstin" name="gstin" placeholder="Enter your GST Number"
-                      autofocus oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+                    <input type="text" class="form-control {% if errors.gstin %}invalid{% endif %}" id="gstin" name="gstin" placeholder="Enter your GST Number"
+                      value="{{ values.gstin|default:'' }}" autofocus oninput="this.value = this.value.toUpperCase(); clearFieldError(this)" />
+                    {% if errors.gstin %}
+                    <div class="invalid-feedback d-block">{{ errors.gstin }}</div>
+                    {% endif %}
                   </div>
                   <div class="mb-3">
                     <label for="mobile" class="form-label">Mobile Number</label>
-                    <input type="text" class="form-control" id="mobile" name="mobile"
-                      placeholder="Enter your phone number" maxlength="10" autofocus
-                      oninput="this.classList.remove('invalid')" />
+                    <input type="text" class="form-control {% if errors.mobile %}invalid{% endif %}" id="mobile" name="mobile"
+                      placeholder="Enter your phone number" maxlength="10" value="{{ values.mobile|default:'' }}" autofocus
+                      oninput="clearFieldError(this)" />
+                    {% if errors.mobile %}
+                    <div class="invalid-feedback d-block">{{ errors.mobile }}</div>
+                    {% endif %}
                   </div>
 
                 </div>
                 <div class="col-sm-6">
                   <div class="mb-3">
                     <label for="email" class="form-label">Email</label>
-                    <input type="text" class="form-control" id="email" name="email" placeholder="Enter your email"
-                      oninput="this.classList.remove('invalid') ,this.value =  this.value.toLowerCase()" />
+                    <input type="text" class="form-control {% if errors.email %}invalid{% endif %}" id="email" name="email" placeholder="Enter your email"
+                      value="{{ values.email|default:'' }}" oninput="this.value =  this.value.toLowerCase(); clearFieldError(this)" />
+                    {% if errors.email %}
+                    <div class="invalid-feedback d-block">{{ errors.email }}</div>
+                    {% endif %}
                   </div>
                   <div class="mb-3 form-password-toggle">
                     <label class="form-label" for="password">Password</label>
                     <div class="input-group input-group-merge">
-                      <input type="password" id="password" class="form-control" name="password"
+                      <input type="password" id="password" class="form-control {% if errors.password %}invalid{% endif %}" name="password"
                         placeholder="&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;"
-                        aria-describedby="password" oninput="this.classList.remove('invalid')" />
+                        aria-describedby="password" oninput="clearFieldError(this)" />
                       <span class="input-group-text cursor-pointer"><i class="bx bx-hide"></i></span>
                     </div>
+                    {% if errors.password %}
+                    <div class="invalid-feedback d-block">{{ errors.password }}</div>
+                    {% endif %}
                   </div>
                   <div class="mb-3 form-password-toggle">
                     <label class="form-label" for="rpassword">Confirm Password</label>
                     <div class="input-group input-group-merge">
-                      <input type="password" id="rpassword" class="form-control" name="rpassword"
+                      <input type="password" id="rpassword" class="form-control {% if errors.rpassword %}invalid{% endif %}" name="rpassword"
                         placeholder="&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;"
-                        aria-describedby="password" oninput="this.classList.remove('invalid')" />
+                        aria-describedby="password" oninput="clearFieldError(this)" />
                       <span class="input-group-text cursor-pointer"><i class="bx bx-hide"></i></span>
                     </div>
+                    {% if errors.rpassword %}
+                    <div class="invalid-feedback d-block">{{ errors.rpassword }}</div>
+                    {% endif %}
                   </div>
                 </div>
               </div>
               <div class="col-sm-6">
                 <div class="mb-3">
                   <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="tc" name="tc"
-                      onclick="this.classList.remove('invalid')" />
+                    <input class="form-check-input {% if errors.tc %}invalid{% endif %}" type="checkbox" id="tc" name="tc" {% if values.tc %}checked{% endif %}
+                      onclick="clearFieldError(this)" />
                     <label class="form-check-label" for="terms-conditions">
                       I agree to
                       <a href="javascript:void(0);">privacy policy & terms</a>
                     </label>
+                    {% if errors.tc %}
+                    <div class="invalid-feedback d-block">{{ errors.tc }}</div>
+                    {% endif %}
                   </div>
                 </div>
                 <button class="btn btn-primary d-grid w-100">Sign up</button>

@@ -12,7 +12,7 @@
       <!-- Register Card -->
       <div class="card">
         <div class="card-body">
-          <form id="formAuthentication" class="mb-3" method="POST" onsubmit="return company_profile_validation(this)" enctype="multipart/form-data">
+          <form id="formAuthentication" class="mb-3" method="POST" onsubmit="return company_profile_validation(this)" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             <div class="row">
               <h5 class="text-primary fw-semibold mb-3">Company Information</h5>
@@ -39,9 +39,12 @@
               <div class="col-sm-6">
                 <div class="mb-3">
                   <label for="gstin" class="form-label">Pan Number</label>
-                  <input type="text" class="form-control" id="pan_number" name="pan_number"
+                  <input type="text" class="form-control {% if errors.pan_number %}is-invalid{% endif %}" id="pan_number" name="pan_number"
                     placeholder="Enter your pan number" autofocus
-                    oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" {% if profile.pan_number %} value="{{ profile.pan_number }}" readonly {% endif %} required/>
+                    oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" value="{% if values.pan_number %}{{ values.pan_number }}{% elif profile.pan_number %}{{ profile.pan_number }}{% endif %}" {% if profile.pan_number %} readonly {% endif %} />
+                  {% if errors.pan_number %}
+                  <div class="invalid-feedback d-block">{{ errors.pan_number }}</div>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -50,26 +53,37 @@
               <div class="col-sm-6">
                 <div class="mb-3">
                   <label for="address" class="form-label">Adress</label>
-                  <input type="text" class="form-control" id="address" name="address" placeholder="Enter your address"
-                    autofocus oninput="this.classList.remove('invalid')" {% if profile.address %}
-                    value="{{ profile.address }}" {% endif %} />
+                  <input type="text" class="form-control {% if errors.address %}is-invalid{% endif %}" id="address" name="address" placeholder="Enter your address"
+                    autofocus oninput="this.classList.remove('invalid')" value="{% if values.address %}{{ values.address }}{% elif profile.address %}{{ profile.address }}{% endif %}" />
+                  {% if errors.address %}
+                  <div class="invalid-feedback d-block">{{ errors.address }}</div>
+                  {% endif %}
                 </div>
                 <div class="mb-3">
                   <label for="state" class="form-label">State</label>
-                  <input type="text" class="form-control" id="state" name="state" placeholder="Enter your state"
-                    oninput="this.classList.remove('invalid') " {% if profile.state %} value="{{ profile.state }}" {% endif %} />
+                  <input type="text" class="form-control {% if errors.state %}is-invalid{% endif %}" id="state" name="state" placeholder="Enter your state"
+                    oninput="this.classList.remove('invalid') " value="{% if values.state %}{{ values.state }}{% elif profile.state %}{{ profile.state }}{% endif %}" />
+                  {% if errors.state %}
+                  <div class="invalid-feedback d-block">{{ errors.state }}</div>
+                  {% endif %}
                 </div>
               </div>
               <div class="col-sm-6">
                 <div class="mb-3">
                   <label for="city" class="form-label">City</label>
-                  <input type="text" class="form-control" id="city" name="city" placeholder="Enter your city" autofocus
-                    oninput=" this.classList.remove('invalid')" {% if profile.city %} value="{{ profile.city }}" {% endif %} />
+                  <input type="text" class="form-control {% if errors.city %}is-invalid{% endif %}" id="city" name="city" placeholder="Enter your city" autofocus
+                    oninput=" this.classList.remove('invalid')" value="{% if values.city %}{{ values.city }}{% elif profile.city %}{{ profile.city }}{% endif %}" />
+                  {% if errors.city %}
+                  <div class="invalid-feedback d-block">{{ errors.city }}</div>
+                  {% endif %}
                 </div>
                 <div class="mb-3">
                   <label for="pin" class="form-label">Pin code</label>
-                  <input type="text" class="form-control" id="pin" name="pin" placeholder="Enter your pin code"
-                    maxlength="6" autofocus oninput="this.classList.remove('invalid')" {% if profile.pincode %} value="{{ profile.pincode }}" {% endif %} />
+                  <input type="text" class="form-control {% if errors.pin %}is-invalid{% endif %}" id="pin" name="pin" placeholder="Enter your pin code"
+                    maxlength="6" autofocus oninput="this.classList.remove('invalid')" value="{% if values.pin %}{{ values.pin }}{% elif profile.pincode %}{{ profile.pincode }}{% endif %}" />
+                  {% if errors.pin %}
+                  <div class="invalid-feedback d-block">{{ errors.pin }}</div>
+                  {% endif %}
                 </div>
               </div>
             </div>

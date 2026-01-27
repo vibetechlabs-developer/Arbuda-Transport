@@ -932,17 +932,17 @@ def rout_view(request):
         messages.error(request , 'Route not fonded')
     return render(request , 'rout-view.html' , alldata)
 
+
 @session_required
 def product_master_view(request):
-    """List unique products created through dispatches for the current company."""
+    company_id = request.session['company_info']['company_id']
+
     products = (
-        Dispatch.objects.filter(company_id=request.session["company_info"]["company_id"])
-        .exclude(product_name__isnull=True)
-        .exclude(product_name__exact="")
+        Dispatch.objects.filter(company_id=company_id)
         .values("product_name")
         .annotate(
-            total_dispatches=Count("id"),
             contract_count=Count("contract_id", distinct=True),
+            total_dispatches=Count("id"),
             last_dispatch_date=Max("dep_date"),
         )
         .order_by("product_name")

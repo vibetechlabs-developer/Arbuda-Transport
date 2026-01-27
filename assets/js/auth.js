@@ -1,6 +1,45 @@
 console.log("hello i am auth");
 
+// Clear visual error state and inline message for a single field
+function clearFieldError(input) {
+  if (!input) return;
+  // Remove both custom "invalid" and Bootstrap-style "is-invalid" classes
+  input.classList.remove("invalid", "is-invalid");
+  const group = input.closest(".input-group");
+  const anchor = group || input;
+  const fb = anchor.nextElementSibling;
+  if (fb && fb.classList && fb.classList.contains("invalid-feedback")) {
+    fb.remove();
+  }
+}
+
 function registraion_validation(form) {
+  function ensureFeedbackEl(input) {
+    // If the input is inside an input-group, show feedback after the group
+    const group = input.closest(".input-group");
+    const anchor = group || input;
+
+    let fb = anchor.nextElementSibling;
+    if (!fb || !fb.classList || !fb.classList.contains("invalid-feedback")) {
+      fb = document.createElement("div");
+      fb.className = "invalid-feedback d-block";
+      fb.setAttribute("role", "alert");
+      anchor.insertAdjacentElement("afterend", fb);
+    }
+    return fb;
+  }
+
+  function setError(input, message) {
+    if (!input) return;
+    input.classList.add("invalid");
+    const fb = ensureFeedbackEl(input);
+    fb.textContent = message;
+  }
+
+  function clearError(input) {
+    clearFieldError(input);
+  }
+
   let status = true;
   let company_name = form.company_name;
   let gstin = form.gstin;
@@ -16,39 +55,54 @@ function registraion_validation(form) {
   const mobilePattern = /^[6-9][0-9]{9}$/;
 
   if (company_name.value.length <= 0 || company_name.value.length > 20) {
-    company_name.classList.add("invalid");
+    setError(company_name, "Company name is required (max 20 characters).");
     status = false;
+  } else {
+    clearError(company_name);
   }
   if (gstin.value.length <= 0 || !gstPattern.test(gstin.value)) {
-    gstin.classList.add("invalid");
+    setError(gstin, "Enter a valid GST number.");
     status = false;
+  } else {
+    clearError(gstin);
   }
   if (!emailPattern.test(email.value) || email.value.length <= 0) {
-    email.classList.add("invalid");
+    setError(email, "Enter a valid email address.");
     status = false;
+  } else {
+    clearError(email);
   }
 
   if (pass.value.length <= 0) {
-    pass.classList.add("invalid");
+    setError(pass, "Password is required.");
     status = false;
+  } else {
+    clearError(pass);
   }
   if (rpass.value.length <= 0 || pass.value != rpass.value) {
-    rpass.classList.add("invalid");
+    setError(
+      rpass,
+      rpass.value.length <= 0 ? "Confirm password is required." : "Passwords do not match."
+    );
     status = false;
+  } else {
+    clearError(rpass);
   }
   if (mobile.value.length <= 0 || !mobilePattern.test(mobile.value)) {
-    mobile.classList.add("invalid");
+    setError(mobile, "Enter a valid 10-digit mobile number.");
     status = false;
+  } else {
+    clearError(mobile);
   }
   if (!tc.checked) {
-    tc.classList.add("invalid");
+    setError(tc, "Please accept the privacy policy & terms.");
     status = false;
+  } else {
+    clearError(tc);
   }
 
   return status;
 }
-
-
 
 function company_profile_validation(form) {
 
@@ -133,6 +187,18 @@ function company_profile_validation(form) {
 
   return status;
 }
+
+// Automatically clear inline errors for Company Profile fields as user types
+document.addEventListener("DOMContentLoaded", function () {
+  var form = document.getElementById("formAuthentication");
+  if (!form) return;
+  var fields = form.querySelectorAll("input, textarea, select");
+  fields.forEach(function (field) {
+    field.addEventListener("input", function () {
+      clearFieldError(field);
+    });
+  });
+});
 function client_profile_validation(form) {
 
   let status = true;
