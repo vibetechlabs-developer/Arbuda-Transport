@@ -69,6 +69,8 @@
                             <th style="text-align: center;">Actions</th>
                             <th>Dep Date</th>
                             <th>Challan No.</th>
+                            <th>E-Bill No.</th>
+                            <th>Bill Series</th>
                             <th>Truck No</th>
                             <th>Product Name</th>
                             <th>Party Name</th>
@@ -94,16 +96,26 @@
                         </tr>
                     </thead>
                     <tbody style="border-bottom: none;">
+                        {% if has_dispatch %}
                         {% for dispatch in all_dispatch %}
                         <tr>
-                            <td>{{ forloop.revcounter }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td style="text-align: center; ">
+                                {% if dispatch.inv_status %}
+                                <a href="dispatch-update?dispatch_id={{ dispatch.id }}" style="pointer-events: none; opacity: 0.5;">
+                                    <button style="text-align: center; padding: 5px 10px;" type="button"
+                                        class="btn btn-outline-primary" disabled title="Cannot edit: Dispatch is selected in an invoice. Please unselect it first."><i class='bx  bx-edit'
+                                            style="font-size: 1rem;"></i>
+                                    </button>
+                                </a>
+                                {% else %}
                                 <a href="dispatch-update?dispatch_id={{ dispatch.id }}">
                                     <button style="text-align: center; padding: 5px 10px;" type="button"
                                         class="btn btn-outline-primary"><i class='bx  bx-edit'
                                             style="font-size: 1rem;"></i>
                                     </button>
                                 </a>
+                                {% endif %}
                                 <button style="text-align: center; padding: 5px 10px;" type="button"
                                     class="btn btn-outline-primary" data-bs-toggle="modal"
                                     data-bs-target="#modalCenter{{ dispatch.id }}delete"><i class='bx  bx-trash'
@@ -136,6 +148,14 @@
                             </td>
                             <td>{{ dispatch.dep_date|date:'d-m-Y' }}</td>
                             <td>{{ dispatch.challan_no }}</td>
+                            <td>{% if dispatch.ebill_no %}{{ dispatch.ebill_no }}{% else %}-{% endif %}</td>
+                            <td>
+                                {% if dispatch.ebill_no and dispatch.contract_id.bill_series_from %}
+                                    {{ dispatch.contract_id.bill_series_from }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                             <td>{{ dispatch.truck_no }}</td>
                             <td>{{ dispatch.product_name }}</td>
                             <td>{{ dispatch.party_name }}</td>
@@ -159,11 +179,20 @@
                             <td>{{ dispatch.created_at }}</td>
                         </tr>
                         {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="28" class="text-center">No dispatch records found for the selected criteria.</td>
+                        </tr>
+                        {% endif %}
                     </tbody>
+                    {% if has_dispatch %}
                     <tfoot class="fw-bold">
                         <tr>
+                            <!-- Label column -->
                             <td>Totals</td>
-                            <td colspan="11"></td>
+                            <!-- Empty cells for all non-numeric columns up to KM -->
+                            <td colspan="13"></td>
+                            <!-- Numeric totals start from Weight onwards -->
                             <td>{{ totals.total_weight }}</td>
                             <td>{{ totals.total_rate }}</td>
                             <td>{{ totals.total_freight }}</td>
@@ -171,6 +200,7 @@
                             <td>{{ totals.total_unloading_2 }}</td>
                             <td>{{ totals.total_loading }}</td>
                             <td>{{ totals.total_grand_total }}</td>
+                            <!-- Truck Booking Rate has no total -->
                             <td>-</td>
                             <td>{{ totals.total_paid }}</td>
                             <td>{{ totals.total_advance }}</td>
@@ -179,6 +209,7 @@
                             <td></td>
                         </tr>
                     </tfoot>
+                    {% endif %}
                 </table>
 
             </div>

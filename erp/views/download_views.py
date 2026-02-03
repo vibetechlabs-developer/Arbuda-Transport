@@ -17,11 +17,13 @@ import re
 from itertools import groupby
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from erp.utils.financial_year import get_current_financial_year, get_financial_year_start_end
+from django.db.models import Q
 
 
-def sort_dispatches_by_challan_desc(dispatches):
+def sort_dispatches_by_challan_asc(dispatches):
     """
-    Sort dispatches by challan_no in descending order (numeric sorting).
+    Sort dispatches by challan_no in ascending order (numeric sorting).
     Handles challan numbers like "0005", "0009", etc.
     """
     def get_numeric_value(challan_no):
@@ -34,8 +36,8 @@ def sort_dispatches_by_challan_desc(dispatches):
     
     # Convert queryset to list if needed
     dispatch_list = list(dispatches) if hasattr(dispatches, '__iter__') and not isinstance(dispatches, list) else dispatches
-    # Sort in descending order by challan_no numeric value
-    return sorted(dispatch_list, key=lambda d: get_numeric_value(d.challan_no), reverse=True)
+    # Sort in ascending order by challan_no numeric value
+    return sorted(dispatch_list, key=lambda d: get_numeric_value(d.challan_no))
 
 
 
@@ -44,17 +46,71 @@ def generate_invoice_pdf(request):
     if request.method != "POST":
         return redirect("create-dispatch-invoice")
 
+    # Prepare context for error rendering
+    alldata = {}
+    try:
+        company_id = request.session['company_info']['company_id']
+        financial_year = request.session.get('financial_year', get_current_financial_year())
+        start_date, end_date = get_financial_year_start_end(financial_year)
+        
+        # Filter contracts that are active during the financial year
+        allcontract = T_Contract.objects.filter(
+            company_id=company_id
+        ).filter(
+            Q(
+                Q(c_start_date__lte=end_date) & (
+                    Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True)
+                )
+            ) |
+            Q(c_start_date__isnull=True)
+        ).order_by('-id')
+        alldata['allcontract'] = allcontract
+    except Exception as e:
+        messages.error(request, f'Error loading contracts: {str(e)}')
+        return redirect("create-dispatch-invoice")
+
     # --- Fetch POST data ---
     contract_id = request.POST.get("contract_no")
-    dispatch_ids = [int(i) for i in request.POST.getlist("dispatch_ids")]
-    i_bill_no = request.POST.get("bill_no")
+    dispatch_ids_raw = request.POST.getlist("dispatch_ids")
+    i_bill_no = request.POST.get("bill_no", "").strip()
     bill_date_str = request.POST.get("bill_date")
-    bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else None
-    rr_number = request.POST.get("rr_number", "").strip()
+    
+    # Store form data for repopulation
+    alldata['form_data'] = request.POST
 
-    if not dispatch_ids:
-        messages.error(request, "Please select at least one dispatch to generate invoice.")
-        return redirect("create-dispatch-invoice")
+    # Validation: Check if dispatch_ids are selected
+    if not dispatch_ids_raw:
+        alldata['dispatch_error'] = "Please select at least one dispatch to generate invoice."
+        return render(request, 'dispatch-invoice.html', alldata)
+
+    # Convert dispatch_ids to integers
+    try:
+        dispatch_ids = [int(i) for i in dispatch_ids_raw]
+    except (ValueError, TypeError):
+        alldata['dispatch_error'] = "Invalid dispatch selection."
+        return render(request, 'dispatch-invoice.html', alldata)
+
+    # Validation: Check if contract is selected
+    if not contract_id:
+        alldata['contract_error'] = "Please select a contract."
+        return render(request, 'dispatch-invoice.html', alldata)
+
+    # Validation: Check if bill_no is provided
+    if not i_bill_no:
+        alldata['bill_no_error'] = "Bill No. is required."
+        return render(request, 'dispatch-invoice.html', alldata)
+
+    # Validation: Check if bill_date is provided
+    if not bill_date_str:
+        alldata['bill_date_error'] = "Bill Date is required."
+        return render(request, 'dispatch-invoice.html', alldata)
+
+    # Parse bill_date
+    try:
+        bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        alldata['bill_date_error'] = "Invalid bill date format."
+        return render(request, 'dispatch-invoice.html', alldata)
 
     # --- Fetch contract and company ---
     try:
@@ -63,33 +119,51 @@ def generate_invoice_pdf(request):
         company_profile = Company_profile.objects.get(company_id_id=request.session['company_info']['company_id'])
         company = Company_user.objects.get(id=request.session['company_info']['company_id'])
     except T_Contract.DoesNotExist:
-        return HttpResponse("Contract not found", status=404)
+        alldata['contract_error'] = "Contract not found."
+        return render(request, 'dispatch-invoice.html', alldata)
     except Company_user.DoesNotExist:
-        return HttpResponse("User's company not found", status=404)
+        alldata['general_error'] = "User's company not found."
+        return render(request, 'dispatch-invoice.html', alldata)
     except Company_profile.DoesNotExist:
-        return HttpResponse("Company profile not found", status=404)
+        alldata['general_error'] = "Company profile not found."
+        return render(request, 'dispatch-invoice.html', alldata)
 
-    # --- Validate bill no ---
-    if i_bill_no < contract.bill_series_from or i_bill_no > contract.bill_series_to:
-        messages.error(request, f'Please enter valid bill no. {contract.bill_series_from} to {contract.bill_series_to}')
-        return redirect('create-dispatch-invoice')
+    # --- Validate bill no range ---
+    # Note: contract.bill_series_from / bill_series_to are CharFields in the DB.
+    # Only perform numeric range validation when all values are numeric to avoid int<->str TypeErrors.
+    series_from_raw = contract.bill_series_from
+    series_to_raw = contract.bill_series_to
+    if series_from_raw not in [None, ""] and series_to_raw not in [None, ""]:
+        bill_no_s = str(i_bill_no).strip()
+        series_from_s = str(series_from_raw).strip()
+        series_to_s = str(series_to_raw).strip()
 
+        if bill_no_s.isdigit() and series_from_s.isdigit() and series_to_s.isdigit():
+            bill_no_int = int(bill_no_s)
+            series_from_int = int(series_from_s)
+            series_to_int = int(series_to_s)
+            if bill_no_int < series_from_int or bill_no_int > series_to_int:
+                alldata['bill_no_error'] = (
+                    f"Please enter valid bill no. {contract.bill_series_from} to {contract.bill_series_to}"
+                )
+                return render(request, "dispatch-invoice.html", alldata)
+
+    # --- Validate duplicate bill no ---
     if Invoice.objects.filter(Bill_no=i_bill_no, company_id=i_company_id, contract_id=contract.id).exists():
-        messages.error(request, "Invoice with this bill number already exists!")
-        return redirect("create-dispatch-invoice")
+        alldata['bill_no_error'] = f"Invoice with bill number '{i_bill_no}' already exists!"
+        return render(request, 'dispatch-invoice.html', alldata)
 
     # --- Create Invoice ---
     invoice = Invoice.objects.create(
         Bill_no=i_bill_no,
         Bill_date=bill_date,
-        rr_number=rr_number if rr_number else None,
         company_id=i_company_id,
         contract_id=contract,
     )
 
     dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
-    # Sort by challan_no in descending order (will be re-sorted for district-wise contracts)
-    dispatches = sort_dispatches_by_challan_desc(dispatches)
+    # Sort by challan_no in ascending order (will be re-sorted for district-wise contracts)
+    dispatches = sort_dispatches_by_challan_asc(dispatches)
     invoice.dispatch_list.add(*dispatches)
 
     # --- Create GC Notes ---
@@ -129,7 +203,15 @@ def generate_invoice_pdf(request):
 
     # --- PDF Generation ---
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=2*mm, leftMargin=2*mm, topMargin=5*mm, bottomMargin=5*mm)
+    # Use tighter margins so typical invoices fit on a single A4 landscape page
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=2 * mm,
+        leftMargin=2 * mm,
+        topMargin=2 * mm,
+        bottomMargin=2 * mm,
+    )
     styles = getSampleStyleSheet()
     elements = []
 
@@ -161,15 +243,66 @@ def generate_invoice_pdf(request):
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
    
         # Header row
-        data = [[("Challan No" if getattr(contract, f) in [None, "None", "null", ""] else getattr(contract, f))
-                if f=="dc_field" else f.replace("_", " ").title() for f in fields]]
+        label_map = {
+            "sr_no": "Sr No",
+            "depature_date": "Dep Date",
+            "dep_date": "Dep Date",
+            "dc_field": ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))),
+            "truck_no": "Truck No",
+            "party_name": "Party Name",
+            "product_name": "Product",
+            "district": "District",
+            "taluka": "Taluka",
+            "unloading_charge_1": "Unloading 1",
+            "unloading_charge_2": "Unloading 2",
+            "loading_charge": "Loading",
+            "totalfreight": "Freight",
+            "gc_note": "GC Note",
+        }
+        data = [[label_map.get(f, f.replace("_", " ").title()) for f in fields]]
 
         numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
                         "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
+        compact = len(dispatch_subset) >= 13
+        compact_fs = 6 if compact else None
+        
+        compact_leading = 14.5 if compact else None
+
+        center_style_desc_local = ParagraphStyle(
+            name="CenterDescLocal",
+            parent=center_style_desc,
+            fontSize=compact_fs or center_style_desc.fontSize,
+            leading=compact_leading or center_style_desc.leading,
+        )
+        to_style_desc_local = ParagraphStyle(
+            name="ToDescLocal",
+            parent=to_style_desc,
+            fontSize=compact_fs or to_style_desc.fontSize,
+            leading=compact_leading or to_style_desc.leading,
+        )
+        to_right_style_desc_local = ParagraphStyle(
+            name="ToRightDescLocal",
+            parent=to_right_style_desc,
+            fontSize=compact_fs or to_right_style_desc.fontSize,
+            leading=compact_leading or to_right_style_desc.leading,
+        )
+        to_right_style_desc_heading_local = ParagraphStyle(
+            name="ToRightDescHeadingLocal",
+            parent=to_right_style_desc_heading,
+            fontSize=(compact_fs + 0.5) if compact else to_right_style_desc_heading.fontSize,
+            leading=(compact_leading + 1) if compact else to_right_style_desc_heading.leading,
+        )
+        total_style_local = ParagraphStyle(
+            name="TotalStyleLocal",
+            parent=total_style,
+            fontSize=compact_fs or total_style.fontSize,
+            leading=compact_leading or total_style.leading,
+        )
+
         # Initialize page totals
-        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = total_rate = total_km = 0
+        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = 0
 
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=1):
@@ -184,8 +317,6 @@ def generate_invoice_pdf(request):
             total_loading_sum += float(d.loading_charge or 0)
             total_amount_sum += total_amount
             total_weight += float(d.weight or 0)
-            total_rate += float(d.rate or 0)
-            total_km += float(d.km or 0)
 
             row = []
             for field in fields:
@@ -203,6 +334,10 @@ def generate_invoice_pdf(request):
                     row.append(f"{total_amount:.2f}")
                 elif field == "gc_note":
                     row.append(d.gc_note_no)
+                elif field == "main_party":
+                    row.append(d.main_party or "")
+                elif field == "sub_party":
+                    row.append(d.sub_party or "")
                 else:
                     row.append(getattr(d, field, ""))
             data.append(row)                
@@ -222,7 +357,7 @@ def generate_invoice_pdf(request):
 
         if add_total:
             # Calculate totals
-            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
+            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = 0
             for d in dispatches_to_sum:
                 total_amount = (float(d.totalfreight or 0) +
                                 float(d.unloading_charge_1 or 0) +
@@ -234,16 +369,10 @@ def generate_invoice_pdf(request):
                 total_loading_sum += float(d.loading_charge or 0)
                 total_amount_sum += total_amount
                 total_weight += float(d.weight or 0)
-                total_rate += float(d.rate or 0)
-                total_km += float(d.km or 0)
 
             for i, field in enumerate(fields):
                 if field == "weight":
                     total_row.append(f"{total_weight:.3f}")
-                elif field == "km":
-                    total_row.append(f"{total_km:.3f}")
-                elif field == "rate":
-                    total_row.append(f"{total_rate:.2f}")
                 elif field in ("luggage", "totalfreight"):
                     total_row.append(f"{total_freight_sum:.2f}")
                 elif field == "unloading_charge_1":
@@ -260,19 +389,23 @@ def generate_invoice_pdf(request):
             data.append(total_row)
 
         # Special column widths
+        # NOTE: header keys must match `data[0]` exactly.
         special_widths = {
             "Sr No": width_for_chars(5) * mm,
-            f"{contract.dc_field}": width_for_chars(16) * mm,
-            "truck_no": width_for_chars(10) * mm,
-            "Party Name": width_for_chars(25) * mm,
-            "Product Name": width_for_chars(14) * mm,
+            ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): width_for_chars(15) * mm,
+            "Truck No": width_for_chars(22) * mm,
+            "Party Name": width_for_chars(12) * mm,
+            "Product": width_for_chars(12) * mm,
             "Gc Note": width_for_chars(8) * mm,
             "Weight": width_for_chars(10) * mm,
             "Km": width_for_chars(5) * mm,
             "Rate": width_for_chars(12) * mm,
-            "Luggage": width_for_chars(14) * mm,
-            "Unloading Charge 1": width_for_chars(14) * mm,
-            "Loading Charge": width_for_chars(14) * mm,
+            "Luggage": width_for_chars(12) * mm,
+            "Unloading 1": width_for_chars(12) * mm,
+            "Unloading 2": width_for_chars(12) * mm,
+            "Loading": width_for_chars(12) * mm,
+            "Freight": width_for_chars(12) * mm,
+            "Dep Date": width_for_chars(12) * mm,
         }
 
         table_width = 288 * mm
@@ -296,12 +429,12 @@ def generate_invoice_pdf(request):
             for j, cell in enumerate(row):
                 field_name = fields[j]
                 if i == 0:  # header
-                    style = to_right_style_desc_heading if field_name in numeric_fields else center_style_desc if field_name in center_fields else to_style_desc
+                    style = to_right_style_desc_heading_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(f"<b>{cell}</b>", style)
                 elif add_total and i == len(data) - 1:  # total/grand total row
-                    row[j] = Paragraph(str(cell), total_style)
+                    row[j] = Paragraph(str(cell), total_style_local)
                 else:
-                    style = to_right_style_desc if field_name in numeric_fields else center_style_desc if field_name in center_fields else to_style_desc
+                    style = to_right_style_desc_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(str(cell), style)
 
         table = Table(data, colWidths=col_widths, repeatRows=1)
@@ -312,15 +445,23 @@ def generate_invoice_pdf(request):
             ("VALIGN", (0,0), (-1,-1), "TOP"),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-            ("LEFTPADDING", (0,0), (-1,-1), 2),
-            ("RIGHTPADDING", (0,0), (-1,-1), 2),
-            ("TOPPADDING", (0,0), (-1,0), 4),
-            ("BOTTOMPADDING", (0,0), (-1,0), 4),
-            ("TOPPADDING", (0,1), (-1,-2), 2),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 2),
+            ("LEFTPADDING", (0,0), (-1,-1), 1 if compact else 2),
+            ("RIGHTPADDING", (0,0), (-1,-1), 1 if compact else 2),
+            # Header row height
+            ("TOPPADDING", (0,0), (-1,0), 4 if compact else 7),
+            ("BOTTOMPADDING", (0,0), (-1,0), 4 if compact else 7),
+            # Body row height
+            ("TOPPADDING", (0,1), (-1,-2), 3 if compact else 4),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 3 if compact else 4),
             ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 0.2, colors.black),
+            # Make it readable: light grid + zebra rows
+            ("GRID", (0,0), (-1,-1), 0.15, colors.lightgrey),
         ]
+        # zebra rows for body (exclude header)
+        for r in range(1, len(data) - (1 if add_total else 0)):
+            if (r % 2) == 0:
+                styles.append(("BACKGROUND", (0, r), (-1, r), colors.HexColor("#FAFAFA")))
         if add_total:
             styles += [
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
@@ -337,7 +478,7 @@ def generate_invoice_pdf(request):
     # --- Split dispatches per page ---
 
     if contract.rate_type == "Distric-Wise":
-        # Sort dispatches by district, then by challan_no (descending) within each district
+        # Sort dispatches by district, then by challan_no (ascending) within each district
         page_no=1
         def sort_key(d):
             def get_numeric_value(challan_no):
@@ -345,7 +486,8 @@ def generate_invoice_pdf(request):
                     return 0
                 num_match = re.search(r'\d+', str(challan_no))
                 return int(num_match.group(0)) if num_match else 0
-            return (d.district or '', -get_numeric_value(d.challan_no))  # Negative for descending
+            # Positive for ascending challan order within each district
+            return (d.district or '', get_numeric_value(d.challan_no))
         
         dispatches_sorted = sorted(dispatches, key=sort_key)
 
@@ -361,7 +503,7 @@ def generate_invoice_pdf(request):
                 
                 # Header
                 elements.append(header_table)
-                elements.append(Spacer(1, 10))
+                elements.append(Spacer(1, 6))
 
                 # TO Table with Page number
                 to_content = [
@@ -375,7 +517,6 @@ def generate_invoice_pdf(request):
                 bill_no_content = [
                     Paragraph(f"Bill No : {i_bill_no}", to_style),
                     Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
-                    Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                     Paragraph(f"From : {contract.from_center}", to_style),
                     Paragraph(f"District : {district}", to_style),
                     Paragraph(f"Page : {page_no} ", to_style)
@@ -392,12 +533,12 @@ def generate_invoice_pdf(request):
                 ]))
                 elements.append(to_table)
                 elements.append(Spacer(1,3))
-                elements.append(Paragraph("<cneter><b>PERTICULARS</b></center>", center_style))
+                elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
                 elements.append(Spacer(1,3))
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
-                elements.append(Spacer(1,20))
+                elements.append(Spacer(1,8))
 
                 # Signature per page
                 signature_data = [
@@ -424,7 +565,7 @@ def generate_invoice_pdf(request):
             if i > 0: elements.append(PageBreak())
 
             elements.append(header_table)
-            elements.append(Spacer(1,10))
+            elements.append(Spacer(1,6))
 
             # TO Table
             to_content = [
@@ -438,7 +579,6 @@ def generate_invoice_pdf(request):
             bill_no_content = [
                 Paragraph(f"Bill No : {i_bill_no}", to_style),
                 Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
-                Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                 Paragraph(f"From : {contract.from_center}", to_style),
                 Paragraph(f"Page : {page_no} of {total_pages}", to_style)
             ]
@@ -453,11 +593,11 @@ def generate_invoice_pdf(request):
             
             elements.append(to_table)
             elements.append(Spacer(1,3))
-            elements.append(Paragraph("<cneter><b>PERTICULARS</b></center>", center_style))
+            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
             elements.append(Spacer(1,3))
             # Dispatch Table
             elements.append(build_table_page(dispatch_chunk,add_total_row=False, is_last_page=is_last_page, all_dispatches=dispatches))
-            elements.append(Spacer(1,20))
+            elements.append(Spacer(1,8))
 
             # Signature per page
             signature_data = [
@@ -509,15 +649,23 @@ def download_generate_invoice_pdf(request):
             return redirect("view-dispatch-invoice")
    
         dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
-        # Sort by challan_no in descending order
-        dispatches = sort_dispatches_by_challan_desc(dispatches)
+        # Sort by challan_no in ascending order
+        dispatches = sort_dispatches_by_challan_asc(dispatches)
    
         bill_date_str = request.POST.get("bill_date")
         bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else None
         
     # --- PDF Generation ---
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=2*mm, leftMargin=2*mm, topMargin=3*mm, bottomMargin=5*mm)
+    # Keep margins tight for single-page readability
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=2 * mm,
+        leftMargin=2 * mm,
+        topMargin=2 * mm,
+        bottomMargin=2 * mm,
+    )
     styles = getSampleStyleSheet()
     elements = []
 
@@ -549,15 +697,67 @@ def download_generate_invoice_pdf(request):
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
    
         # Header row
-        data = [[("Challan No" if getattr(contract, f) in [None, "None", "null", ""] else getattr(contract, f))
-                if f=="dc_field" else f.replace("_", " ").title() for f in fields]]
+        label_map = {
+            "sr_no": "Sr No",
+            "depature_date": "Dep Date",
+            "dep_date": "Dep Date",
+            "dc_field": ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))),
+            "truck_no": "Truck No",
+            "party_name": "Party Name",
+            "product_name": "Product",
+            "district": "District",
+            "taluka": "Taluka",
+            "unloading_charge_1": "Unloading 1",
+            "unloading_charge_2": "Unloading 2",
+            "loading_charge": "Loading",
+            "totalfreight": "Freight",
+            "gc_note": "GC Note",
+        }
+        data = [[label_map.get(f, f.replace("_", " ").title()) for f in fields]]
 
         numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
                         "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
+        # Compact typography for larger tables to reduce page breaks
+        compact = len(dispatch_subset) >= 13
+        compact_fs = 6 if compact else None
+        # Taller rows for readability (compact mode still tries to fit one page)
+        compact_leading = 9.5 if compact else None
+
+        center_style_desc_local = ParagraphStyle(
+            name="CenterDescLocalDl",
+            parent=center_style_desc,
+            fontSize=compact_fs or center_style_desc.fontSize,
+            leading=compact_leading or center_style_desc.leading,
+        )
+        to_style_desc_local = ParagraphStyle(
+            name="ToDescLocalDl",
+            parent=to_style_desc,
+            fontSize=compact_fs or to_style_desc.fontSize,
+            leading=compact_leading or to_style_desc.leading,
+        )
+        to_right_style_desc_local = ParagraphStyle(
+            name="ToRightDescLocalDl",
+            parent=to_right_style_desc,
+            fontSize=compact_fs or to_right_style_desc.fontSize,
+            leading=compact_leading or to_right_style_desc.leading,
+        )
+        to_right_style_desc_heading_local = ParagraphStyle(
+            name="ToRightDescHeadingLocalDl",
+            parent=to_right_style_desc_heading,
+            fontSize=(compact_fs + 0.5) if compact else to_right_style_desc_heading.fontSize,
+            leading=(compact_leading + 1) if compact else to_right_style_desc_heading.leading,
+        )
+        total_style_local = ParagraphStyle(
+            name="TotalStyleLocalDl",
+            parent=total_style,
+            fontSize=compact_fs or total_style.fontSize,
+            leading=compact_leading or total_style.leading,
+        )
+
         # Initialize page totals
-        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = total_rate = total_km = 0
+        total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = 0
 
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=1):
@@ -572,8 +772,6 @@ def download_generate_invoice_pdf(request):
             total_loading_sum += float(d.loading_charge or 0)
             total_amount_sum += total_amount
             total_weight += float(d.weight or 0)
-            total_rate += float(d.rate or 0)
-            total_km += float(d.km or 0)
 
             row = []
             for field in fields:
@@ -591,6 +789,10 @@ def download_generate_invoice_pdf(request):
                     row.append(f"{total_amount:.2f}")
                 elif field == "gc_note":
                     row.append(d.gc_note_no)
+                elif field == "main_party":
+                    row.append(d.main_party or "")
+                elif field == "sub_party":
+                    row.append(d.sub_party or "")
                 else:
                     row.append(getattr(d, field, ""))
             data.append(row)                
@@ -610,7 +812,7 @@ def download_generate_invoice_pdf(request):
 
         if add_total:
             # Calculate totals
-            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
+            total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = 0
             for d in dispatches_to_sum:
                 total_amount = (float(d.totalfreight or 0) +
                                 float(d.unloading_charge_1 or 0) +
@@ -622,16 +824,10 @@ def download_generate_invoice_pdf(request):
                 total_loading_sum += float(d.loading_charge or 0)
                 total_amount_sum += total_amount
                 total_weight += float(d.weight or 0)
-                total_rate += float(d.rate or 0)
-                total_km += float(d.km or 0)
 
             for i, field in enumerate(fields):
                 if field == "weight":
                     total_row.append(f"{total_weight:.3f}")
-                elif field == "km":
-                    total_row.append(f"{total_km:.3f}")
-                elif field == "rate":
-                    total_row.append(f"{total_rate:.2f}")
                 elif field in ("luggage", "totalfreight"):
                     total_row.append(f"{total_freight_sum:.2f}")
                 elif field == "unloading_charge_1":
@@ -650,17 +846,20 @@ def download_generate_invoice_pdf(request):
         # Special column widths
         special_widths = {
             "Sr No": width_for_chars(5) * mm,
-            f"{contract.dc_field}": width_for_chars(16) * mm,
-            "truck_no": width_for_chars(10) * mm,
-            "Party Name": width_for_chars(25) * mm,
-            "Product Name": width_for_chars(14) * mm,
+            ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): width_for_chars(15) * mm,
+            "Truck No": width_for_chars(22) * mm,
+            "Party Name": width_for_chars(12) * mm,
+            "Product": width_for_chars(12) * mm,
             "Gc Note": width_for_chars(8) * mm,
             "Weight": width_for_chars(10) * mm,
             "Km": width_for_chars(5) * mm,
             "Rate": width_for_chars(12) * mm,
-            "Luggage": width_for_chars(14) * mm,
-            "Unloading Charge 1": width_for_chars(14) * mm,
-            "Loading Charge": width_for_chars(14) * mm,
+            "Luggage": width_for_chars(12) * mm,
+            "Unloading 1": width_for_chars(12) * mm,
+            "Unloading 2": width_for_chars(12) * mm,
+            "Loading": width_for_chars(12) * mm,
+            "Freight": width_for_chars(12) * mm,
+            "Dep Date": width_for_chars(12) * mm,
         }
 
         table_width = 288 * mm
@@ -684,12 +883,12 @@ def download_generate_invoice_pdf(request):
             for j, cell in enumerate(row):
                 field_name = fields[j]
                 if i == 0:  # header
-                    style = to_right_style_desc_heading if field_name in numeric_fields else center_style_desc if field_name in center_fields else to_style_desc
+                    style = to_right_style_desc_heading_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(f"<b>{cell}</b>", style)
                 elif add_total and i == len(data) - 1:  # total/grand total row
-                    row[j] = Paragraph(str(cell), total_style)
+                    row[j] = Paragraph(str(cell), total_style_local)
                 else:
-                    style = to_right_style_desc if field_name in numeric_fields else center_style_desc if field_name in center_fields else to_style_desc
+                    style = to_right_style_desc_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(str(cell), style)
 
         table = Table(data, colWidths=col_widths, repeatRows=1)
@@ -700,15 +899,21 @@ def download_generate_invoice_pdf(request):
             ("VALIGN", (0,0), (-1,-1), "TOP"),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-            ("LEFTPADDING", (0,0), (-1,-1), 2),
-            ("RIGHTPADDING", (0,0), (-1,-1), 2),
-            ("TOPPADDING", (0,0), (-1,0), 4),
-            ("BOTTOMPADDING", (0,0), (-1,0), 4),
-            ("TOPPADDING", (0,1), (-1,-2), 2),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 2),
+            ("LEFTPADDING", (0,0), (-1,-1), 1 if compact else 2),
+            ("RIGHTPADDING", (0,0), (-1,-1), 1 if compact else 2),
+            # Header row height
+            ("TOPPADDING", (0,0), (-1,0), 4 if compact else 7),
+            ("BOTTOMPADDING", (0,0), (-1,0), 4 if compact else 7),
+            # Body row height
+            ("TOPPADDING", (0,1), (-1,-2), 3 if compact else 4),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 3 if compact else 4),
             ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 0.2, colors.black),
+            ("GRID", (0,0), (-1,-1), 0.15, colors.lightgrey),
         ]
+        for r in range(1, len(data) - (1 if add_total else 0)):
+            if (r % 2) == 0:
+                styles.append(("BACKGROUND", (0, r), (-1, r), colors.HexColor("#FAFAFA")))
         if add_total:
             styles += [
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
@@ -728,14 +933,15 @@ def download_generate_invoice_pdf(request):
     # --- Split dispatches per page ---
     if contract.rate_type == "Distric-Wise":
         page_no=1  
-        # Sort dispatches by district, then by challan_no (descending) within each district
+        # Sort dispatches by district, then by challan_no (ascending) within each district
         def sort_key(d):
             def get_numeric_value(challan_no):
                 if not challan_no:
                     return 0
                 num_match = re.search(r'\d+', str(challan_no))
                 return int(num_match.group(0)) if num_match else 0
-            return (d.district or '', -get_numeric_value(d.challan_no))  # Negative for descending
+            # Positive for ascending challan order within each district
+            return (d.district or '', get_numeric_value(d.challan_no))
         
         dispatches_sorted = sorted(dispatches, key=sort_key)
     
@@ -752,7 +958,7 @@ def download_generate_invoice_pdf(request):
                 
                 # Header
                 elements.append(header_table)
-                elements.append(Spacer(1, 10))
+                elements.append(Spacer(1, 6))
 
                 # TO Table with Page number
                 to_content = [
@@ -766,7 +972,6 @@ def download_generate_invoice_pdf(request):
                 bill_no_content = [
                     Paragraph(f"Bill No : {invoice.Bill_no}", to_style),
                     Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
-                    Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                     Paragraph(f"From : {contract.from_center}", to_style),
                     Paragraph(f"District : {district}", to_style),
                     Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
@@ -784,12 +989,12 @@ def download_generate_invoice_pdf(request):
                 ]))
                 elements.append(to_table)
                 elements.append(Spacer(1,3))
-                elements.append(Paragraph("<cneter><b>PERTICULARS</b></center>", center_style))
+                elements.append(Paragraph("<center><b>PERTICULARS</b></center>", center_style))
                 elements.append(Spacer(1,3))
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
-                elements.append(Spacer(1,20))
+                elements.append(Spacer(1,8))
 
                 # Signature per page
                 signature_data = [
@@ -817,7 +1022,7 @@ def download_generate_invoice_pdf(request):
                 elements.append(PageBreak())
 
             elements.append(header_table)
-            elements.append(Spacer(1, 10))
+            elements.append(Spacer(1, 6))
 
             # TO Table
             to_content = [
@@ -831,7 +1036,6 @@ def download_generate_invoice_pdf(request):
             bill_no_content = [
                 Paragraph(f"Bill No : {invoice.Bill_no}", to_style),
                 Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
-                Paragraph(f"RR Number : {invoice.rr_number or ''}", to_style) if invoice.rr_number else Paragraph("", to_style),
                 Paragraph(f"From : {contract.from_center}", to_style),
                 Paragraph(f"Page : {page_no} of {total_pages}", to_style)
             ]
@@ -846,12 +1050,12 @@ def download_generate_invoice_pdf(request):
                                         ("RIGHTPADDING",(0,0),(-1,-1),0)]))
             elements.append(to_table)  
             elements.append(Spacer(1,3))
-            elements.append(Paragraph("<cneter><b>PERTICULARS</b></center>", center_style))
+            elements.append(Paragraph("<center><b>PERTICULARS</b></center>", center_style))
             elements.append(Spacer(1,3))
 
             # **Build table only ONCE per page**
             elements.append(build_table_page(dispatch_chunk, add_total_row=False, is_last_page=is_last_page, all_dispatches=dispatches))
-            elements.append(Spacer(1,20))
+            elements.append(Spacer(1,8))
 
             # Signature
             signature_data = [
@@ -998,4 +1202,331 @@ def width_for_chars(num_chars, font_size=6, factor=0.6):
     """Estimate width in mm for given characters at a font size."""
     char_width_pt = font_size * factor  # width in points
     total_width_pt = num_chars * char_width_pt  
-    return total_width_pt / 2.835 
+    return total_width_pt / 2.835
+
+@session_required
+def generate_summary_pdf(request):
+    if request.method != "POST":
+        return redirect("summary-view")
+    
+    contract_id = request.POST.get("contract_no")
+    bill_ids = [int(i) for i in request.POST.getlist("bill_ids")]
+    summary_date_str = request.POST.get("summary_date")
+    
+    if not contract_id or not bill_ids:
+        messages.error(request, "Please select contract and at least one bill.")
+        return redirect("summary-view")
+    
+    try:
+        contract = T_Contract.objects.get(id=contract_id, company_id=request.session['company_info']['company_id'])
+        company = Company_user.objects.get(id=request.session['company_info']['company_id'])
+        try:
+            company_profile = Company_profile.objects.get(company_id=company)
+        except Company_profile.DoesNotExist:
+            company_profile = None
+    except (T_Contract.DoesNotExist, Company_user.DoesNotExist):
+        messages.error(request, "Contract or company not found!")
+        return redirect("summary-view")
+    
+    # Get selected invoices
+    invoices = Invoice.objects.filter(
+        id__in=bill_ids,
+        contract_id=contract_id,
+        company_id=request.session['company_info']['company_id']
+    ).order_by('Bill_no')
+    
+    if not invoices.exists():
+        messages.error(request, "No valid bills found.")
+        return redirect("summary-view")
+    
+    # Parse summary date
+    summary_date = None
+    if summary_date_str:
+        try:
+            summary_date = datetime.strptime(summary_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            summary_date = datetime.now().date()
+    else:
+        summary_date = datetime.now().date()
+    
+    # Collect bill data with totals
+    bills_data = []
+    total_mt = 0
+    total_bill_amount = 0
+    total_loading = 0
+    total_unloading1 = 0
+    total_unloading2 = 0
+    total_grand_total = 0
+    
+    for invoice in invoices:
+        dispatches = invoice.dispatch_list.all()
+        
+        if dispatches.exists():
+            bill_mt = sum(float(d.weight) for d in dispatches if d.weight)
+            bill_amount = sum(float(d.totalfreight) for d in dispatches if d.totalfreight)
+            bill_loading = sum(float(d.loading_charge) for d in dispatches if d.loading_charge)
+            bill_unloading1 = sum(float(d.unloading_charge_1) for d in dispatches if d.unloading_charge_1)
+            bill_unloading2 = sum(float(d.unloading_charge_2) for d in dispatches if d.unloading_charge_2)
+            
+            bill_grand_total = bill_amount + bill_loading + bill_unloading1 + bill_unloading2
+            
+            bills_data.append({
+                'bill_no': invoice.Bill_no,
+                'mt': bill_mt,
+                'bill_amount': bill_amount,
+                'loading': bill_loading,
+                'unloading1': bill_unloading1,
+                'unloading2': bill_unloading2,
+                'grand_total': bill_grand_total,
+            })
+            
+            total_mt += bill_mt
+            total_bill_amount += bill_amount
+            total_loading += bill_loading
+            total_unloading1 += bill_unloading1
+            total_unloading2 += bill_unloading2
+            total_grand_total += bill_grand_total
+    
+    # Get product name from first dispatch in selected invoices
+    product_name = ""
+    for invoice in invoices:
+        dispatches = invoice.dispatch_list.all()
+        if dispatches.exists():
+            product_name = dispatches.first().product_name
+            break
+    
+    # PDF Generation (match requested "Bill Summary" format)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=12 * mm,
+        leftMargin=12 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+    )
+    elements = []
+
+    # ---- Styles ----
+    title_center = ParagraphStyle(name="TitleCenter", fontName="Helvetica-Bold", fontSize=12, alignment=1, leading=14)
+    small_center = ParagraphStyle(name="SmallCenter", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
+    normal = ParagraphStyle(name="Normal", fontName="Helvetica", fontSize=9, alignment=0, leading=11)
+    normal_bold = ParagraphStyle(name="NormalBold", fontName="Helvetica-Bold", fontSize=9, alignment=0, leading=11)
+    right = ParagraphStyle(name="Right", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
+    right_bold = ParagraphStyle(name="RightBold", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)
+    center_bold = ParagraphStyle(name="CenterBold", fontName="Helvetica-Bold", fontSize=10, alignment=1, leading=12)
+    cell_center = ParagraphStyle(name="CellCenter", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
+    cell_right = ParagraphStyle(name="CellRight", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
+    cell_header = ParagraphStyle(name="CellHeader", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)
+
+    company_name = (company.company_name or "").upper()
+    pan_no = (company_profile.pan_number if company_profile and company_profile.pan_number else "") if company_profile else ""
+    gstin_no = (company.gst_number or "") if hasattr(company, "gst_number") else ""
+
+    # ---- Header box ----
+    header_lines = []
+    if company_profile:
+        addr_parts = [company_profile.address, company_profile.city, company_profile.state]
+        addr = ", ".join([p for p in addr_parts if p])
+        if company_profile.pincode:
+            addr = f"{addr} - {company_profile.pincode}" if addr else str(company_profile.pincode)
+        if addr:
+            header_lines.append(Paragraph(addr, small_center))
+
+    pan_gst_line = "  ".join([p for p in [f"PAN NO.{pan_no}" if pan_no else "", f"GSTIN:{gstin_no}" if gstin_no else ""] if p])
+
+    header_cell = [
+        Paragraph(company_name, title_center),
+        Spacer(1, 2),
+        *header_lines,
+        Spacer(1, 2),
+        Paragraph(pan_gst_line, small_center) if pan_gst_line else Paragraph("", small_center),
+    ]
+    header_table = Table([[header_cell]], colWidths=[A4[0] - doc.leftMargin - doc.rightMargin])
+    header_table.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 1, colors.black),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    elements.append(header_table)
+    elements.append(Spacer(1, 8))
+
+    # ---- To + Date row ----
+    date_str = summary_date.strftime("%d.%m.%Y")
+    to_lines = [
+        Paragraph("To,", normal),
+        Paragraph("The State Manager", normal_bold),
+        Paragraph(f"{(contract.company_name or '').upper()}.", normal_bold),
+    ]
+    if contract.billing_address:
+        to_lines.append(Paragraph(contract.billing_address, normal))
+    city_state = ", ".join([p for p in [contract.billing_city, contract.billing_state] if p])
+    if city_state:
+        to_lines.append(Paragraph(city_state, normal))
+    if contract.billing_pin:
+        to_lines.append(Paragraph(f"PIN: {contract.billing_pin}", normal))
+    if contract.gst_number:
+        to_lines.append(Paragraph(f"GST NO.{contract.gst_number}", normal))
+
+    to_date_table = Table(
+        [[to_lines, [Paragraph(f"Date: {date_str}", right)]]],
+        colWidths=[(A4[0] - doc.leftMargin - doc.rightMargin) * 0.7, (A4[0] - doc.leftMargin - doc.rightMargin) * 0.3],
+    )
+    to_date_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    elements.append(to_date_table)
+    elements.append(Spacer(1, 6))
+
+    elements.append(Paragraph("Bill Summary", center_bold))
+    elements.append(Spacer(1, 6))
+
+    # ---- FROM + Product row ----
+    from_text = contract.from_center or ""
+    product_text = product_name or ""
+    from_prod_table = Table(
+        [[Paragraph(f"<b>FROM:</b> {from_text}", normal), Paragraph(f"<b>Product :</b> {product_text}", right)]],
+        colWidths=[(A4[0] - doc.leftMargin - doc.rightMargin) * 0.5, (A4[0] - doc.leftMargin - doc.rightMargin) * 0.5],
+    )
+    from_prod_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    elements.append(from_prod_table)
+    elements.append(Spacer(1, 6))
+
+    # ---- Bills table (Sr, Bill No, M.T, Bill Amount, Loading, Unloading1, Unloading2, Grand Total) ----
+    table_data = [
+        [
+            Paragraph("Sr.", cell_header),
+            Paragraph("Bill No.", cell_header),
+            Paragraph("M.T", cell_header),
+            Paragraph("Bill Amount Rs.", cell_header),
+            Paragraph("Loading Rs.", cell_header),
+            Paragraph("Unloading 1 Rs.", cell_header),
+            Paragraph("Unloading 2 Rs.", cell_header),
+            Paragraph("Grand Total Rs.", cell_header),
+        ]
+    ]
+    for idx, bill in enumerate(bills_data, 1):
+        table_data.append(
+            [
+                Paragraph(str(idx), cell_center),
+                Paragraph(str(bill["bill_no"]), cell_center),
+                Paragraph(f"{bill['mt']:.3f}", cell_right),
+                Paragraph(f"{bill['bill_amount']:.2f}", cell_right),
+                Paragraph(f"{bill['loading']:.2f}", cell_right),
+                Paragraph(f"{bill['unloading1']:.2f}", cell_right),
+                Paragraph(f"{bill['unloading2']:.2f}", cell_right),
+                Paragraph(f"{bill['grand_total']:.2f}", cell_right),
+            ]
+        )
+
+    # Total row: "Total" spanning first two columns
+    table_data.append(
+        [
+            Paragraph("Total", ParagraphStyle(name="TotalLeft", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)),
+            "",
+            Paragraph(f"{total_mt:.3f}", ParagraphStyle(name="TotalRight", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_bill_amount:.2f}", ParagraphStyle(name="TotalRight2", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_loading:.2f}", ParagraphStyle(name="TotalRight3", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_unloading1:.2f}", ParagraphStyle(name="TotalRight4", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_unloading2:.2f}", ParagraphStyle(name="TotalRight5", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_grand_total:.2f}", ParagraphStyle(name="TotalRight6", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+        ]
+    )
+
+    available_w = A4[0] - doc.leftMargin - doc.rightMargin
+    # Fit 8 columns into available width while keeping Bill No readable
+    col_widths = [
+        9 * mm,   # Sr
+        35 * mm,  # Bill No
+        20 * mm,  # MT
+        26 * mm,  # Bill Amount
+        22 * mm,  # Loading
+        24 * mm,  # Unloading 1
+        24 * mm,  # Unloading 2
+        0,        # Grand total (computed)
+    ]
+    fixed = sum(w for w in col_widths if w)
+    col_widths[-1] = max(20 * mm, available_w - fixed)
+
+    bill_table = Table(table_data, colWidths=col_widths)
+    bill_table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                ("SPAN", (0, -1), (1, -1)),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    elements.append(bill_table)
+    elements.append(Spacer(1, 10))
+
+    # ---- Footer note + Signature ----
+    elements.append(Paragraph("*GST Shall be paid by KRIBHCO under", normal))
+    elements.append(Paragraph("RCM", normal))
+    elements.append(Spacer(1, 14))
+
+    sig_table = Table(
+        [
+            [
+                Paragraph("", normal),
+                Paragraph(f"FOR NARMADA TRANSPORT" if not company_name else f"FOR {company_name}", right_bold),
+            ],
+            ["", Paragraph("__________________", right)],
+            ["", Paragraph("Authorised Signatory", right_bold)],
+        ],
+        colWidths=[available_w * 0.55, available_w * 0.45],
+    )
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
+    elements.append(sig_table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    filename = f"{contract.company_name}_{summary_date.strftime('%Y%m%d')}_Summary.pdf"
+    return FileResponse(buffer, as_attachment=True, filename=filename) 

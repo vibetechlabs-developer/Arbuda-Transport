@@ -88,6 +88,20 @@
                   placeholder="Enter party name" autofocus oninput=" this.classList.remove('invalid')" required />
               </div>
             </div>
+            <div class="row" id="main_party_row" style="display: none;">
+              <div class="mb-3 col-sm-6">
+                <label for="main_party" class="form-label">Main Party</label>
+                <input type="text" class="form-control" id="main_party" name="main_party" placeholder="Enter main party"
+                  autofocus oninput=" this.classList.remove('invalid')" />
+              </div>
+            </div>
+            <div class="row" id="sub_party_row" style="display: none;">
+              <div class="mb-3 col-sm-6">
+                <label for="sub_party" class="form-label">Sub Party</label>
+                <input type="text" class="form-control" id="sub_party" name="sub_party" placeholder="Enter sub party"
+                  autofocus oninput=" this.classList.remove('invalid')" />
+              </div>
+            </div>
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="destination" class="form-label">Destination</label>
@@ -509,6 +523,8 @@
     if (data.party_name) document.getElementById('party_name').value = data.party_name;
     if (data.from_center) document.getElementById('from_center').value = data.from_center;
     if (data.truck_no) document.getElementById('truck_no').value = data.truck_no;
+    if (data.main_party) document.getElementById('main_party').value = data.main_party;
+    if (data.sub_party) document.getElementById('sub_party').value = data.sub_party;
 
     // Destination – prefer selecting via Destination ID so existing km/rate logic works
     if (data.destination_id && destinationTomSelect) {
@@ -579,6 +595,19 @@
           document.getElementById('i_unloading_charge_1').value = 0;
           document.getElementById('i_unloading_charge_2').value = 0;
           document.getElementById('i_loading_charge').value = 0;
+        }
+        // Show/hide main_party and sub_party fields based on invoice_fields
+        if (data.invoice_fields) {
+          const invoiceFields = Array.isArray(data.invoice_fields) ? data.invoice_fields : [];
+          const mainPartyRow = document.getElementById('main_party_row');
+          const subPartyRow = document.getElementById('sub_party_row');
+          
+          if (mainPartyRow) {
+            mainPartyRow.style.display = invoiceFields.includes('main_party') ? 'flex' : 'none';
+          }
+          if (subPartyRow) {
+            subPartyRow.style.display = invoiceFields.includes('sub_party') ? 'flex' : 'none';
+          }
         }
         if (data.destinations) {
           updateDestinations(data.destinations);

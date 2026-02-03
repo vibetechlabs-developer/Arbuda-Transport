@@ -392,6 +392,7 @@ function renderTable(dispatches, fields) {
       editBtn.style.textAlign = "center";
       editBtn.style.padding = "5px 10px";
       editBtn.className = "btn btn-outline-primary";
+      editBtn.id = `edit-btn-${dest.id}`;
       const editIcon = document.createElement("i");
       editIcon.className = "bx bx-edit";
       editIcon.style.fontSize = "1rem";
@@ -399,6 +400,29 @@ function renderTable(dispatches, fields) {
       editLink.appendChild(editBtn);
       actionTd.appendChild(editLink);
       tr.appendChild(actionTd);
+
+      // In "In Invoice" table:
+      // - While the checkbox is checked, the dispatch remains in this invoice → editing is blocked.
+      // - When the checkbox is unchecked, the user intends to remove it from the invoice → allow editing.
+      const setEditState = (disabled) => {
+        editBtn.disabled = disabled;
+        editLink.style.pointerEvents = disabled ? "none" : "auto";
+        editLink.style.opacity = disabled ? "0.5" : "1";
+        editBtn.style.cursor = disabled ? "not-allowed" : "pointer";
+      };
+
+      // Initial state: all rows are part of the invoice, so their checkboxes are checked
+      // and editing should be disabled until user unchecks them.
+      setEditState(true);
+
+      // Toggle edit availability when user checks/unchecks the row
+      checkbox.addEventListener("change", function() {
+        if (this.checked) {
+          setEditState(true);
+        } else {
+          setEditState(false);
+        }
+      });
 
       tableBody.appendChild(tr);
     });
@@ -522,6 +546,7 @@ function renderTable(dispatches, fields) {
       editBtn.style.textAlign = "center";
       editBtn.style.padding = "5px 10px";
       editBtn.className = "btn btn-outline-primary";
+      editBtn.id = `edit-btn-ninv-${dest.id}`;
       const editIcon = document.createElement("i");
       editIcon.className = "bx bx-edit";
       editIcon.style.fontSize = "1rem";
@@ -529,6 +554,13 @@ function renderTable(dispatches, fields) {
       editLink.appendChild(editBtn);
       actionTd.appendChild(editLink);
       tr.appendChild(actionTd);
+
+      // In "Not In Invoice" table, dispatches are already free from invoices,
+      // so editing should always be allowed regardless of checkbox state.
+      editBtn.disabled = false;
+      editLink.style.pointerEvents = "auto";
+      editLink.style.opacity = "1";
+      editBtn.style.cursor = "pointer";
 
       tableBody.appendChild(tr);
     });

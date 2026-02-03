@@ -267,8 +267,8 @@
   let allDispatches = []; // store fetched data globally
   let allfield 
 
-  // Helper function to sort dispatches by challan_no in descending order
-  function sortByChallanNoDesc(dispatches) {
+  // Helper function to sort dispatches by challan_no in ascending order
+  function sortByChallanNoAsc(dispatches) {
     return dispatches.sort((a, b) => {
       // Extract numeric value from challan_no (handle cases like "0005", "0009", etc.)
       const getNumericValue = (challan) => {
@@ -279,7 +279,7 @@
       };
       const numA = getNumericValue(a.challan_no);
       const numB = getNumericValue(b.challan_no);
-      return numB - numA; // Descending order
+      return numA - numB; // Ascending order
     });
   }
 
@@ -302,8 +302,8 @@
           document.getElementById("bill_date").value = data.bill_date;
           document.getElementById("contract_no").value = data.contract_no;
           document.getElementById("contract_id").value = data.contract_id;
-          // Sort by challan_no in descending order
-          allDispatches = sortByChallanNoDesc(data.destinations);
+          // Sort by challan_no in ascending order
+          allDispatches = sortByChallanNoAsc(data.destinations);
           allfield = data.fields // save all data
           
           renderTable(allDispatches, data.fields); // render initially
@@ -355,8 +355,8 @@ function filterTable() {
     return matchesSearch && matchesDate; // must match both
   });
 
-  // Sort filtered results by challan_no in descending order
-  const sortedFiltered = sortByChallanNoDesc([...filtered]);
+  // Sort filtered results by challan_no in ascending order
+  const sortedFiltered = sortByChallanNoAsc([...filtered]);
   renderTable(sortedFiltered, allfield);
 }
 function isNumericValue(value) {

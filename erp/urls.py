@@ -32,6 +32,7 @@ urlpatterns = [
 
     path("client-report-view", report_view.client_report_view, name="client-report-view"),
     path("internal-report", report_view.internal_report, name="internal-report"),
+    path("download-our-report", report_view.download_our_report, name="download-our-report"),
 
     # dispatch invoice and gc note
     path("view-dispatch-invoice", transport_views.view_dispatch_Invoice, name="view-dispatch-invoice"), # created view
@@ -48,7 +49,12 @@ urlpatterns = [
     # others master
     path('rate-master-view' , transport_views.Rate_master_view, name='rate-master-view'),
     path('rout-view', transport_views.rout_view , name='rout-view'), # destination view
+    path('rout-update', transport_views.rout_update, name='rout-update'), # route update
     path('product-master-view', transport_views.product_master_view , name='product-master-view'), # product list
+
+    # summary
+    path('summary-view', transport_views.summary_view, name='summary-view'),
+    path('generate-summary-pdf', download_views.generate_summary_pdf, name='generate-summary-pdf'),
 
 ]
 if settings.DEBUG:

@@ -1,0 +1,293 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Summary </title>
+{% endblock %}
+
+{% block content %}
+<style>
+  mark {
+    background: yellow;
+    color: black;
+    font-weight: bold;
+    border-radius: 2px;
+  }
+</style>
+
+<div class="container-xxl"> 
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Summary</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <!-- Register Card -->
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST" action="{% url 'generate-summary-pdf' %}">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Summary Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_no" class="form-label">Contract no.</label>
+                <select class="form-select ts-select" name="contract_no" id="contract_no"
+                  placeholder="Select contract no" autocomplete="off" onchange="fetchBills()" required>
+                  <option value="" disabled selected>Select contract no</option>
+                  {% for contract in allcontract %}
+                  <option value="{{ contract.id }}">
+                    {{ contract.company_name }} -- {{ contract.contract_no }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="summary_date" class="form-label">Summary Date</label>
+                <input type="date" class="form-control" id="summary_date" name="summary_date" autofocus
+                  oninput="this.classList.remove('invalid')" required />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="from_center" class="form-label">From</label>
+                <input type="text" class="form-control" id="from_center" name="from_center" autofocus
+                  oninput="this.classList.remove('invalid')" placeholder="From center" required readonly />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="product_name" class="form-label">Product</label>
+                <input type="text" class="form-control" id="product_name" name="product_name" autofocus
+                  oninput="this.classList.remove('invalid')" placeholder="Product name" required readonly />
+              </div>
+            </div>
+            <h5 class="text-primary fw-semibold mb-3 mt-4">Select Bills</h5>
+            <div class="row">
+              <div class="table-responsive mb-3">
+                <table id="billsTable" class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>
+                        <input type="checkbox" id="selectAll" onchange="toggleAllBills()" />
+                      </th>
+                      <th>Sr.</th>
+                      <th>Bill No.</th>
+                      <th>Bill Date</th>
+                      <th>M.T</th>
+                      <th>Bill Amount</th>
+                      <th>Loading Charge</th>
+                      <th>Unloading 1</th>
+                      <th>Unloading 2</th>
+                      <th>Grand Total</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billsTableBody">
+                    <tr>
+                      <td colspan="10" class="text-center">Please select a contract to view bills</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr id="billsTableFooter">
+                      <td colspan="4" class="text-end fw-bold">Total:</td>
+                      <td id="totalMT" class="fw-bold">0.000</td>
+                      <td id="totalBillAmount" class="fw-bold">0.00</td>
+                      <td id="totalLoading" class="fw-bold">0.00</td>
+                      <td id="totalUnloading1" class="fw-bold">0.00</td>
+                      <td id="totalUnloading2" class="fw-bold">0.00</td>
+                      <td id="totalGrandTotal" class="fw-bold">0.00</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <button type="submit" class="btn btn-primary d-grid w-100">Generate Summary PDF</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script>
+  document.querySelectorAll('.ts-select').forEach((el) => {
+    let settings = {};
+    new TomSelect(el, settings);
+  });
+
+  let allBills = [];
+  let contractData = null;
+
+  function getContractValue() {
+    const contractSelect = document.getElementById("contract_no");
+    if (contractSelect && contractSelect.tomselect) {
+      return contractSelect.tomselect.getValue();
+    }
+    return contractSelect ? contractSelect.value : "";
+  }
+
+  function fetchBills() {
+    const contract_id = getContractValue();
+    if (!contract_id) {
+      document.getElementById("billsTableBody").innerHTML = 
+        '<tr><td colspan="10" class="text-center">Please select a contract to view bills</td></tr>';
+      return;
+    }
+
+    fetch(`/api/get-contract-bills?contract-id=${encodeURIComponent(contract_id)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          alert(data.error);
+          return;
+        }
+
+        contractData = data.contract;
+        allBills = data.bills || [];
+        
+        // Set contract details
+        document.getElementById("from_center").value = data.contract.from_center || "";
+        document.getElementById("product_name").value = data.contract.product_name || "";
+
+        renderBillsTable();
+      })
+      .catch(err => {
+        console.error('Error fetching bills:', err);
+        alert('Error fetching bills. Please try again.');
+      });
+  }
+
+  function renderBillsTable() {
+    const tbody = document.getElementById("billsTableBody");
+    tbody.innerHTML = "";
+
+    if (allBills.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center">No bills found for this contract</td></tr>';
+      updateTotals();
+      return;
+    }
+
+    allBills.forEach((bill, index) => {
+      const tr = document.createElement("tr");
+      
+      // Checkbox
+      const checkboxTd = document.createElement("td");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "bill_ids";
+      checkbox.value = bill.id;
+      checkbox.classList.add("bill-checkbox");
+      checkbox.checked = true; // Default to checked
+      checkbox.onchange = updateTotals;
+      checkboxTd.appendChild(checkbox);
+      tr.appendChild(checkboxTd);
+
+      // Sr.
+      const srTd = document.createElement("td");
+      srTd.textContent = index + 1;
+      tr.appendChild(srTd);
+
+      // Bill No.
+      const billNoTd = document.createElement("td");
+      billNoTd.textContent = bill.bill_no;
+      tr.appendChild(billNoTd);
+
+      // Bill Date
+      const billDateTd = document.createElement("td");
+      billDateTd.textContent = bill.bill_date || "";
+      tr.appendChild(billDateTd);
+
+      // M.T (Total Weight)
+      const mtTd = document.createElement("td");
+      mtTd.textContent = parseFloat(bill.total_weight || 0).toFixed(3);
+      tr.appendChild(mtTd);
+
+      // Bill Amount
+      const billAmountTd = document.createElement("td");
+      billAmountTd.textContent = parseFloat(bill.total_freight || 0).toFixed(2);
+      tr.appendChild(billAmountTd);
+
+      // Loading Charge
+      const loadingTd = document.createElement("td");
+      loadingTd.textContent = parseFloat(bill.total_loading || 0).toFixed(2);
+      tr.appendChild(loadingTd);
+
+      // Unloading 1
+      const unloading1Td = document.createElement("td");
+      unloading1Td.textContent = parseFloat(bill.total_unloading1 || 0).toFixed(2);
+      tr.appendChild(unloading1Td);
+
+      // Unloading 2
+      const unloading2Td = document.createElement("td");
+      unloading2Td.textContent = parseFloat(bill.total_unloading2 || 0).toFixed(2);
+      tr.appendChild(unloading2Td);
+
+      // Grand Total
+      const grandTotalTd = document.createElement("td");
+      const grandTotal = parseFloat(bill.total_freight || 0) + 
+                        parseFloat(bill.total_loading || 0) + 
+                        parseFloat(bill.total_unloading1 || 0) + 
+                        parseFloat(bill.total_unloading2 || 0);
+      grandTotalTd.textContent = grandTotal.toFixed(2);
+      tr.appendChild(grandTotalTd);
+
+      tbody.appendChild(tr);
+    });
+
+    updateTotals();
+  }
+
+  function toggleAllBills() {
+    const selectAll = document.getElementById("selectAll");
+    const checkboxes = document.querySelectorAll(".bill-checkbox");
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = selectAll.checked;
+    });
+    updateTotals();
+  }
+
+  function updateTotals() {
+    const checkboxes = document.querySelectorAll(".bill-checkbox:checked");
+    let totalMT = 0;
+    let totalBillAmount = 0;
+    let totalLoading = 0;
+    let totalUnloading1 = 0;
+    let totalUnloading2 = 0;
+    let totalGrandTotal = 0;
+
+    checkboxes.forEach(checkbox => {
+      const row = checkbox.closest("tr");
+      const cells = row.querySelectorAll("td");
+      
+      if (cells.length >= 10) {
+        totalMT += parseFloat(cells[4].textContent || 0);
+        totalBillAmount += parseFloat(cells[5].textContent || 0);
+        totalLoading += parseFloat(cells[6].textContent || 0);
+        totalUnloading1 += parseFloat(cells[7].textContent || 0);
+        totalUnloading2 += parseFloat(cells[8].textContent || 0);
+        totalGrandTotal += parseFloat(cells[9].textContent || 0);
+      }
+    });
+
+    document.getElementById("totalMT").textContent = totalMT.toFixed(3);
+    document.getElementById("totalBillAmount").textContent = totalBillAmount.toFixed(2);
+    document.getElementById("totalLoading").textContent = totalLoading.toFixed(2);
+    document.getElementById("totalUnloading1").textContent = totalUnloading1.toFixed(2);
+    document.getElementById("totalUnloading2").textContent = totalUnloading2.toFixed(2);
+    document.getElementById("totalGrandTotal").textContent = totalGrandTotal.toFixed(2);
+  }
+
+  // Ensure TomSelect-selected contract_no is submitted
+  document.getElementById("formAuthentication").addEventListener("submit", function (e) {
+    const contractSelect = document.getElementById("contract_no");
+    if (contractSelect && contractSelect.tomselect) {
+      contractSelect.value = contractSelect.tomselect.getValue();
+    }
+
+    const checkedBills = document.querySelectorAll(".bill-checkbox:checked");
+    if (checkedBills.length === 0) {
+      e.preventDefault();
+      alert("Please select at least one bill for summary.");
+      return false;
+    }
+  });
+</script>
+
+{% endblock %}

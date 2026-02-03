@@ -83,6 +83,8 @@ class Dispatch(models.Model):
     taluka = models.CharField(max_length=150 , default=0)
     district = models.CharField(max_length=150 , default=0)
     km = models.BigIntegerField()
+    main_party = models.CharField(max_length=150, blank=True, null=True)
+    sub_party = models.CharField(max_length=150, blank=True, null=True)
 
     weight = models.DecimalField(max_digits=10, decimal_places=3)
     rate = models.DecimalField(max_digits=10, decimal_places=4)

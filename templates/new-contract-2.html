@@ -26,24 +26,27 @@
               <div class="mb-3 col-sm-6">
                 <label for="company_name" class="form-label">Company Name</label>
                 <input type="text" class="form-control" id="company_name" name="company_name"
-                  placeholder="Enter Company Name" oninput="this.classList.remove('invalid')" required />
+                  placeholder="Enter Company Name" oninput="this.classList.remove('invalid')" 
+                  value="{% if form_data.company_name %}{{ form_data.company_name }}{% endif %}" required />
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="company_name" class="form-label">GST Number</label>
                 <input type="text" class="form-control" id="gst_number" name="gst_number" placeholder="Enter gst number"
-                  value="" oninput="this.classList.remove('invalid')" required />
+                  value="{% if form_data.gst_number %}{{ form_data.gst_number }}{% endif %}" oninput="this.classList.remove('invalid')" required />
               </div>
             </div>
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="vendor_code" class="form-label">Vendor Code</label>
                 <input type="text" class="form-control" id="vendor_code" name="vendor_code"
-                  placeholder="Enter Vendor Code" oninput="this.classList.remove('invalid')" />
+                  placeholder="Enter Vendor Code" oninput="this.classList.remove('invalid')" 
+                  value="{% if form_data.vendor_code %}{{ form_data.vendor_code }}{% endif %}" />
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="gstin" class="form-label">Pan Number</label>
                 <input type="text" class="form-control" id="pan_number" name="pan_number" placeholder="Enter pan number"
                   autofocus required
+                  value="{% if form_data.pan_number %}{{ form_data.pan_number }}{% endif %}"
                   oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
               </div>
             </div>
@@ -52,6 +55,7 @@
                 <label for="from_center" class="form-label">From Center</label>
                 <input type="text" class="form-control" id="from_center" name="from_center"
                   placeholder="Enter From Center" autofocus
+                  value="{% if form_data.from_center %}{{ form_data.from_center }}{% endif %}"
                   oninput="this.classList.remove('invalid'),this.value =  this.value.toUpperCase()" required />
               </div>
             </div>
@@ -71,9 +75,17 @@
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="contract_no" class="form-label">Contract Number</label>
-                <input type="text" class="form-control" id="contract_no" name="contract_no"
+                <input type="text" class="form-control {% if contract_error %}is-invalid{% endif %}" id="contract_no" name="contract_no"
                   placeholder="Enter contract number" autofocus
-                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" required />
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid', 'is-invalid'); clearContractError(); validateContractNo(this.value)" 
+                  value="{% if form_data.contract_no %}{{ form_data.contract_no }}{% endif %}" required />
+                {% if contract_error %}
+                <div class="invalid-feedback d-block" id="contract_error">
+                  {{ contract_error }}
+                </div>
+                {% else %}
+                <div class="invalid-feedback d-none" id="contract_error"></div>
+                {% endif %}
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="bill_start_date" class="form-label">Bill Serise</label>
@@ -81,11 +93,14 @@
                   <div class="col-sm-6">
                     <input type="text" class="form-control " id="bill_start_date" name="bill_start_date"
                       placeholder="From" autofocus
+                      value="{% if form_data.bill_start_date %}{{ form_data.bill_start_date }}{% endif %}"
                       oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" required />
                   </div>
                   <div class="col-sm-6">
                     <input type="text" class="form-control" id="bill_end_date" name="bill_end_date" placeholder="To"
-                      autofocus oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')"
+                      autofocus 
+                      value="{% if form_data.bill_end_date %}{{ form_data.bill_end_date }}{% endif %}"
+                      oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')"
                       required />
                   </div>
                 </div>
@@ -97,11 +112,13 @@
                 <label for="c_start_date" class="form-label">Contract Start Date</label>
                 <input type="date" class="form-control" id="c_start_date" name="c_start_date"
                   placeholder="Enter pan number" autofocus
+                  value="{% if form_data.c_start_date %}{{ form_data.c_start_date }}{% endif %}"
                   oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" required />
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="c_date" class="form-label">Contract End Date</label>
                 <input type="date" class="form-control" id="c_end_date" name="c_end_date" placeholder="Enter tan number"
+                  value="{% if form_data.c_end_date %}{{ form_data.c_end_date }}{% endif %}"
                   oninput="this.classList.remove('invalid') ,this.value =  this.value.toUpperCase()" required />
               </div>
             </div>
@@ -109,22 +126,26 @@
               <div class="mb-3 col-sm-6">
                 <label for="dc_field" class="form-label">DC Field Name</label>
                 <input type="name" class="form-control" id="dc_field" name="dc_field" placeholder="Enter DC Field Name"
-                  autofocus oninput=" this.classList.remove('invalid')" required />
+                  autofocus 
+                  value="{% if form_data.dc_field %}{{ form_data.dc_field }}{% endif %}"
+                  oninput=" this.classList.remove('invalid')" required />
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="gc_note_required" class="form-label">GC Note required ?</label>
 
                 <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="yes"
-                  id="gc_note_required_yes" onchange="toggleGcinput()" onclick="">
+                  id="gc_note_required_yes" onchange="toggleGcinput()" onclick=""
+                  {% if form_data.gc_note_required == 'yes' %}checked{% endif %}>
                 <label class="form-check-label" for="gc_note_required_yes">Yes</label>
 
                 <input name="gc_note_required" class="form-check-input ms-2" type="radio" value="no"
-                  id="gc_note_required_no" checked onchange="toggleGcinput()" onclick="add_extra_cost()">
+                  id="gc_note_required_no" {% if not form_data.gc_note_required or form_data.gc_note_required == 'no' %}checked{% endif %} onchange="toggleGcinput()" onclick="add_extra_cost()">
                 <label class="form-check-label" for="gc_note_required_no">No</label>
 
-                <div class=" gap-2" id="gc_note_required" style="display: none;">
+                <div class=" gap-2" id="gc_note_required" style="display: {% if form_data.gc_note_required == 'yes' %}flex{% else %}none{% endif %};">
                   <div class="col-sm-6">
                     <input type="text" class="form-control " id="gc_start" name="gc_start" placeholder="From" autofocus
+                      value="{% if form_data.gc_start %}{{ form_data.gc_start }}{% endif %}"
                       oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
                   </div>
                   <script>
@@ -147,12 +168,13 @@
                     <label for="address" class="form-label">Contact Person Name</label>
                     <input type="text" class="form-control" id="cp_name" name="cp_name"
                       placeholder="Enter contact person name" autofocus oninput="this.classList.remove('invalid')"
-                      required />
+                      value="{% if form_data.cp_name %}{{ form_data.cp_name }}{% endif %}" required />
                   </div>
                   <div class="mb-3">
                     <label for="address" class="form-label">Contact Email</label>
                     <input type="text" class="form-control" id="c_email" name="c_email"
-                      placeholder="Enter contact email" autofocus oninput="this.classList.remove('invalid')" required />
+                      placeholder="Enter contact email" autofocus oninput="this.classList.remove('invalid')" 
+                      value="{% if form_data.c_email %}{{ form_data.c_email }}{% endif %}" required />
                   </div>
                 </div>
                 <div class="col-sm-6">
@@ -160,13 +182,14 @@
                     <label for="c_designation" class="form-label">Contact Person Designation</label>
                     <input type="text" class="form-control" id="c_designation" name="c_designation"
                       placeholder="Enter contact person designation" autofocus
+                      value="{% if form_data.c_designation %}{{ form_data.c_designation }}{% endif %}"
                       oninput="this.classList.remove('invalid')" required />
                   </div>
                   <div class="mb-3">
                     <label for="address" class="form-label">Contact Number</label>
                     <input type="text" class="form-control" id="c_number" name="c_number"
                       placeholder="Enter contact number" autofocus oninput="this.classList.remove('invalid')"
-                      required />
+                      value="{% if form_data.c_number %}{{ form_data.c_number }}{% endif %}" required />
                   </div>
                 </div>
               </div>
@@ -206,24 +229,27 @@
                     <label for="address" class="form-label">Adress</label>
                     <input type="text" class="form-control" id="billing_address" name="billing_address"
                       placeholder="Enter billing address" autofocus oninput="this.classList.remove('invalid')"
-                      required />
+                      value="{% if form_data.billing_address %}{{ form_data.billing_address }}{% endif %}" required />
                   </div>
                   <div class="mb-3">
                     <label for="state" class="form-label">State</label>
                     <input type="text" class="form-control" id="billing_state" name="billing_state"
-                      placeholder="Enter biiling state" oninput="this.classList.remove('invalid') " />
+                      placeholder="Enter biiling state" oninput="this.classList.remove('invalid')" 
+                      value="{% if form_data.billing_state %}{{ form_data.billing_state }}{% endif %}" />
                   </div>
                 </div>
                 <div class="col-sm-6">
                   <div class="mb-3">
                     <label for="city" class="form-label">City</label>
                     <input type="text" class="form-control" id="billing_city" name="billing_city"
-                      placeholder="Enter billing city" autofocus oninput=" this.classList.remove('invalid')" required />
+                      placeholder="Enter billing city" autofocus oninput=" this.classList.remove('invalid')" 
+                      value="{% if form_data.billing_city %}{{ form_data.billing_city }}{% endif %}" required />
                   </div>
                   <div class="mb-3">
                     <label for="pin" class="form-label">Pin code</label>
                     <input type="text" class="form-control" id="billing_pin" name="billing_pin"
                       placeholder="Enter billing pin-code" maxlength="6" autofocus
+                      value="{% if form_data.billing_pin %}{{ form_data.billing_pin }}{% endif %}"
                       oninput="this.classList.remove('invalid')" required />
                   </div>
                 </div>
@@ -234,12 +260,12 @@
                   <label for="rate_type" class="form-label">Select Rate Type</label>
                   <select name="rate_type" id="rate_type" class="form-select form-control" onchange="toggleRateType()"
                     required>
-                    <option value="" selected disabled>Select Rate Type</option>
-                    <option value="Kilometer-Wise">Kilometer-Wise</option>
-                    <option value="Taluka-Wise">Taluka-Wise</option>
-                    <option value="Incometax-Wise">Incometax-Wise</option>
-                    <option value="Distric-Wise">Distric-Wise</option>
-                    <option value="Cumulative-Wise">Cumulative-Wise</option>
+                    <option value="" {% if not form_data.rate_type %}selected{% endif %} disabled>Select Rate Type</option>
+                    <option value="Kilometer-Wise" {% if form_data.rate_type == 'Kilometer-Wise' %}selected{% endif %}>Kilometer-Wise</option>
+                    <option value="Taluka-Wise" {% if form_data.rate_type == 'Taluka-Wise' %}selected{% endif %}>Taluka-Wise</option>
+                    <option value="Incometax-Wise" {% if form_data.rate_type == 'Incometax-Wise' %}selected{% endif %}>Incometax-Wise</option>
+                    <option value="Distric-Wise" {% if form_data.rate_type == 'Distric-Wise' %}selected{% endif %}>Distric-Wise</option>
+                    <option value="Cumulative-Wise" {% if form_data.rate_type == 'Cumulative-Wise' %}selected{% endif %}>Cumulative-Wise</option>
                   </select>
                 </div>
               </div>
@@ -304,19 +330,20 @@
                   <div class="d-flex gap-3">
                     <div class="form-check">
                       <input name="loading_rate" class="form-check-input" type="radio" value="yes" id="loadingYes"
-                        onchange="toggleloadingInput()">
+                        onchange="toggleloadingInput()" {% if form_data.loading_rate == 'yes' %}checked{% endif %}>
                       <label class="form-check-label" for="loadingYes">Yes</label>
                     </div>
                     <div class="form-check">
-                      <input name="loading_rate" class="form-check-input" type="radio" value="no" id="loadingNo" checked
+                      <input name="loading_rate" class="form-check-input" type="radio" value="no" id="loadingNo" 
+                        {% if not form_data.loading_rate or form_data.loading_rate == 'no' %}checked{% endif %}
                         onchange="toggleloadingInput()">
                       <label class="form-check-label" for="loadingNo">No</label>
                     </div>
                   </div>
                 </div>
-                <div class="mb-3 col-sm-6" id="loadingChargeWrapper" style="display: none;">
+                <div class="mb-3 col-sm-6" id="loadingChargeWrapper" style="display: {% if form_data.loading_rate == 'yes' %}block{% else %}none{% endif %};">
                   <input type="number" id="loadingCharge" name="loading_charge" class="form-control"
-                    placeholder="Enter loading rate">
+                    placeholder="Enter loading rate" value="{% if form_data.loading_charge %}{{ form_data.loading_charge }}{% endif %}">
                 </div>
                 <script>
                   function toggleloadingInput() {
@@ -339,19 +366,19 @@
                   <div class="d-flex gap-3">
                     <div class="form-check">
                       <input name="unloading_rate_1" class="form-check-input" type="radio" value="yes"
-                        id="unloadingYes_1" onchange="toggleUnloadingInput_1()">
+                        id="unloadingYes_1" onchange="toggleUnloadingInput_1()" {% if form_data.unloading_rate_1 == 'yes' %}checked{% endif %}>
                       <label class="form-check-label" for="unloadingYes_1">Yes</label>
                     </div>
                     <div class="form-check">
                       <input name="unloading_rate_1" class="form-check-input" type="radio" value="no" id="unloadingNo_1"
-                        checked onchange="toggleUnloadingInput_1()">
+                        {% if not form_data.unloading_rate_1 or form_data.unloading_rate_1 == 'no' %}checked{% endif %} onchange="toggleUnloadingInput_1()">
                       <label class="form-check-label" for="unloadingNo_1">No</label>
                     </div>
                   </div>
                 </div>
-                <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_1" style="display: none;">
+                <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_1" style="display: {% if form_data.unloading_rate_1 == 'yes' %}block{% else %}none{% endif %};">
                   <input type="number" id="unloadingCharge_1" name="unloading_charge_1" class="form-control"
-                    placeholder="Enter unloading rate 1">
+                    placeholder="Enter unloading rate 1" value="{% if form_data.unloading_charge_1 %}{{ form_data.unloading_charge_1 }}{% endif %}">
                 </div>
                 <script>
                   function toggleUnloadingInput_1() {
@@ -373,19 +400,19 @@
                   <div class="d-flex gap-3">
                     <div class="form-check">
                       <input name="unloading_rate_2" class="form-check-input" type="radio" value="yes"
-                        id="unloadingYes_2" onchange="toggleUnloadingInput_2()">
+                        id="unloadingYes_2" onchange="toggleUnloadingInput_2()" {% if form_data.unloading_rate_2 == 'yes' %}checked{% endif %}>
                       <label class="form-check-label" for="unloadingYes_2">Yes</label>
                     </div>
                     <div class="form-check">
                       <input name="unloading_rate_2" class="form-check-input" type="radio" value="no" id="unloadingNo_2"
-                        checked onchange="toggleUnloadingInput_2()">
+                        {% if not form_data.unloading_rate_2 or form_data.unloading_rate_2 == 'no' %}checked{% endif %} onchange="toggleUnloadingInput_2()">
                       <label class="form-check-label" for="unloadingNo_2">No</label>
                     </div>
                   </div>
                 </div>
-                <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_2" style="display: none;">
+                <div class="mb-3 col-sm-6" id="unloadingChargeWrapper_2" style="display: {% if form_data.unloading_rate_2 == 'yes' %}block{% else %}none{% endif %};">
                   <input type="number" id="unloadingCharge" name="unloading_charge_2" class="form-control"
-                    placeholder="Enter unloading rate 2">
+                    placeholder="Enter unloading rate 2" value="{% if form_data.unloading_charge_2 %}{{ form_data.unloading_charge_2 }}{% endif %}">
                 </div>
                 <script>
                   function toggleUnloadingInput_2() {
@@ -480,6 +507,16 @@
                   <label class="form-check-label" for="defaultCheck1">GC Note</label>
                 </div>
                 </div>
+                <div class="col-sm-3">
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="main_party" name="field">
+                    <label class="form-check-label" for="main_party">Main Party</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="sub_party" name="field">
+                    <label class="form-check-label" for="sub_party">Sub Party</label>
+                  </div>
+                </div>
               </div>
 
               <div class="col-sm-6 mt-4">
@@ -497,4 +534,92 @@
 </div>
 
 <script src="{% static 'js/rate-tabels.js' %} "></script>
+<script>
+  // Real-time contract number validation
+  let contractValidationTimeout;
+  
+  // Function to clear contract error when user starts typing
+  function clearContractError() {
+    const contractInput = document.getElementById('contract_no');
+    const errorDiv = document.getElementById('contract_error');
+    
+    if (contractInput) {
+      contractInput.classList.remove('is-invalid');
+    }
+    if (errorDiv) {
+      errorDiv.textContent = ''; // Clear error message text
+      errorDiv.style.display = 'none';
+      errorDiv.classList.remove('d-block');
+      errorDiv.classList.add('d-none');
+    }
+    // Clear any pending validation
+    clearTimeout(contractValidationTimeout);
+  }
+  
+  function validateContractNo(contractNo) {
+    const contractInput = document.getElementById('contract_no');
+    const errorDiv = document.getElementById('contract_error');
+    
+    // Clear previous timeout
+    clearTimeout(contractValidationTimeout);
+    
+    // If empty, don't validate
+    if (!contractNo || contractNo.trim() === '') {
+      return;
+    }
+    
+    // Debounce: wait 500ms after user stops typing
+    contractValidationTimeout = setTimeout(function() {
+      fetch(`/api/check-contract-duplicate?contract_no=${encodeURIComponent(contractNo)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.exists) {
+            // Show error
+            contractInput.classList.add('is-invalid');
+            if (errorDiv) {
+              errorDiv.textContent = `Contract Number '${contractNo}' already exists. Please use a different contract number.`;
+              errorDiv.style.display = 'block';
+              errorDiv.classList.remove('d-none');
+              errorDiv.classList.add('d-block');
+            }
+          } else {
+            // Remove error - input is valid
+            contractInput.classList.remove('is-invalid');
+            if (errorDiv) {
+              errorDiv.textContent = ''; // Clear error message text
+              errorDiv.style.display = 'none';
+              errorDiv.classList.remove('d-block');
+              errorDiv.classList.add('d-none');
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Error checking contract duplicate:', err);
+        });
+    }, 500);
+  }
+  
+  // Add event listener for contract_no input
+  document.addEventListener('DOMContentLoaded', function() {
+    const contractInput = document.getElementById('contract_no');
+    if (contractInput) {
+      contractInput.addEventListener('input', function() {
+        validateContractNo(this.value);
+      });
+    }
+    
+    // Preserve checkbox values for invoice fields
+    {% if form_data.field %}
+    const selectedFields = [{% for field in form_data.field %}'{{ field }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const fieldCheckboxes = document.querySelectorAll('[name="field"]');
+    fieldCheckboxes.forEach(function(checkbox) {
+      if (selectedFields.includes(checkbox.value)) {
+        checkbox.checked = true;
+      } else {
+        checkbox.checked = false;
+      }
+    });
+    {% endif %}
+  });
+</script>
 {% endblock %}

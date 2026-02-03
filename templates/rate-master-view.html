@@ -45,6 +45,7 @@
                         <table class="table table-bordered" id="rateTable">
                             <thead>
                                 <tr>
+                                    <th>Rate Type</th>
                                     <th>From Km</th>
                                     <th>To Km</th>
                                     <th>MT</th>
@@ -80,16 +81,29 @@
         function loadRates() {
             let clientId = document.getElementById("contract_no").value;
 
-            fetch(`/rates/${clientId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        let tbody = document.getElementById("rate-table");
-                        tbody.innerHTML = "";  // clear old rows
+            // Check if a contract is selected
+            if (!clientId || clientId === "") {
+                let tbody = document.getElementById("rate-table");
+                tbody.innerHTML = "";  // clear old rows
+                return;
+            }
 
+            fetch(`/api/rates/${clientId}/`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    let tbody = document.getElementById("rate-table");
+                    tbody.innerHTML = "";  // clear old rows
+
+                    if (data.success && data.data && data.data.length > 0) {
                         data.data.forEach(rate => {
                             let row = `
                     <tr>
+                        <td>${rate.rate_type || 'N/A'}</td>
                         <td>${rate.from_km}</td>
                         <td>${rate.to_km}</td>
                         <td>${rate.mt}</td>
@@ -99,10 +113,23 @@
                             tbody.innerHTML += row;
                         });
                     } else {
-                        alert("No data found!");
+                        // Show message when no rates found
+                        tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">No rates found for this contract</td>
+                    </tr>
+                `;
                     }
                 })
-                .catch(err => console.error("Error fetching rates:", err));
+                .catch(err => {
+                    console.error("Error fetching rates:", err);
+                    let tbody = document.getElementById("rate-table");
+                    tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-danger">Error loading rates. Please try again.</td>
+                    </tr>
+                `;
+                });
         }
 
     </script>

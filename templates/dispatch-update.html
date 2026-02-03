@@ -50,6 +50,18 @@
                   oninput=" this.classList.remove('invalid')" value="{{ dispatch.truck_no }}" required />
               </div>
             </div>
+            {% if ebill_no %}
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">E-Bill No.</label>
+                <input type="text" class="form-control" value="{{ ebill_no }}" readonly />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label class="form-label">Bill Series</label>
+                <input type="text" class="form-control" value="{{ bill_series }}" readonly />
+              </div>
+            </div>
+            {% endif %}
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="product_name" class="form-label">Product Name</label>
@@ -70,6 +82,24 @@
                   placeholder="Enter party name" oninput=" this.classList.remove('invalid')" value="{{ dispatch.from_center }}" readonly />
               </div>
             </div>
+            {% if 'main_party' in dispatch.contract_id.invoice_fields %}
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="main_party" class="form-label">Main Party</label>
+                <input type="text" class="form-control" id="main_party" name="main_party" placeholder="Enter main party"
+                  oninput=" this.classList.remove('invalid')" value="{{ dispatch.main_party|default:'' }}" />
+              </div>
+            </div>
+            {% endif %}
+            {% if 'sub_party' in dispatch.contract_id.invoice_fields %}
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="sub_party" class="form-label">Sub Party</label>
+                <input type="text" class="form-control" id="sub_party" name="sub_party" placeholder="Enter sub party"
+                  oninput=" this.classList.remove('invalid')" value="{{ dispatch.sub_party|default:'' }}" />
+              </div>
+            </div>
+            {% endif %}
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="destination" class="form-label">Destination</label>

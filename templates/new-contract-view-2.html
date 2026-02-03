@@ -62,7 +62,7 @@
                     <tbody style="border-bottom: none;">
                         {% for contract in all_contract %}
                         <tr>
-                            <td>{{ forloop.revcounter }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td style="text-align: center; ">
 
                               <a href="update-contract-form?contract_id={{ contract.id }}">

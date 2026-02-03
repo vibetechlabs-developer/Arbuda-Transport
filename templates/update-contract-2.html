@@ -73,9 +73,16 @@
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="contract_no" class="form-label">Contract Number</label>
-                <input type="text" class="form-control" id="contract_no" name="contract_no"
+                <input type="text" class="form-control {% if contract_error %}is-invalid{% endif %}" id="contract_no" name="contract_no"
                   placeholder="Enter contract number" autofocus value="{{ contract.contract_no }}"
-                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid')" />
+                  oninput="this.value = this.value.toUpperCase() , this.classList.remove('invalid', 'is-invalid'); clearContractError(); validateContractNo(this.value)" />
+                {% if contract_error %}
+                <div class="invalid-feedback d-block" id="contract_error">
+                  {{ contract_error }}
+                </div>
+                {% else %}
+                <div class="invalid-feedback d-none" id="contract_error"></div>
+                {% endif %}
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="bill_start_date" class="form-label">Bill Serise</label>
@@ -929,6 +936,16 @@
                   <label class="form-check-label" for="defaultCheck1">GC Note</label>
                 </div>
               </div>
+              <div class="col-sm-3">
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="main_party" name="field">
+                  <label class="form-check-label" for="main_party">Main Party</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input class="form-check-input" type="checkbox" value="sub_party" name="field">
+                  <label class="form-check-label" for="sub_party">Sub Party</label>
+                </div>
+              </div>
             </div>
 
             <script>
@@ -955,4 +972,81 @@
 </div>
 </div>
 <script src="{% static 'js/rate-tabels.js' %} "></script>
+<script>
+  // Real-time contract number validation
+  let contractValidationTimeout;
+  const currentContractId = {{ contract.id }};
+  
+  // Function to clear contract error when user starts typing
+  function clearContractError() {
+    const contractInput = document.getElementById('contract_no');
+    const errorDiv = document.getElementById('contract_error');
+    
+    if (contractInput) {
+      contractInput.classList.remove('is-invalid');
+    }
+    if (errorDiv) {
+      errorDiv.textContent = ''; // Clear error message text
+      errorDiv.style.display = 'none';
+      errorDiv.classList.remove('d-block');
+      errorDiv.classList.add('d-none');
+    }
+    // Clear any pending validation
+    clearTimeout(contractValidationTimeout);
+  }
+  
+  function validateContractNo(contractNo) {
+    const contractInput = document.getElementById('contract_no');
+    const errorDiv = document.getElementById('contract_error');
+    
+    // Clear previous timeout
+    clearTimeout(contractValidationTimeout);
+    
+    // If empty, don't validate
+    if (!contractNo || contractNo.trim() === '') {
+      return;
+    }
+    
+    // Debounce: wait 500ms after user stops typing
+    contractValidationTimeout = setTimeout(function() {
+      const url = `/api/check-contract-duplicate?contract_no=${encodeURIComponent(contractNo)}&contract_id=${currentContractId}`;
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if (data.exists) {
+            // Show error
+            contractInput.classList.add('is-invalid');
+            if (errorDiv) {
+              errorDiv.textContent = `Contract Number '${contractNo}' already exists. Please use a different contract number.`;
+              errorDiv.style.display = 'block';
+              errorDiv.classList.remove('d-none');
+              errorDiv.classList.add('d-block');
+            }
+          } else {
+            // Remove error - input is valid
+            contractInput.classList.remove('is-invalid');
+            if (errorDiv) {
+              errorDiv.textContent = ''; // Clear error message text
+              errorDiv.style.display = 'none';
+              errorDiv.classList.remove('d-block');
+              errorDiv.classList.add('d-none');
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Error checking contract duplicate:', err);
+        });
+    }, 500);
+  }
+  
+  // Add event listener for contract_no input
+  document.addEventListener('DOMContentLoaded', function() {
+    const contractInput = document.getElementById('contract_no');
+    if (contractInput) {
+      contractInput.addEventListener('input', function() {
+        validateContractNo(this.value);
+      });
+    }
+  });
+</script>
 {% endblock %}

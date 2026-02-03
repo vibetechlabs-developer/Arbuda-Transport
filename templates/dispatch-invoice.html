@@ -30,50 +30,81 @@
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="contract_no" class="form-label">Contract no.</label>
-                <select class="form-select ts-select" name="contract_no" id="contract_no"
+                <select class="form-select ts-select {% if contract_error %}is-invalid{% endif %}" name="contract_no" id="contract_no"
                   placeholder="Select contract no" autocomplete="off" onchange="fetchDistricts()" required>
                   <option value="" disabled selected>Select contract no</option>
                   {% for contract in allcontract %}
-                  <option value="{{ contract.id }}">
+                  <option value="{{ contract.id }}" {% if form_data.contract_no == contract.id|stringformat:"s" %}selected{% endif %}>
                     {{ contract.company_name }} -- {{ contract.contract_no }}</option>
                   {% endfor %}
                 </select>
+                {% if contract_error %}
+                <div class="invalid-feedback d-block" id="contract_error">
+                  {{ contract_error }}
+                </div>
+                {% else %}
+                <div class="invalid-feedback d-none" id="contract_error"></div>
+                {% endif %}
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="bill_date" class="form-label">Bill Date</label>
-                <input type="date" class="form-control" id="bill_date" name="bill_date" autofocus
-                  oninput="this.classList.remove('invalid')" required />
+                <input type="date" class="form-control {% if bill_date_error %}is-invalid{% endif %}" id="bill_date" name="bill_date" autofocus
+                  oninput="this.classList.remove('invalid', 'is-invalid')" value="{% if form_data.bill_date %}{{ form_data.bill_date }}{% endif %}" required />
+                {% if bill_date_error %}
+                <div class="invalid-feedback d-block" id="bill_date_error">
+                  {{ bill_date_error }}
+                </div>
+                {% else %}
+                <div class="invalid-feedback d-none" id="bill_date_error"></div>
+                {% endif %}
               </div>
 
             </div>
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="bill_no" class="form-label">Bill No.</label>
-                <input type="text" class="form-control" id="bill_no" name="bill_no" autofocus
-                  oninput="this.classList.remove('invalid')" placeholder="Enter bill no" required />
+                <input type="text" class="form-control {% if bill_no_error %}is-invalid{% endif %}" id="bill_no" name="bill_no" autofocus
+                  oninput="this.classList.remove('invalid', 'is-invalid')" placeholder="Enter bill no" value="{% if form_data.bill_no %}{{ form_data.bill_no }}{% endif %}" required />
+                {% if bill_no_error %}
+                <div class="invalid-feedback d-block" id="bill_no_error">
+                  {{ bill_no_error }}
+                </div>
+                {% else %}
+                <div class="invalid-feedback d-none" id="bill_no_error"></div>
+                {% endif %}
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="rr_number" class="form-label">RR Number</label>
                 <input type="text" class="form-control" id="rr_number" name="rr_number" autofocus
-                  oninput="this.classList.remove('invalid')" placeholder="Enter RR number" />
+                  oninput="this.classList.remove('invalid')" placeholder="Enter RR number" value="{% if form_data.rr_number %}{{ form_data.rr_number }}{% endif %}" />
               </div>
             </div>
+            {% if dispatch_error %}
+            <div class="alert alert-danger" role="alert">
+              {{ dispatch_error }}
+            </div>
+            {% endif %}
+            {% if general_error %}
+            <div class="alert alert-danger" role="alert">
+              {{ general_error }}
+            </div>
+            {% endif %}
 
             <h5 class="text-primary fw-semibold mb-3">Sign Details</h5>
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="v_by_name" class="form-label">Verified By Name</label>
-                <input type="text" class="form-control" id="v_by_name" name="v_by_name" autofocus value="" />
+                <input type="text" class="form-control" id="v_by_name" name="v_by_name" autofocus value="{% if form_data.v_by_name %}{{ form_data.v_by_name }}{% endif %}" />
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="r_by_name" class="form-label">Recommended By Name</label>
-                <input type="text" class="form-control" id="r_by_name" name="r_by_name" autofocus value="" />
+                <input type="text" class="form-control" id="r_by_name" name="r_by_name" autofocus value="{% if form_data.r_by_name %}{{ form_data.r_by_name }}{% endif %}" />
               </div>
             </div>
             <div class="row mb-3">
               <div class="col-sm-6">
                 <label class="form-label">Enter Dispacthes Per Page</label>
-                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="10" required>
+                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="{% if form_data.chunk %}{{ form_data.chunk }}{% else %}15{% endif %}" required>
               </div>
             </div>
             <h5 class="text-primary fw-semibold mb-3">Search</h5>
@@ -299,8 +330,8 @@
   let allDispatches = []; // store fetched data globally
   let allfield
 
-  // Helper function to sort dispatches by challan_no in descending order
-  function sortByChallanNoDesc(dispatches) {
+  // Helper function to sort dispatches by challan_no in ascending order
+  function sortByChallanNoAsc(dispatches) {
     return dispatches.sort((a, b) => {
       // Extract numeric value from challan_no (handle cases like "0005", "0009", etc.)
       const getNumericValue = (challan) => {
@@ -311,7 +342,7 @@
       };
       const numA = getNumericValue(a.challan_no);
       const numB = getNumericValue(b.challan_no);
-      return numB - numA; // Descending order
+      return numA - numB; // Ascending order
     });
   }
 
@@ -398,8 +429,8 @@
       .then(response => response.json())
       .then(data => {
         if (data.destinations) {
-          // Sort by challan_no in descending order
-          allDispatches = sortByChallanNoDesc(data.destinations);
+          // Sort by challan_no in ascending order
+          allDispatches = sortByChallanNoAsc(data.destinations);
           allfield = data.fields // save all data
           document.getElementById('bill_no').value = ""
           renderTable(allDispatches, data.fields); // render initially
@@ -459,8 +490,8 @@
       return matchesSearch && matchesDate && matchesDistrict; // must match all
     });
 
-    // Sort filtered results by challan_no in descending order
-    const sortedFiltered = sortByChallanNoDesc([...filtered]);
+    // Sort filtered results by challan_no in ascending order
+    const sortedFiltered = sortByChallanNoAsc([...filtered]);
     renderTable(sortedFiltered, allfield);
   }
   function isNumericValue(value) {
@@ -547,12 +578,13 @@
           rawValue = dest[field]?.toString() || "";
           td.innerHTML = highlightText(rawValue, currentSearch);
         }
-        // Skip dc_field from totals to avoid showing its aggregate in footer
+        // Skip dc_field and km from totals to avoid showing their aggregate in footer
         if (
           field !== "sr_no" &&
           field !== "depature_date" &&
           field !== "dep_date" &&
-          field !== "dc_field"
+          field !== "dc_field" &&
+          field !== "km"
         ) {
           recordTotal(field, rawValue);
         }
@@ -572,7 +604,8 @@
           numericFields.has(field) &&
           field !== "depature_date" &&
           field !== "dep_date" &&
-          field !== "dc_field"
+          field !== "dc_field" &&
+          field !== "km"
         ) {
           const totalValue = totals[field] || 0;
           td.textContent = formatNumber(totalValue);
@@ -588,6 +621,62 @@
     const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
     return text.replace(regex, `<mark>$1</mark>`);
   }
+
+  // Clear error on input for contract_no
+  document.addEventListener('DOMContentLoaded', function() {
+    const contractSelect = document.getElementById('contract_no');
+    if (contractSelect) {
+      contractSelect.addEventListener('change', function() {
+        this.classList.remove('is-invalid');
+        const errorDiv = document.getElementById('contract_error');
+        if (errorDiv) {
+          errorDiv.style.display = 'none';
+        }
+      });
+    }
+
+    // Clear error on input for bill_no
+    const billNoInput = document.getElementById('bill_no');
+    if (billNoInput) {
+      billNoInput.addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+        const errorDiv = document.getElementById('bill_no_error');
+        if (errorDiv) {
+          errorDiv.style.display = 'none';
+        }
+      });
+    }
+
+    // Clear error on input for bill_date
+    const billDateInput = document.getElementById('bill_date');
+    if (billDateInput) {
+      billDateInput.addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+        const errorDiv = document.getElementById('bill_date_error');
+        if (errorDiv) {
+          errorDiv.style.display = 'none';
+        }
+      });
+    }
+
+    // Restore selected contract if form_data exists
+    {% if form_data.contract_no %}
+    const contractId = '{{ form_data.contract_no }}';
+    if (contractId && contractSelect) {
+      // Wait for TomSelect to initialize, then set value
+      setTimeout(function() {
+        if (contractSelect.tomselect) {
+          contractSelect.tomselect.setValue(contractId);
+          // Trigger fetchDistricts to load dispatches
+          fetchDistricts();
+        } else {
+          contractSelect.value = contractId;
+          fetchDistricts();
+        }
+      }, 200);
+    }
+    {% endif %}
+  });
 
 </script>
 

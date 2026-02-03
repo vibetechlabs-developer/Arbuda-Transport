@@ -37,5 +37,9 @@ urlpatterns = [
     
     # validation
     path("check-challan-duplicate", views.check_challan_duplicate, name="check-challan-duplicate"),
+    path("check-contract-duplicate", views.check_contract_duplicate, name="check-contract-duplicate"),
+
+    # summary
+    path("get-contract-bills", views.get_contract_bills, name="get-contract-bills"),
 
 ]

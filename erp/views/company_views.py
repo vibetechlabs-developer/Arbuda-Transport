@@ -1,6 +1,7 @@
 from django.shortcuts import render ,redirect 
 from django.contrib import messages
 from company.models import Company_user , Company_profile
+from erp.utils import validate_gstin
 from erp.utils.decorators import session_required
 
 
@@ -28,6 +29,8 @@ def Company_registraion(request):
             errors['company_name'] = "Company name is required."
         if not cgstin:
             errors['gstin'] = "GST number is required."
+        elif not validate_gstin(cgstin):
+            errors['gstin'] = "Enter a valid GSTIN as per GST rules."
         if not cemail:
             errors['email'] = "Email is required."
         if not cmobile:

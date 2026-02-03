@@ -12,9 +12,27 @@
     <div class="container-xxl grow container-p-y ">
         <div class="header d-flex justify-content-between align-items-center mb-4">
             <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Routs</h4>
-            <a href="{% url 'download-distance-master-pdf' %}" class="btn btn-primary">
+            <a href="{% url 'download-distance-master-pdf' %}" id="downloadPdfBtn" class="btn btn-primary">
                 <i class='bx bx-download'></i> Download PDF
             </a>
+        </div>
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="mb-3 col-sm-6">
+                        <label for="contract_filter" class="form-label">Filter by Contract</label>
+                        <select class="form-select ts-select" name="contract_filter" id="contract_filter"
+                            placeholder="Select contract" autocomplete="off" onchange="filterTable()">
+                            <option value="">All Contracts</option>
+                            {% for contract in allcontract %}
+                            <option value="{{ contract.id }}" {% if selected_contract_id == contract.id %}selected{% endif %}>
+                                {{ contract.company_name }} -- {{ contract.contract_no }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
         <!-- <div class="filter-tab mb-4 d-flex align-items-center gap-2">
             <h5 class="mb-0 me-2">Filters </h5>
@@ -46,11 +64,12 @@
                             <th>Dilevery Taluka</th>
                             <th>Dilevery District</th>
                             <th>KiloMiter</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
-                    <tbody style="border-bottom: none;">
+                    <tbody style="border-bottom: none;" id="routesTableBody">
                         {% for route in all_routes %}
-                        <tr>
+                        <tr data-contract-id="{% if route.contract_id %}{{ route.contract_id.id }}{% else %}none{% endif %}">
                             <td>{{ route.id }}</td>
                             <td>{{ route.contract_id}}</td>
                             <td>{{ route.from_center }}</td>
@@ -58,44 +77,14 @@
                             <td>{{ route.taluka }}</td>
                             <td>{{ route.district }}</td>
                             <td>{{ route.km }}</td>
-                            <!-- <td style="text-align: center; ">
-
-                                <a href="rout-form-update?update={{ route.id }}">
+                            <td style="text-align: center; ">
+                                <a href="{% url 'rout-update' %}?update={{ route.id }}">
                                     <button style="text-align: center; padding: 5px 10px;" type="button"
                                         class="btn btn-outline-primary"><i class='bx  bx-edit'
                                             style="font-size: 1rem;"></i>
                                     </button>
                                 </a>
-                                <button style="text-align: center; padding: 5px 10px;" type="button"
-                                    class="btn btn-outline-primary" data-bs-toggle="modal"
-                                    data-bs-target="#modalCenter{{ route.id }}delete"><i class='bx  bx-trash'
-                                        style="font-size: 1rem;"></i></button>
-                                <div class="modal fade" id="modalCenter{{ route.id }}delete" tabindex="-1"
-                                    aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered" role="document">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="modalCenterTitle">Delete
-                                                    {{ route.source }} to {{ route.destination }}</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body text-start">
-                                                Are you sure for deleting this rout ? <br>
-                                                if you delete this rout all entries linked with it will be deleted
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-outline-secondary"
-                                                    data-bs-dismiss="modal">
-                                                    Close
-                                                </button>
-                                                <a href="?delete={{ route.id }}"><button style="text-align: center;"
-                                                        type="button" class="btn btn-primary">Delete</button></a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td> -->
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -113,10 +102,62 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script>
-    document.querySelectorAll('.ts-select').forEach((el) => {
-
-        let settings = {};
-        new TomSelect(el, settings);
+    let contractTomSelect = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize TomSelect for contract filter (single select, like dispatch form)
+        const contractFilterEl = document.getElementById('contract_filter');
+        if (contractFilterEl) {
+            contractTomSelect = new TomSelect(contractFilterEl, {
+                onChange: function(value) {
+                    filterTable();
+                }
+            });
+        }
+        
+        // Initialize filter on page load
+        filterTable();
     });
+
+    function filterTable() {
+        // Get contract ID from TomSelect (single select)
+        let contractId = '';
+        if (contractTomSelect) {
+            contractId = contractTomSelect.getValue() || '';
+        } else {
+            const contractFilter = document.getElementById('contract_filter');
+            if (contractFilter) {
+                contractId = contractFilter.value || '';
+            }
+        }
+        
+        const tableBody = document.getElementById('routesTableBody');
+        if (!tableBody) return;
+        
+        const rows = tableBody.getElementsByTagName('tr');
+        
+        // Update PDF link
+        const downloadBtn = document.getElementById('downloadPdfBtn');
+        if (downloadBtn) {
+            if (contractId) {
+                downloadBtn.href = "{% url 'download-distance-master-pdf' %}?contract_id=" + contractId;
+            } else {
+                downloadBtn.href = "{% url 'download-distance-master-pdf' %}";
+            }
+        }
+        
+        // Filter table rows - show if contract ID matches, or if no filter selected (show all)
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowContractId = row.getAttribute('data-contract-id');
+            
+            // Show row if no filter selected, or if contract ID matches
+            if (!contractId || rowContractId === contractId) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+    }
 </script>
 {% endblock %}

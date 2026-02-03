@@ -117,7 +117,19 @@
             <div class="row mt-3">
               <div class="col-sm-6">
                 <label class="form-label">Enter Dispacthes Per Page</label>
-                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="10" required>
+                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="15" readonly>
+                <small class="text-muted">Fixed at 15 entries per page</small>
+              </div>
+            </div>
+            
+            <div class="row mt-3">
+              <div class="col-sm-6">
+                <label for="v_by_name" class="form-label">Verified By Name</label>
+                <input type="text" class="form-control" id="v_by_name" name="v_by_name" value="" />
+              </div>
+              <div class="col-sm-6">
+                <label for="r_by_name" class="form-label">Recommended By Name</label>
+                <input type="text" class="form-control" id="r_by_name" name="r_by_name" value="" />
               </div>
             </div>
 

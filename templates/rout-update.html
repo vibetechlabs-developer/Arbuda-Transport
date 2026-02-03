@@ -1,0 +1,74 @@
+{% extends 'masterpage.html' %}
+
+{% block title %}
+<title>ARBUDA | Update Route </title>
+{% endblock %}
+
+{% block content %}
+
+<div class="container-xxl">
+  <div class="header d-flex justify-content-between align-items-center mt-2">
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Update Distance Master</h4>
+  </div>
+  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
+    <div class="authentication-inner w-100" style="max-width: 100%;">
+      <div class="card">
+        <div class="card-body">
+          <form id="formAuthentication" class="mb-3" method="POST">
+            {% csrf_token %}
+            <h5 class="text-primary fw-semibold mb-3">Route Details</h5>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="contract_id" class="form-label">Contract</label>
+                <select class="form-select" name="contract_id" id="contract_id" required>
+                  {% for contract in allcontract %}
+                  <option value="{{ contract.id }}" {% if contract.id == route.contract_id.id %}selected{% endif %}>
+                    {{ contract.company_name }} -- {{ contract.contract_no }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="from_center" class="form-label">From Center</label>
+                <input type="text" class="form-control" id="from_center" name="from_center"
+                  placeholder="Enter from center" value="{{ route.from_center }}" required />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="destination" class="form-label">Destination</label>
+                <input type="text" class="form-control" id="destination" name="destination"
+                  placeholder="Enter destination" value="{{ route.destination }}" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="taluka" class="form-label">Taluka</label>
+                <input type="text" class="form-control" id="taluka" name="taluka" placeholder="Enter taluka"
+                  value="{{ route.taluka|default:'' }}" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="mb-3 col-sm-6">
+                <label for="district" class="form-label">District</label>
+                <input type="text" class="form-control" id="district" name="district" placeholder="Enter district"
+                  value="{{ route.district }}" required />
+              </div>
+              <div class="mb-3 col-sm-6">
+                <label for="km" class="form-label">Kilometer</label>
+                <input type="number" class="form-control" id="km" name="km" placeholder="Enter km"
+                  value="{{ route.km }}" required />
+              </div>
+            </div>
+            <div class="mb-3">
+              <button class="btn btn-primary d-grid w-100" type="submit">Update Route</button>
+            </div>
+            <div class="mb-3">
+              <a href="{% url 'rout-view' %}" class="btn btn-outline-secondary d-grid w-100">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

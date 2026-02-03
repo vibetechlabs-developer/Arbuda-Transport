@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from erp.utils.decorators import session_required
+from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year
 from transport.models import (
     T_Contract,
     Destination,
@@ -33,6 +34,7 @@ def get_contract_details(request):
                 'loading_charge' : contract.loading_charge if contract.loading_charge else 0,
                 'destinations': list(destination),
                 "rate_type" : contract.rate_type,
+                'invoice_fields': contract.invoice_fields if contract.invoice_fields else [],
             })
         except Destination.DoesNotExist:
             return JsonResponse({
@@ -42,6 +44,7 @@ def get_contract_details(request):
                 'unloading_charge_2' : contract.unloading_charge_2 if contract.unloading_charge_2 else 0,
                 'loading_charge' : contract.loading_charge if contract.loading_charge else 0,
                 "rate_type" : contract.rate_type,
+                'invoice_fields': contract.invoice_fields if contract.invoice_fields else [],
             })
         
     except T_Contract.DoesNotExist:
@@ -179,7 +182,30 @@ def check_challan_duplicate(request):
         'exists': exists,
         'valid': not exists
     })
+
+
+@session_required
+def check_contract_duplicate(request):
+    contract_no = request.GET.get('contract_no', '').strip()
+    contract_id = request.GET.get('contract_id')  # For update form, exclude current contract
+    company_id = request.session['company_info']['company_id']
     
+    if not contract_no:
+        return JsonResponse({'exists': False, 'valid': False})
+    
+    # Check for duplicate contract_no (case-insensitive and trimmed)
+    query = T_Contract.objects.filter(contract_no__iexact=contract_no, company_id=company_id)
+    
+    # If updating, exclude the current contract
+    if contract_id:
+        query = query.exclude(id=contract_id)
+    
+    exists = query.exists()
+    
+    return JsonResponse({
+        'exists': exists,
+        'valid': not exists
+    })
 
 
 @session_required
@@ -207,6 +233,7 @@ def get_districts(request):
 def get_dispacth(request):
     dcontract_id = request.GET.get('contract-id')
     district_filter = request.GET.get('district', '').strip()
+    financial_year = request.session.get('financial_year', get_current_financial_year())
     try:
         contract = T_Contract.objects.get(id=dcontract_id)
         try:
@@ -214,6 +241,9 @@ def get_dispacth(request):
                 contract_id=dcontract_id,
                 company_id=request.session['company_info']['company_id']
             )
+            
+            # Filter by financial year
+            dispatch = filter_by_financial_year(dispatch, financial_year, 'dep_date')
             
             # Filter by district if provided
             if district_filter:
@@ -250,13 +280,24 @@ def get_dispacth(request):
 @session_required
 def get_ninv_dispacth(request):                  # ninv means not in invoice dispatch
     dbill_id = request.GET.get('bill-id')
+    financial_year = request.session.get('financial_year', get_current_financial_year())
     if not dbill_id:
         return JsonResponse({'error': 'bill-id is required'}, status=400)
     
     try:
         invoice = Invoice.objects.get(id=dbill_id , company_id = request.session['company_info']['company_id'])
         contract = T_Contract.objects.get(id=invoice.contract_id.id)
-        dispatch = Dispatch.objects.filter(contract_id=invoice.contract_id.id , company_id = request.session['company_info']['company_id'], inv_status = False).values().order_by('dep_date')
+        # Include inv_status explicitly to ensure it's in the response
+        dispatch = Dispatch.objects.filter(contract_id=invoice.contract_id.id , company_id = request.session['company_info']['company_id'], inv_status = False)
+        
+        # Filter by financial year
+        dispatch = filter_by_financial_year(dispatch, financial_year, 'dep_date')
+        
+        dispatch = dispatch.values('id', 'challan_no', 'dep_date', 'truck_no', 'product_name', 
+                                                      'party_name', 'from_center', 'destination', 'taluka', 'district',
+                                                      'km', 'weight', 'rate', 'totalfreight', 'unloading_charge_1',
+                                                      'unloading_charge_2', 'loading_charge', 'grand_total', 
+                                                      'gc_note_no', 'inv_status').order_by('dep_date')
 
         return JsonResponse({
             'fields' : contract.invoice_fields,
@@ -314,7 +355,12 @@ def get_invoice(request):
         contract_id = invoice.contract_id.id
         try:
             contract = T_Contract.objects.get(id=contract_id)
-            dispatch = invoice.dispatch_list.values().order_by('dep_date')
+            # Include inv_status explicitly to ensure it's in the response
+            dispatch = invoice.dispatch_list.values('id', 'challan_no', 'dep_date', 'truck_no', 'product_name', 
+                                                      'party_name', 'from_center', 'destination', 'taluka', 'district',
+                                                      'km', 'weight', 'rate', 'totalfreight', 'unloading_charge_1',
+                                                      'unloading_charge_2', 'loading_charge', 'grand_total', 
+                                                      'gc_note_no', 'inv_status', 'main_party', 'sub_party').order_by('dep_date')
             return JsonResponse({
            'bill_date': invoice.Bill_date,  
             'contract_no' : contract.contract_no, 
@@ -550,6 +596,7 @@ def fetch_rates(request, client_id):
             "to_km": r.to_km,
             "mt": r.mt,
             "mt_per_km": r.mt_per_km,
+            "rate_type": r.rate_type if r.rate_type else "N/A",
         })
     return JsonResponse({"success": True, "data": data})
 
@@ -650,6 +697,8 @@ def _serialize_dispatch_details(dispatch_obj, company_id):
         "advance_paid": str(dispatch_obj.advance_paid),
         "panding_amount": str(dispatch_obj.panding_amount),
         "net_profit": str(dispatch_obj.net_profit),
+        "main_party": dispatch_obj.main_party or "",
+        "sub_party": dispatch_obj.sub_party or "",
     }
 
 
@@ -710,4 +759,75 @@ def get_dispatch_details(request):
 
     data = _serialize_dispatch_details(dispatch_obj, company_id)
     return JsonResponse(data)
+
+@session_required
+def get_contract_bills(request):
+    contract_id = request.GET.get('contract-id')
+    company_id = request.session['company_info']['company_id']
+    
+    try:
+        contract = T_Contract.objects.get(id=contract_id, company_id=company_id)
+    except T_Contract.DoesNotExist:
+        return JsonResponse({'error': 'Contract not found'}, status=404)
+    
+    # Get all invoices for this contract
+    invoices = Invoice.objects.filter(
+        contract_id=contract_id,
+        company_id=company_id
+    ).order_by('Bill_no')
+    
+    bills_data = []
+    for invoice in invoices:
+        # Get all dispatches for this invoice
+        dispatches = invoice.dispatch_list.all()
+        
+        if dispatches.exists():
+            # Calculate totals
+            total_weight = sum(d.weight for d in dispatches if d.weight)
+            total_freight = sum(d.totalfreight for d in dispatches if d.totalfreight)
+            total_loading = sum(d.loading_charge for d in dispatches if d.loading_charge)
+            total_unloading1 = sum(d.unloading_charge_1 for d in dispatches if d.unloading_charge_1)
+            total_unloading2 = sum(d.unloading_charge_2 for d in dispatches if d.unloading_charge_2)
+            
+            # Get product name from first dispatch (assuming all have same product)
+            product_name = dispatches.first().product_name if dispatches.first() else ""
+            
+            bills_data.append({
+                'id': invoice.id,
+                'bill_no': invoice.Bill_no,
+                'bill_date': invoice.Bill_date.strftime('%Y-%m-%d') if invoice.Bill_date else '',
+                'total_weight': float(total_weight),
+                'total_freight': float(total_freight),
+                'total_loading': float(total_loading),
+                'total_unloading1': float(total_unloading1),
+                'total_unloading2': float(total_unloading2),
+            })
+    
+    # Get product name from bills' dispatches (use first available)
+    product_name = ""
+    for invoice in invoices:
+        dispatches = invoice.dispatch_list.all()
+        if dispatches.exists():
+            product_name = dispatches.first().product_name
+            break
+    
+    return JsonResponse({
+        'contract': {
+            'id': contract.id,
+            'contract_no': contract.contract_no,
+            'company_name': contract.company_name,
+            'from_center': contract.from_center or "",
+            'product_name': product_name,
+            'billing_address': contract.billing_address or "",
+            'billing_state': contract.billing_state or "",
+            'billing_city': contract.billing_city or "",
+            'billing_pin': contract.billing_pin or "",
+            'gst_number': contract.gst_number or "",
+            'pan_number': contract.pan_number or "",
+            'loading_charge': float(contract.loading_charge) if contract.loading_charge else 0,
+            'unloading_charge_1': float(contract.unloading_charge_1) if contract.unloading_charge_1 else 0,
+            'unloading_charge_2': float(contract.unloading_charge_2) if contract.unloading_charge_2 else 0,
+        },
+        'bills': bills_data
+    })
 

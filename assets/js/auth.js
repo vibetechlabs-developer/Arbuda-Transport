@@ -61,7 +61,10 @@ function registraion_validation(form) {
     clearError(company_name);
   }
   if (gstin.value.length <= 0 || !gstPattern.test(gstin.value)) {
-    setError(gstin, "Enter a valid GST number.");
+    setError(
+      gstin,
+      "Enter a valid GST number (15 characters, e.g. 22AAAAA0000A1Z5)."
+    );
     status = false;
   } else {
     clearError(gstin);
@@ -218,14 +221,14 @@ function client_profile_validation(form) {
   let office_city = form.office_city;
   let office_pin = form.office_pin;
   
-  const gstPattern =
-    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
   const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const mobilePattern = /^[6-9][0-9]{9}$/;
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
   const tanRegex = /^[A-Z]{4}[0-9]{5}[A-Z]{1}$/;
   const cinRegex = /^[LU]{1}[0-9]{5}[A-Z]{2}[0-9]{4}(PLC|PTC)[0-9]{6}$/;
   const pinRegex = /^[1-9][0-9]{5}$/;
+  const gstPattern =
+    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 
   if (company_name.value.length <= 0 || company_name.value.length > 20) {

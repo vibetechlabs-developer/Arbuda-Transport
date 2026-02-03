@@ -23,7 +23,7 @@
       <!-- Register Card -->
       <div class="card">
         <div class="card-body">
-          <form id="" class="mb-3" method="POST" action="download-report">
+          <form id="" class="mb-3" method="POST" action="download-our-report">
             {% csrf_token %}
             <h5 class="text-primary fw-semibold mb-3">Report Details</h5>
             <div class="row">
@@ -136,55 +136,178 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script>
+  let contractTomSelect = null;
+  let tomSelectInstance = null;
+
+  // Initialize contract dropdown with TomSelect and store reference
+  const contractSelect = document.getElementById("contract_no");
+  if (contractSelect) {
+    contractTomSelect = new TomSelect(contractSelect, {
+      onChange: function(value) {
+        // Call onContractChange when contract changes
+        onContractChange();
+      }
+    });
+  }
+
+  // Initialize other ts-select elements
   document.querySelectorAll('.ts-select').forEach((el) => {
-    let settings = {};
-    new TomSelect(el, settings);
+    // Skip contract_no as we already initialized it
+    if (el.id !== 'contract_no') {
+      let settings = {};
+      new TomSelect(el, settings);
+    }
   });
 
-  const tomSelectInstance = new TomSelect("#select-beast", {
-    create: false,
-    lableField: 'data_id',
-    sortField: {
-      field: "text",
-      direction: "asc"
-    },
-  });
+  // Initialize TomSelect for product dropdown
+  function initializeProductSelect() {
+    const selectElement = document.getElementById("select-beast");
+    if (!selectElement) {
+      console.warn('select-beast element not found');
+      return;
+    }
+    
+    // Destroy existing instance if any
+    if (tomSelectInstance) {
+      try {
+        tomSelectInstance.destroy();
+      } catch(e) {
+        console.warn('Error destroying TomSelect:', e);
+      }
+      tomSelectInstance = null;
+    }
+    
+    // Create new instance
+    try {
+      tomSelectInstance = new TomSelect("#select-beast", {
+        create: false,
+        sortField: {
+          field: "text",
+          direction: "asc"
+        },
+        placeholder: "Select Product Name",
+      });
+      console.log('TomSelect initialized successfully');
+    } catch(e) {
+      console.error('Error initializing TomSelect:', e);
+      tomSelectInstance = null;
+    }
+  }
+
+  // Initialize when page loads (element might be hidden but that's okay)
+  // Wait a bit for DOM to be ready
+  setTimeout(() => {
+    initializeProductSelect();
+  }, 100);
 
 </script>
 <script>
   function fecthproduct(opt) {
-    if (opt === "product_wise") {
-      let contract_id = document.getElementById("contract_no").value
-      fetch(`/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
-        .then(response => response.json())
-        .then(data => {
-          if (data.product_list) {
-            updateDestinations(data.product_list)
+    if (opt == "product_wise") {
+      // Get contract ID from TomSelect instance or fallback to element value
+      let contract_id = contractTomSelect ? contractTomSelect.getValue() : document.getElementById("contract_no").value;
+      if (!contract_id) {
+        // Clear products if no contract is selected
+        if (tomSelectInstance) {
+          tomSelectInstance.clearOptions();
+        }
+        return;
+      }
+      
+      // Ensure TomSelect is initialized
+      if (!tomSelectInstance) {
+        initializeProductSelect();
+      }
+      
+      fetch(`/api/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
           }
-
+          return response.json();
+        })
+        .then(data => {
+          console.log('Fetched product data:', data); // Debug log
+          if (data.product_list && Array.isArray(data.product_list)) {
+            updateDestinations(data.product_list);
+          } else {
+            console.warn('No product list in response:', data);
+            if (tomSelectInstance) {
+              tomSelectInstance.clearOptions();
+            }
+          }
         })
         .catch(err => {
-          console.error('Error fetching Slip details:', err);
+          console.error('Error fetching product details:', err);
+          if (tomSelectInstance) {
+            tomSelectInstance.clearOptions();
+          }
         });
 
     }
     else {
+      // Clear products if not product_wise
+      if (tomSelectInstance) {
+        tomSelectInstance.clearOptions();
+      }
       return
     }
 
 
   }
 
+  function onContractChange() {
+    // When contract changes, update products if Product-wise is selected
+    const reportType = document.getElementById("type_of_report").value;
+    if (reportType === "product_wise") {
+      // Small delay to ensure TomSelect value is updated
+      setTimeout(() => {
+        fecthproduct("product_wise");
+      }, 50);
+    }
+  }
+
   function updateDestinations(product_list) {
-    tomSelectInstance.clearOptions(); // remove old options
-    product_list.forEach(product => {
-      tomSelectInstance.addOption({
-        value: product,
-        text: product,
+    console.log('updateDestinations called with:', product_list);
+    
+    // Ensure TomSelect is initialized
+    if (!tomSelectInstance) {
+      console.log('Initializing TomSelect...');
+      initializeProductSelect();
+    }
+    
+    if (!tomSelectInstance) {
+      console.error('TomSelect instance not available after initialization');
+      return;
+    }
+    
+    // Clear old options
+    tomSelectInstance.clearOptions();
+    tomSelectInstance.clear();
+    
+    // Add new options
+    if (product_list && product_list.length > 0) {
+      console.log('Adding', product_list.length, 'products to dropdown');
+      const options = [];
+      product_list.forEach(product => {
+        if (product) { // Ensure product is not null/undefined
+          options.push({
+            value: product,
+            text: product,
+          });
+        }
       });
-    });
-    // tomSelectInstance.refreshOptions(); // refresh the dropdown
-    // if (destinations.length > 0) tomSelectInstance.setValue(destinations[0].id);
+      
+      // Add all options at once
+      tomSelectInstance.addOptions(options);
+      
+      // Refresh the dropdown to show new options
+      tomSelectInstance.refreshOptions(false);
+      
+      console.log('Products added successfully. Options count:', tomSelectInstance.options.length);
+    } else {
+      console.warn('No products to add');
+    }
   }
 
   let allDispatches = []; // store fetched data globally
@@ -194,7 +317,7 @@
     const contract_id = document.getElementById('contract_no').value;
     if (!contract_id) return;
 
-    fetch(`/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
+    fetch(`/api/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
       .then(response => response.json())
       .then(data => {
         if (data.product_list) {
@@ -206,15 +329,28 @@
       });
   }
   function updateProduct(product_list) {
+    if (!tomSelectInstance) {
+      initializeProductSelect();
+    }
+    if (!tomSelectInstance) {
+      return;
+    }
     tomSelectInstance.clearOptions(); // remove old options
-    product_list.forEach(product => {
-      tomSelectInstance.addOption({
-        value: product,
-        text: product,
+    tomSelectInstance.clear();
+    
+    if (product_list && product_list.length > 0) {
+      const options = [];
+      product_list.forEach(product => {
+        if (product) {
+          options.push({
+            value: product,
+            text: product,
+          });
+        }
       });
-    });
-    // tomSelectInstance.refreshOptions(); // refresh the dropdown
-    // if (destinations.length > 0) tomSelectInstance.setValue(destinations[0].id);
+      tomSelectInstance.addOptions(options);
+      tomSelectInstance.refreshOptions(false);
+    }
   }
 
   let currentSearch = "";
