@@ -341,7 +341,8 @@
                     </div>
                   </div>
                 </div>
-                <div class="mb-3 col-sm-6" id="loadingChargeWrapper" style="display: {% if form_data.loading_rate == 'yes' %}block{% else %}none{% endif %};">
+                <div class="mb-3 col-sm-6" id="loadingChargeWrapper" style="display: {% if form_data.loading_rate == 'yes' %}block
+                {% else %}none{% endif %};">
                   <input type="number" id="loadingCharge" name="loading_charge" class="form-control"
                     placeholder="Enter loading rate" value="{% if form_data.loading_charge %}{{ form_data.loading_charge }}{% endif %}">
                 </div>
@@ -446,6 +447,19 @@
                     <input class="form-check-input" type="checkbox" value="dc_field" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">DC Field</label>
                   </div>
+                  
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="main_party" name="field">
+                    <label class="form-check-label" for="main_party">Main Party</label>
+                  </div>
+                  <div class="form-check mt-3 ">
+                    <input class="form-check-input" type="checkbox" value="sub_party" name="field">
+                    <label class="form-check-label" for="sub_party">Sub Party</label>
+                  </div>
+                
+                  
+                </div>
+                <div class="col-sm-3">
                   <div class="form-check mt-3 ">
                     <input class="form-check-input" type="checkbox" value="party_name" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">Party name</label>
@@ -454,8 +468,6 @@
                     <input class="form-check-input" type="checkbox" value="destination" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">Destination</label>
                   </div>
-                </div>
-                <div class="col-sm-3">
                   <div class="form-check mt-3 ">
                     <input class="form-check-input" type="checkbox" value="taluka" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">taluka</label>
@@ -472,6 +484,9 @@
                     <input class="form-check-input" type="checkbox" value="weight" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">Weight</label>
                   </div>
+                  
+                </div>
+                <div class="col-sm-3">
                   <div class="form-check mt-3 ">
                     <input class="form-check-input" type="checkbox" value="km" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">Kilo meter</label>
@@ -480,8 +495,6 @@
                     <input class="form-check-input" type="checkbox" value="rate" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">Rate</label>
                   </div>
-                </div>
-                <div class="col-sm-3">
                   <div class="form-check mt-3 ">
                     <input class="form-check-input" type="checkbox" value="luggage" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">Luggage</label>
@@ -498,7 +511,11 @@
                     <input class="form-check-input" type="checkbox" value="loading_charge" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">loading_charge</label>
                   </div>
-                  <div class="form-check mt-3 ">
+                 
+                </div>
+
+                <div class="col-sm-3">
+                   <div class="form-check mt-3 ">
                     <input class="form-check-input" type="checkbox" value="amount" name="field" checked="">
                     <label class="form-check-label" for="defaultCheck1">Total Amount</label>
                   </div>
@@ -507,16 +524,7 @@
                   <label class="form-check-label" for="defaultCheck1">GC Note</label>
                 </div>
                 </div>
-                <div class="col-sm-3">
-                  <div class="form-check mt-3 ">
-                    <input class="form-check-input" type="checkbox" value="main_party" name="field">
-                    <label class="form-check-label" for="main_party">Main Party</label>
-                  </div>
-                  <div class="form-check mt-3 ">
-                    <input class="form-check-input" type="checkbox" value="sub_party" name="field">
-                    <label class="form-check-label" for="sub_party">Sub Party</label>
-                  </div>
-                </div>
+                
               </div>
 
               <div class="col-sm-6 mt-4">

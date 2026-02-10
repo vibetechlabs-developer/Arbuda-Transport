@@ -29,6 +29,11 @@
                   {% endfor %}
                 </select>
               </div>
+              <div class="mb-3 col-sm-6 d-flex align-items-end gap-2">
+                <button type="button" class="btn btn-outline-primary w-100" id="btnToggleNewDispatch" disabled>
+                  Add New
+                </button>
+              </div>
               <div class="mb-3 col-sm-6">
                 <label for="dep_date" class="form-label">Dispatch date</label>
                 <input type="date" class="form-control" id="dep_date" name="dep_date" autofocus
@@ -338,6 +343,101 @@
   let destinationTomSelect = null;
   let productTomSelect = null;
   let isAutoFillingDispatch = false;
+  let dispatchMode = 'autofill'; // 'autofill' (static) | 'new' (editable)
+  let isDispatchModeApplying = false;
+
+  const DISPATCH_LOCK_FIELDS = [
+    'challan_no',
+    'truck_no',
+    'product_name',
+    'party_name',
+    'from_center',
+    'main_party',
+    'sub_party',
+    'taluka',
+    'district',
+    'km',
+    'weight',
+    'rate',
+    'totalfreight',
+    'loading_charge',
+    'unloading_charge_1',
+    'unloading_charge_2',
+    'grand_total',
+    'truck_booking_rate',
+    'total_paid_truck_onwer',
+    'advance_paid',
+    'panding_amount',
+    'net_profit'
+  ];
+
+  function setElementReadOnly(id, isReadOnly) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    // Inputs/selects handled differently
+    if (el.tagName === 'SELECT') {
+      el.disabled = !!isReadOnly;
+    } else {
+      if (isReadOnly) el.setAttribute('readonly', 'true');
+      else el.removeAttribute('readonly');
+      // keep required validation behavior; do not change "required" here
+    }
+  }
+
+  function setDispatchStatic(isStatic) {
+    // Contract selection always remains enabled
+    isDispatchModeApplying = true;
+    try {
+      DISPATCH_LOCK_FIELDS.forEach((id) => setElementReadOnly(id, isStatic));
+
+      // TomSelect controls (destination/product)
+      if (destinationTomSelect) {
+        if (isStatic) destinationTomSelect.disable();
+        else destinationTomSelect.enable();
+      }
+      if (productTomSelect) {
+        if (isStatic) productTomSelect.disable();
+        else productTomSelect.enable();
+      }
+
+      const btn = document.getElementById('btnToggleNewDispatch');
+      if (btn) {
+        btn.disabled = !document.getElementById('contract_id')?.value;
+        btn.textContent = isStatic ? 'Add New' : 'Use Fetched Details';
+      }
+    } finally {
+      isDispatchModeApplying = false;
+    }
+  }
+
+  function clearForNewDispatch() {
+    // Keep contract + dep_date intact; clear everything else user should enter new
+    const keep = new Set(['contract_id', 'dep_date', 'from_center']);
+    DISPATCH_LOCK_FIELDS.forEach((id) => {
+      if (keep.has(id)) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.tagName === 'SELECT') {
+        el.value = '';
+      } else {
+        el.value = '';
+      }
+    });
+
+    // Clear TomSelect selections too
+    if (destinationTomSelect) destinationTomSelect.clear(true);
+    if (productTomSelect) productTomSelect.clear(true);
+
+    // Hide optional party rows until contract details decide to show them
+    const mainPartyRow = document.getElementById('main_party_row');
+    const subPartyRow = document.getElementById('sub_party_row');
+    if (mainPartyRow) mainPartyRow.style.display = 'none';
+    if (subPartyRow) subPartyRow.style.display = 'none';
+
+    // Remove challan duplicate error UI
+    clearChallanError();
+  }
 
   document.addEventListener('DOMContentLoaded', function () {
     // Initialize TomSelect for contract dropdowns
@@ -377,11 +477,36 @@
         onChange: function (value) {
           if (!value) return;
           if (isAutoFillingDispatch) return;
+          if (dispatchMode === 'new') return; // in new mode we don't overwrite user input
           // When product is changed, auto-fill using last dispatch for this contract + product
           autoFillFromLastDispatch();
         }
       });
     }
+
+    // Add New / Use Fetched Details toggle
+    const btn = document.getElementById('btnToggleNewDispatch');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        const contractVal = document.getElementById('contract_id')?.value;
+        if (!contractVal) return;
+
+        if (dispatchMode === 'autofill') {
+          dispatchMode = 'new';
+          setDispatchStatic(false);
+          clearForNewDispatch();
+          // Keep from_center locked (it’s contract-defined)
+          setElementReadOnly('from_center', true);
+        } else {
+          dispatchMode = 'autofill';
+          setDispatchStatic(true);
+          autoFillFromLastDispatch(true);
+        }
+      });
+    }
+
+    // Initial state: static until contract is selected and autofill runs
+    setDispatchStatic(true);
   });
 
   // Real-time challan number validation
@@ -584,6 +709,8 @@
     fetch(`/api/get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
       .then(response => response.json())
       .then(data => {
+        // Anytime contract changes, default back to static auto-fill mode
+        dispatchMode = 'autofill';
         if (data.from) {
           document.getElementById('from_center').value = data.from;
           document.getElementById('from_center').setAttribute('readonly', true);
@@ -618,10 +745,14 @@
           .then(pdata => {
             if (pdata.product_list) {
               updateProducts(pdata.product_list);
-              // Auto-fill with last dispatch details (including challan and product) after products are updated
-              // Use a small delay to ensure dropdown is ready
+              // After products are updated, auto-fill with last dispatch details, then lock fields (static)
               setTimeout(function() {
-                autoFillFromLastDispatch(true);
+                if (dispatchMode === 'autofill') {
+                  autoFillFromLastDispatch(true);
+                  setDispatchStatic(true);
+                } else {
+                  setDispatchStatic(false);
+                }
               }, 100);
             } else {
               // Clear products if no list returned

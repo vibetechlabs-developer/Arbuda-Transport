@@ -43,7 +43,7 @@
                     </div>
                     <div class="table-responsive text-nowrap">
                         <table class="table table-bordered" id="rateTable">
-                            <thead>
+                            <thead id="rate-table-header">
                                 <tr>
                                     <th>Rate Type</th>
                                     <th>From Km</th>
@@ -84,7 +84,18 @@
             // Check if a contract is selected
             if (!clientId || clientId === "") {
                 let tbody = document.getElementById("rate-table");
+                let thead = document.getElementById("rate-table-header");
                 tbody.innerHTML = "";  // clear old rows
+                // Reset to default header
+                thead.innerHTML = `
+                    <tr>
+                        <th>Rate Type</th>
+                        <th>From Km</th>
+                        <th>To Km</th>
+                        <th>MT</th>
+                        <th>MT/KM</th>
+                    </tr>
+                `;
                 return;
             }
 
@@ -97,38 +108,151 @@
                 })
                 .then(data => {
                     let tbody = document.getElementById("rate-table");
+                    let thead = document.getElementById("rate-table-header");
                     tbody.innerHTML = "";  // clear old rows
 
                     if (data.success && data.data && data.data.length > 0) {
+                        const rateType = data.rate_type || data.data[0]?.display_type;
+                        
+                        // Update table header based on rate type
+                        if (data.data[0]?.display_type === "taluka") {
+                            // Taluka-Wise header
+                            thead.innerHTML = `
+                                <tr>
+                                    <th>Rate Type</th>
+                                    <th>District Name</th>
+                                    <th>Taluka Name</th>
+                                    <th>MT</th>
+                                </tr>
+                            `;
+                        } else if (data.data[0]?.display_type === "district") {
+                            // District-Wise header
+                            thead.innerHTML = `
+                                <tr>
+                                    <th>Rate Type</th>
+                                    <th>District Name</th>
+                                    <th>MT</th>
+                                    <th>MT/KM</th>
+                                </tr>
+                            `;
+                        } else {
+                            // Kilometer-Wise, Slab-Wise, Incometax-Wise, Cumulative-Wise header
+                            thead.innerHTML = `
+                                <tr>
+                                    <th>Rate Type</th>
+                                    <th>From Km</th>
+                                    <th>To Km</th>
+                                    <th>MT</th>
+                                    <th>MT/KM</th>
+                                </tr>
+                            `;
+                        }
+
+                        // Populate table rows based on display type
                         data.data.forEach(rate => {
-                            let row = `
-                    <tr>
-                        <td>${rate.rate_type || 'N/A'}</td>
-                        <td>${rate.from_km}</td>
-                        <td>${rate.to_km}</td>
-                        <td>${rate.mt}</td>
-                        <td>${rate.mt_per_km}</td>
-                    </tr>
-                `;
+                            let row = "";
+                            
+                            if (rate.display_type === "taluka") {
+                                // Taluka-Wise row
+                                row = `
+                                    <tr>
+                                        <td>${rate.rate_type || 'N/A'}</td>
+                                        <td>${rate.district_name || 'N/A'}</td>
+                                        <td>${rate.taluka_name || 'N/A'}</td>
+                                        <td>${rate.mt || '0'}</td>
+                                    </tr>
+                                `;
+                            } else if (rate.display_type === "district") {
+                                // District-Wise row
+                                row = `
+                                    <tr>
+                                        <td>${rate.rate_type || 'N/A'}</td>
+                                        <td>${rate.district_name || 'N/A'}</td>
+                                        <td>${rate.mt || '0'}</td>
+                                        <td>${rate.mt_per_km || '0'}</td>
+                                    </tr>
+                                `;
+                            } else {
+                                // Kilometer-Wise, Slab-Wise, Incometax-Wise, Cumulative-Wise row
+                                row = `
+                                    <tr>
+                                        <td>${rate.rate_type || 'N/A'}</td>
+                                        <td>${rate.from_km || 'N/A'}</td>
+                                        <td>${rate.to_km || 'N/A'}</td>
+                                        <td>${rate.mt || '0'}</td>
+                                        <td>${rate.mt_per_km || '0'}</td>
+                                    </tr>
+                                `;
+                            }
                             tbody.innerHTML += row;
                         });
                     } else {
                         // Show message when no rates found
+                        // Determine header based on rate_type if available
+                        const rateType = data.rate_type;
+                        let headerHtml = '';
+                        let colspan = 5;
+                        
+                        if (rateType === "Taluka-Wise") {
+                            headerHtml = `
+                                <tr>
+                                    <th>Rate Type</th>
+                                    <th>District Name</th>
+                                    <th>Taluka Name</th>
+                                    <th>MT</th>
+                                </tr>
+                            `;
+                            colspan = 4;
+                        } else if (rateType === "Distric-Wise" || rateType === "District-Wise") {
+                            headerHtml = `
+                                <tr>
+                                    <th>Rate Type</th>
+                                    <th>District Name</th>
+                                    <th>MT</th>
+                                    <th>MT/KM</th>
+                                </tr>
+                            `;
+                            colspan = 4;
+                        } else {
+                            headerHtml = `
+                                <tr>
+                                    <th>Rate Type</th>
+                                    <th>From Km</th>
+                                    <th>To Km</th>
+                                    <th>MT</th>
+                                    <th>MT/KM</th>
+                                </tr>
+                            `;
+                            colspan = 5;
+                        }
+                        
+                        thead.innerHTML = headerHtml;
                         tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center text-muted">No rates found for this contract</td>
-                    </tr>
-                `;
+                            <tr>
+                                <td colspan="${colspan}" class="text-center text-muted">No rates found for this contract</td>
+                            </tr>
+                        `;
                     }
                 })
                 .catch(err => {
                     console.error("Error fetching rates:", err);
                     let tbody = document.getElementById("rate-table");
+                    let thead = document.getElementById("rate-table-header");
+                    // Reset to default header on error
+                    thead.innerHTML = `
+                        <tr>
+                            <th>Rate Type</th>
+                            <th>From Km</th>
+                            <th>To Km</th>
+                            <th>MT</th>
+                            <th>MT/KM</th>
+                        </tr>
+                    `;
                     tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center text-danger">Error loading rates. Please try again.</td>
-                    </tr>
-                `;
+                        <tr>
+                            <td colspan="5" class="text-center text-danger">Error loading rates. Please try again.</td>
+                        </tr>
+                    `;
                 });
         }
 

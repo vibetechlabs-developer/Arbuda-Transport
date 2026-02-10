@@ -203,38 +203,44 @@ def generate_invoice_pdf(request):
 
     # --- PDF Generation ---
     buffer = BytesIO()
-    # Use tighter margins so typical invoices fit on a single A4 landscape page
+    # Use reasonable margins for better readability
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        rightMargin=2 * mm,
-        leftMargin=2 * mm,
-        topMargin=2 * mm,
-        bottomMargin=2 * mm,
+        rightMargin=8 * mm,
+        leftMargin=8 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
     )
     styles = getSampleStyleSheet()
     elements = []
 
     # --- Styles ---
-    center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=9, alignment=1 ,leading=12)
-    center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=7, alignment=1 ,leading=9)
-    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=14, alignment=1 ,leading=18)
-    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=0 ,leading=12)
-    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=2 ,leading=12)
-    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=7, alignment=2, leading=9)
-    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=7, alignment=0 ,leading=9)
-    to_right_style_desc_heading = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=8, alignment=2 ,leading=10)
-    to_right_style_desc = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=7, alignment=2 ,leading=9)
+    center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=10, alignment=1, leading=14)
+    center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=8, alignment=1, leading=11)
+    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=16, alignment=1, leading=20)
+    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=10, alignment=0, leading=14)
+    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=10, alignment=2, leading=14)
+    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=8, alignment=2, leading=11)
+    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=7, alignment=0, leading=10)
+    # Uniform header style for all column names - same size for consistency
+    to_right_style_desc_heading = ParagraphStyle(name="ToRightDesc", fontName="Helvetica-Bold", fontSize=7.5, alignment=1, leading=10)
+    to_right_style_desc = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=7, alignment=2, leading=10)
 
     # --- Header Table ---
     header_data = [
-        [Paragraph(f"<font color='black' size='14'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
-        # [Paragraph(f"{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],
+        [Paragraph(f"<font color='black' size='15'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
         [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
         [Paragraph("<b>Invoice</b>", title_style)],
     ]
-    header_table = Table(header_data, colWidths=[288*mm])
-    header_table.setStyle(TableStyle([('LINEBELOW', (0,2), (-1,2), 0.5, colors.black), ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black)]))
+    header_table = Table(header_data, colWidths=[272*mm])
+    header_table.setStyle(TableStyle([
+        ('LINEBELOW', (0,2), (-1,2), 0.8, colors.black), 
+        ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
 
     fields = contract.invoice_fields
     chunk_size = int(request.POST.get('chunk', 10))  # dispatch per page
@@ -265,10 +271,10 @@ def generate_invoice_pdf(request):
                         "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        compact = len(dispatch_subset) >= 13
-        compact_fs = 6 if compact else None
+        compact = len(dispatch_subset) >= 18
+        compact_fs = 6.5 if compact else None
         
-        compact_leading = 14.5 if compact else None
+        compact_leading = 9 if compact else None
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocal",
@@ -282,17 +288,27 @@ def generate_invoice_pdf(request):
             fontSize=compact_fs or to_style_desc.fontSize,
             leading=compact_leading or to_style_desc.leading,
         )
+        # Uniform header style for all column names
+        header_style_uniform = ParagraphStyle(
+            name="HeaderUniform",
+            parent=to_right_style_desc_heading,
+            fontSize=to_right_style_desc_heading.fontSize,
+            leading=to_right_style_desc_heading.leading,
+            alignment=1,  # Center all headers
+        )
         to_right_style_desc_local = ParagraphStyle(
             name="ToRightDescLocal",
             parent=to_right_style_desc,
             fontSize=compact_fs or to_right_style_desc.fontSize,
             leading=compact_leading or to_right_style_desc.leading,
         )
+        # Uniform header style - same size for all column names
         to_right_style_desc_heading_local = ParagraphStyle(
             name="ToRightDescHeadingLocal",
             parent=to_right_style_desc_heading,
-            fontSize=(compact_fs + 0.5) if compact else to_right_style_desc_heading.fontSize,
-            leading=(compact_leading + 1) if compact else to_right_style_desc_heading.leading,
+            fontSize=to_right_style_desc_heading.fontSize,  # Always use same size
+            leading=to_right_style_desc_heading.leading,  # Always use same leading
+            alignment=1,  # Center align all headers
         )
         total_style_local = ParagraphStyle(
             name="TotalStyleLocal",
@@ -388,27 +404,30 @@ def generate_invoice_pdf(request):
             total_row[0] = "TOTAL"
             data.append(total_row)
 
-        # Special column widths
+        # Special column widths - optimized to prevent wrapping, all headers same size
         # NOTE: header keys must match `data[0]` exactly.
         special_widths = {
-            "Sr No": width_for_chars(5) * mm,
-            ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): width_for_chars(15) * mm,
-            "Truck No": width_for_chars(22) * mm,
-            "Party Name": width_for_chars(12) * mm,
-            "Product": width_for_chars(12) * mm,
-            "Gc Note": width_for_chars(8) * mm,
-            "Weight": width_for_chars(10) * mm,
-            "Km": width_for_chars(5) * mm,
-            "Rate": width_for_chars(12) * mm,
-            "Luggage": width_for_chars(12) * mm,
-            "Unloading 1": width_for_chars(12) * mm,
-            "Unloading 2": width_for_chars(12) * mm,
-            "Loading": width_for_chars(12) * mm,
-            "Freight": width_for_chars(12) * mm,
-            "Dep Date": width_for_chars(12) * mm,
+            "Sr No": 10 * mm,
+            ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 18 * mm,
+            "Truck No": 28 * mm,
+            "Party Name": 22 * mm,
+            "Product": 20 * mm,
+            "Gc Note": 12 * mm,
+            "Weight": 14 * mm,
+            "Km": 10 * mm,
+            "Rate": 14 * mm,
+            "Luggage": 16 * mm,
+            "Unloading 1": 18 * mm,
+            "Unloading 2": 18 * mm,
+            "Loading": 16 * mm,
+            "Freight": 14 * mm,
+            "Dep Date": 18 * mm,
+            "Destination": 22 * mm,
+            "District": 16 * mm,
+            "Taluka": 16 * mm,
         }
 
-        table_width = 288 * mm
+        table_width = 272 * mm
         headers = data[0]
 
         # Calculate column widths
@@ -416,21 +435,33 @@ def generate_invoice_pdf(request):
         for col_name in headers:
             col_widths.append(special_widths.get(col_name, None))
 
-        # Adjust remaining width
+        # Adjust remaining width - ensure valid values
         fixed_total = sum(w for w in col_widths if w is not None)
-        remaining = table_width - fixed_total
+        remaining = max(0, table_width - fixed_total)  # Ensure non-negative
         num_other_cols = sum(1 for w in col_widths if w is None)
-        if num_other_cols > 0:
-            other_width = remaining / num_other_cols
+        if num_other_cols > 0 and remaining > 0:
+            other_width = max(10 * mm, remaining / num_other_cols)  # Minimum 10mm
             col_widths = [w if w is not None else other_width for w in col_widths]
+        else:
+            # If no remaining width, set default for None values
+            default_width = 15 * mm
+            col_widths = [w if w is not None else default_width for w in col_widths]
+        
+        # Ensure all widths are valid and positive (minimum 5mm)
+        col_widths = [max(5 * mm, float(w)) if w is not None else 15 * mm for w in col_widths]
+        
+        # Recalculate total and scale if needed to fit table width
+        total_width = sum(col_widths)
+        if total_width > table_width and total_width > 0:
+            scale_factor = table_width / total_width
+            col_widths = [w * scale_factor for w in col_widths]
 
         # Format cells
         for i, row in enumerate(data):
             for j, cell in enumerate(row):
                 field_name = fields[j]
-                if i == 0:  # header
-                    style = to_right_style_desc_heading_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
-                    row[j] = Paragraph(f"<b>{cell}</b>", style)
+                if i == 0:  # header - use uniform style for all column names
+                    row[j] = Paragraph(f"<b>{cell}</b>", header_style_uniform)
                 elif add_total and i == len(data) - 1:  # total/grand total row
                     row[j] = Paragraph(str(cell), total_style_local)
                 else:
@@ -442,21 +473,23 @@ def generate_invoice_pdf(request):
         # Table styles
         styles = [
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-            ("LEFTPADDING", (0,0), (-1,-1), 1 if compact else 2),
-            ("RIGHTPADDING", (0,0), (-1,-1), 1 if compact else 2),
+            ("LEFTPADDING", (0,0), (-1,-1), 2 if compact else 4),
+            ("RIGHTPADDING", (0,0), (-1,-1), 2 if compact else 4),
             # Header row height
-            ("TOPPADDING", (0,0), (-1,0), 4 if compact else 7),
-            ("BOTTOMPADDING", (0,0), (-1,0), 4 if compact else 7),
+            ("TOPPADDING", (0,0), (-1,0), 5 if compact else 7),
+            ("BOTTOMPADDING", (0,0), (-1,0), 5 if compact else 7),
             # Body row height
-            ("TOPPADDING", (0,1), (-1,-2), 3 if compact else 4),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 3 if compact else 4),
-            ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
-            ("LINEBELOW", (0,0), (-1,0), 0.2, colors.black),
+            ("TOPPADDING", (0,1), (-1,-2), 3 if compact else 5),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 3 if compact else 5),
+            ("LINEABOVE", (0,0), (-1,0), 0.5, colors.black),
+            ("LINEBELOW", (0,0), (-1,0), 0.5, colors.black),
             # Make it readable: light grid + zebra rows
-            ("GRID", (0,0), (-1,-1), 0.15, colors.lightgrey),
+            ("GRID", (0,0), (-1,-1), 0.2, colors.lightgrey),
+            # Prevent text wrapping in cells
+            ("WORDWRAP", (0,0), (-1,-1), "NORMAL"),
         ]
         # zebra rows for body (exclude header)
         for r in range(1, len(data) - (1 if add_total else 0)):
@@ -466,10 +499,10 @@ def generate_invoice_pdf(request):
             styles += [
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
                 ("SPAN", (0,-1), (2,-1)),
-                ("TOPPADDING", (0,-1), (-1,-1), 4),
-                ("BOTTOMPADDING", (0,-1), (-1,-1), 4),
-                ("LINEABOVE", (0,-1), (-1,-1), 0.2, colors.black),
-                ("LINEBELOW", (0,-1), (-1,-1), 0.2, colors.black),
+                ("TOPPADDING", (0,-1), (-1,-1), 6),
+                ("BOTTOMPADDING", (0,-1), (-1,-1), 6),
+                ("LINEABOVE", (0,-1), (-1,-1), 0.5, colors.black),
+                ("LINEBELOW", (0,-1), (-1,-1), 0.5, colors.black),
             ]
         table.setStyle(TableStyle(styles))
 
@@ -503,7 +536,7 @@ def generate_invoice_pdf(request):
                 
                 # Header
                 elements.append(header_table)
-                elements.append(Spacer(1, 6))
+                elements.append(Spacer(1, 8))
 
                 # TO Table with Page number
                 to_content = [
@@ -522,19 +555,21 @@ def generate_invoice_pdf(request):
                     Paragraph(f"Page : {page_no} ", to_style)
                 ]
                 
-                to_table = Table([[to_content, bill_no_content]], colWidths=[238*mm,50*mm])
+                to_table = Table([[to_content, bill_no_content]], colWidths=[222*mm,50*mm])
                 to_table.setStyle(TableStyle([
-                    ('LINEBELOW',(0,0),(-1,0),0.5,colors.black),
+                    ('LINEBELOW',(0,0),(-1,0),0.8,colors.black),
                     ("VALIGN",(0,0),(-1,-1),"TOP"),
                     ("ALIGN",(0,0),(0,0),"LEFT"),
                     ("ALIGN",(1,0),(1,0),"RIGHT"),
-                    ("LEFTPADDING",(0,0),(-1,-1),0),
-                    ("RIGHTPADDING",(0,0),(-1,-1),0)
+                    ("LEFTPADDING",(0,0),(-1,-1),2),
+                    ("RIGHTPADDING",(0,0),(-1,-1),2),
+                    ("TOPPADDING",(0,0),(-1,-1),4),
+                    ("BOTTOMPADDING",(0,0),(-1,-1),4)
                 ]))
                 elements.append(to_table)
-                elements.append(Spacer(1,3))
+                elements.append(Spacer(1,5))
                 elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
-                elements.append(Spacer(1,3))
+                elements.append(Spacer(1,5))
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
@@ -565,7 +600,7 @@ def generate_invoice_pdf(request):
             if i > 0: elements.append(PageBreak())
 
             elements.append(header_table)
-            elements.append(Spacer(1,6))
+            elements.append(Spacer(1,8))
 
             # TO Table
             to_content = [
@@ -582,22 +617,26 @@ def generate_invoice_pdf(request):
                 Paragraph(f"From : {contract.from_center}", to_style),
                 Paragraph(f"Page : {page_no} of {total_pages}", to_style)
             ]
-            to_table = Table([[to_content, bill_no_content]], colWidths=[238*mm,50*mm])
+            to_table = Table([[to_content, bill_no_content]], colWidths=[222*mm,50*mm])
 
-            to_table.setStyle(TableStyle([('LINEBELOW',(0,0),(-1,0),0.5,colors.black),
-                                        ("VALIGN",(0,0),(-1,-1),"TOP"),
-                                        ("ALIGN",(0,0),(0,0),"LEFT"),
-                                        ("ALIGN",(1,0),(1,0),"RIGHT"),
-                                        ("LEFTPADDING",(0,0),(-1,-1),0),
-                                        ("RIGHTPADDING",(0,0),(-1,-1),0)]))
+            to_table.setStyle(TableStyle([
+                ('LINEBELOW',(0,0),(-1,0),0.8,colors.black),
+                ("VALIGN",(0,0),(-1,-1),"TOP"),
+                ("ALIGN",(0,0),(0,0),"LEFT"),
+                ("ALIGN",(1,0),(1,0),"RIGHT"),
+                ("LEFTPADDING",(0,0),(-1,-1),2),
+                ("RIGHTPADDING",(0,0),(-1,-1),2),
+                ("TOPPADDING",(0,0),(-1,-1),4),
+                ("BOTTOMPADDING",(0,0),(-1,-1),4)
+            ]))
             
             elements.append(to_table)
-            elements.append(Spacer(1,3))
+            elements.append(Spacer(1,5))
             elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
-            elements.append(Spacer(1,3))
+            elements.append(Spacer(1,5))
             # Dispatch Table
             elements.append(build_table_page(dispatch_chunk,add_total_row=False, is_last_page=is_last_page, all_dispatches=dispatches))
-            elements.append(Spacer(1,8))
+            elements.append(Spacer(1,10))
 
             # Signature per page
             signature_data = [
@@ -607,10 +646,13 @@ def generate_invoice_pdf(request):
             signature_table = Table(signature_data, colWidths=[70*mm,70*mm,70*mm])
             signature_table.setStyle(TableStyle([
                     ("ALIGN",(0,0),(0,0),"LEFT"),
-                    ("ALIGN",(1,0),(1,0),"RIGHT"),
-                    ("ALIGN",(0,1),(0,1),"LEFT"),
-                    ("ALIGN",(1,1),(1,1),"RIGHT"),
-                    ("TOPPADDING",(0,0),(-1,-1),5)
+                    ("ALIGN",(1,0),(1,0),"CENTER"),
+                    ("ALIGN",(2,0),(2,0),"RIGHT"),
+                    ("VALIGN",(0,0),(-1,-1),"TOP"),
+                    ("TOPPADDING",(0,0),(-1,-1),8),
+                    ("BOTTOMPADDING",(0,0),(-1,-1),4),
+                    ("LEFTPADDING",(0,0),(-1,-1),2),
+                    ("RIGHTPADDING",(0,0),(-1,-1),2)
                 ]))
             elements.append(signature_table)
             page_no += 1
@@ -657,38 +699,44 @@ def download_generate_invoice_pdf(request):
         
     # --- PDF Generation ---
     buffer = BytesIO()
-    # Keep margins tight for single-page readability
+    # Use reasonable margins for better readability
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        rightMargin=2 * mm,
-        leftMargin=2 * mm,
-        topMargin=2 * mm,
-        bottomMargin=2 * mm,
+        rightMargin=8 * mm,
+        leftMargin=8 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
     )
     styles = getSampleStyleSheet()
     elements = []
 
     # --- Styles ---
-    center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=9, alignment=1 ,leading=12)
-    center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=8, alignment=1 ,leading=10)
-    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=14, alignment=1 ,leading=18)
-    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=0 ,leading=12)
-    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=2 ,leading=12)
-    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=8, alignment=2, leading=10)
-    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=8, alignment=0 ,leading=10)
-    to_right_style_desc_heading = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=8, alignment=2 ,leading=10)
-    to_right_style_desc = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=8, alignment=2 ,leading=15)
+    center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=9, alignment=1, leading=12)
+    center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=7, alignment=1, leading=10)
+    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=15, alignment=1, leading=18)
+    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=0, leading=12)
+    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=2, leading=12)
+    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=7, alignment=2, leading=10)
+    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=7, alignment=0, leading=10)
+    # Uniform header style for all column names - same size for consistency
+    to_right_style_desc_heading = ParagraphStyle(name="ToRightDesc", fontName="Helvetica-Bold", fontSize=7.5, alignment=1, leading=10)
+    to_right_style_desc = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=7, alignment=2, leading=10)
 
     # --- Header Table ---
     header_data = [
-        [Paragraph(f"<font color='black' size='14'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
-        # [Paragraph(f"{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],
+        [Paragraph(f"<font color='black' size='15'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
         [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
         [Paragraph("<b>Invoice</b>", title_style)],
     ]
-    header_table = Table(header_data, colWidths=[288*mm])
-    header_table.setStyle(TableStyle([('LINEBELOW', (0,2), (-1,2), 0.5, colors.black), ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black)]))
+    header_table = Table(header_data, colWidths=[272*mm])
+    header_table.setStyle(TableStyle([
+        ('LINEBELOW', (0,2), (-1,2), 0.8, colors.black), 
+        ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
 
     fields = contract.invoice_fields
     chunk_size = int(request.POST.get('chunk', 10))  # dispatch per page
@@ -720,10 +768,10 @@ def download_generate_invoice_pdf(request):
         center_fields = ["sr_no", "gc_note"]
 
         # Compact typography for larger tables to reduce page breaks
-        compact = len(dispatch_subset) >= 13
-        compact_fs = 6 if compact else None
+        compact = len(dispatch_subset) >= 18
+        compact_fs = 6.5 if compact else None
         # Taller rows for readability (compact mode still tries to fit one page)
-        compact_leading = 9.5 if compact else None
+        compact_leading = 9 if compact else None
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocalDl",
@@ -743,11 +791,20 @@ def download_generate_invoice_pdf(request):
             fontSize=compact_fs or to_right_style_desc.fontSize,
             leading=compact_leading or to_right_style_desc.leading,
         )
+        # Uniform header style for all column names
+        header_style_uniform = ParagraphStyle(
+            name="HeaderUniformDl",
+            parent=to_right_style_desc_heading,
+            fontSize=to_right_style_desc_heading.fontSize,
+            leading=to_right_style_desc_heading.leading,
+            alignment=1,  # Center all headers
+        )
         to_right_style_desc_heading_local = ParagraphStyle(
             name="ToRightDescHeadingLocalDl",
             parent=to_right_style_desc_heading,
-            fontSize=(compact_fs + 0.5) if compact else to_right_style_desc_heading.fontSize,
-            leading=(compact_leading + 1) if compact else to_right_style_desc_heading.leading,
+            fontSize=to_right_style_desc_heading.fontSize,  # Always use same size
+            leading=to_right_style_desc_heading.leading,  # Always use same leading
+            alignment=1,  # Center align all headers
         )
         total_style_local = ParagraphStyle(
             name="TotalStyleLocalDl",
@@ -843,26 +900,29 @@ def download_generate_invoice_pdf(request):
             total_row[0] = "TOTAL"
             data.append(total_row)
 
-        # Special column widths
+        # Special column widths - optimized to prevent wrapping, all headers same size
         special_widths = {
-            "Sr No": width_for_chars(5) * mm,
-            ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): width_for_chars(15) * mm,
-            "Truck No": width_for_chars(22) * mm,
-            "Party Name": width_for_chars(12) * mm,
-            "Product": width_for_chars(12) * mm,
-            "Gc Note": width_for_chars(8) * mm,
-            "Weight": width_for_chars(10) * mm,
-            "Km": width_for_chars(5) * mm,
-            "Rate": width_for_chars(12) * mm,
-            "Luggage": width_for_chars(12) * mm,
-            "Unloading 1": width_for_chars(12) * mm,
-            "Unloading 2": width_for_chars(12) * mm,
-            "Loading": width_for_chars(12) * mm,
-            "Freight": width_for_chars(12) * mm,
-            "Dep Date": width_for_chars(12) * mm,
+            "Sr No": 10 * mm,
+            ("Challan No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 18 * mm,
+            "Truck No": 28 * mm,
+            "Party Name": 22 * mm,
+            "Product": 20 * mm,
+            "Gc Note": 12 * mm,
+            "Weight": 14 * mm,
+            "Km": 10 * mm,
+            "Rate": 14 * mm,
+            "Luggage": 16 * mm,
+            "Unloading 1": 18 * mm,
+            "Unloading 2": 18 * mm,
+            "Loading": 16 * mm,
+            "Freight": 14 * mm,
+            "Dep Date": 18 * mm,
+            "Destination": 22 * mm,
+            "District": 16 * mm,
+            "Taluka": 16 * mm,
         }
 
-        table_width = 288 * mm
+        table_width = 272 * mm
         headers = data[0]
 
         # Calculate column widths
@@ -870,21 +930,33 @@ def download_generate_invoice_pdf(request):
         for col_name in headers:
             col_widths.append(special_widths.get(col_name, None))
 
-        # Adjust remaining width
+        # Adjust remaining width - ensure valid values
         fixed_total = sum(w for w in col_widths if w is not None)
-        remaining = table_width - fixed_total
+        remaining = max(0, table_width - fixed_total)  # Ensure non-negative
         num_other_cols = sum(1 for w in col_widths if w is None)
-        if num_other_cols > 0:
-            other_width = remaining / num_other_cols
+        if num_other_cols > 0 and remaining > 0:
+            other_width = max(10 * mm, remaining / num_other_cols)  # Minimum 10mm
             col_widths = [w if w is not None else other_width for w in col_widths]
+        else:
+            # If no remaining width, set default for None values
+            default_width = 15 * mm
+            col_widths = [w if w is not None else default_width for w in col_widths]
+        
+        # Ensure all widths are valid and positive (minimum 5mm)
+        col_widths = [max(5 * mm, float(w)) if w is not None else 15 * mm for w in col_widths]
+        
+        # Recalculate total and scale if needed to fit table width
+        total_width = sum(col_widths)
+        if total_width > table_width and total_width > 0:
+            scale_factor = table_width / total_width
+            col_widths = [w * scale_factor for w in col_widths]
 
         # Format cells
         for i, row in enumerate(data):
             for j, cell in enumerate(row):
                 field_name = fields[j]
-                if i == 0:  # header
-                    style = to_right_style_desc_heading_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
-                    row[j] = Paragraph(f"<b>{cell}</b>", style)
+                if i == 0:  # header - use uniform style for all column names
+                    row[j] = Paragraph(f"<b>{cell}</b>", header_style_uniform)
                 elif add_total and i == len(data) - 1:  # total/grand total row
                     row[j] = Paragraph(str(cell), total_style_local)
                 else:
@@ -896,20 +968,22 @@ def download_generate_invoice_pdf(request):
         # Table styles
         styles = [
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-            ("LEFTPADDING", (0,0), (-1,-1), 1 if compact else 2),
-            ("RIGHTPADDING", (0,0), (-1,-1), 1 if compact else 2),
+            ("LEFTPADDING", (0,0), (-1,-1), 2 if compact else 4),
+            ("RIGHTPADDING", (0,0), (-1,-1), 2 if compact else 4),
             # Header row height
-            ("TOPPADDING", (0,0), (-1,0), 4 if compact else 7),
-            ("BOTTOMPADDING", (0,0), (-1,0), 4 if compact else 7),
+            ("TOPPADDING", (0,0), (-1,0), 5 if compact else 7),
+            ("BOTTOMPADDING", (0,0), (-1,0), 5 if compact else 7),
             # Body row height
-            ("TOPPADDING", (0,1), (-1,-2), 3 if compact else 4),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 3 if compact else 4),
-            ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
-            ("LINEBELOW", (0,0), (-1,0), 0.2, colors.black),
-            ("GRID", (0,0), (-1,-1), 0.15, colors.lightgrey),
+            ("TOPPADDING", (0,1), (-1,-2), 3 if compact else 5),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 3 if compact else 5),
+            ("LINEABOVE", (0,0), (-1,0), 0.5, colors.black),
+            ("LINEBELOW", (0,0), (-1,0), 0.5, colors.black),
+            ("GRID", (0,0), (-1,-1), 0.2, colors.lightgrey),
+            # Prevent text wrapping in cells
+            ("WORDWRAP", (0,0), (-1,-1), "NORMAL"),
         ]
         for r in range(1, len(data) - (1 if add_total else 0)):
             if (r % 2) == 0:
@@ -918,10 +992,10 @@ def download_generate_invoice_pdf(request):
             styles += [
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
                 ("SPAN", (0,-1), (2,-1)),
-                ("TOPPADDING", (0,-1), (-1,-1), 4),
-                ("BOTTOMPADDING", (0,-1), (-1,-1), 4),
-                ("LINEABOVE", (0,-1), (-1,-1), 0.2, colors.black),
-                ("LINEBELOW", (0,-1), (-1,-1), 0.2, colors.black),
+                ("TOPPADDING", (0,-1), (-1,-1), 6),
+                ("BOTTOMPADDING", (0,-1), (-1,-1), 6),
+                ("LINEABOVE", (0,-1), (-1,-1), 0.5, colors.black),
+                ("LINEBELOW", (0,-1), (-1,-1), 0.5, colors.black),
             ]
         table.setStyle(TableStyle(styles))
 
@@ -958,7 +1032,7 @@ def download_generate_invoice_pdf(request):
                 
                 # Header
                 elements.append(header_table)
-                elements.append(Spacer(1, 6))
+                elements.append(Spacer(1, 8))
 
                 # TO Table with Page number
                 to_content = [
@@ -978,23 +1052,25 @@ def download_generate_invoice_pdf(request):
                 ]
                 page_no += 1
                 
-                to_table = Table([[to_content, bill_no_content]], colWidths=[238*mm,50*mm])
+                to_table = Table([[to_content, bill_no_content]], colWidths=[222*mm,50*mm])
                 to_table.setStyle(TableStyle([
-                    ('LINEBELOW',(0,0),(-1,0),0.5,colors.black),
+                    ('LINEBELOW',(0,0),(-1,0),0.8,colors.black),
                     ("VALIGN",(0,0),(-1,-1),"TOP"),
                     ("ALIGN",(0,0),(0,0),"LEFT"),
                     ("ALIGN",(1,0),(1,0),"RIGHT"),  
-                    ("LEFTPADDING",(0,0),(-1,-1),0),
-                    ("RIGHTPADDING",(0,0),(-1,-1),0)
+                    ("LEFTPADDING",(0,0),(-1,-1),2),
+                    ("RIGHTPADDING",(0,0),(-1,-1),2),
+                    ("TOPPADDING",(0,0),(-1,-1),4),
+                    ("BOTTOMPADDING",(0,0),(-1,-1),4)
                 ]))
                 elements.append(to_table)
-                elements.append(Spacer(1,3))
-                elements.append(Paragraph("<center><b>PERTICULARS</b></center>", center_style))
-                elements.append(Spacer(1,3))
+                elements.append(Spacer(1,5))
+                elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
+                elements.append(Spacer(1,5))
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
-                elements.append(Spacer(1,8))
+                elements.append(Spacer(1,10))
 
                 # Signature per page
                 signature_data = [
@@ -1004,10 +1080,13 @@ def download_generate_invoice_pdf(request):
                 signature_table = Table(signature_data, colWidths=[70*mm,70*mm,70*mm])
                 signature_table.setStyle(TableStyle([
                     ("ALIGN",(0,0),(0,0),"LEFT"),
-                    ("ALIGN",(1,0),(1,0),"RIGHT"),
-                    ("ALIGN",(0,1),(0,1),"LEFT"),
-                    ("ALIGN",(1,1),(1,1),"RIGHT"),
-                    ("TOPPADDING",(0,0),(-1,-1),5)
+                    ("ALIGN",(1,0),(1,0),"CENTER"),
+                    ("ALIGN",(2,0),(2,0),"RIGHT"),
+                    ("VALIGN",(0,0),(-1,-1),"TOP"),
+                    ("TOPPADDING",(0,0),(-1,-1),8),
+                    ("BOTTOMPADDING",(0,0),(-1,-1),4),
+                    ("LEFTPADDING",(0,0),(-1,-1),2),
+                    ("RIGHTPADDING",(0,0),(-1,-1),2)
                 ]))
                 elements.append(signature_table)
     else:
@@ -1022,7 +1101,7 @@ def download_generate_invoice_pdf(request):
                 elements.append(PageBreak())
 
             elements.append(header_table)
-            elements.append(Spacer(1, 6))
+            elements.append(Spacer(1, 8))
 
             # TO Table
             to_content = [
@@ -1041,21 +1120,25 @@ def download_generate_invoice_pdf(request):
             ]
             page_no += 1
 
-            to_table = Table([[to_content, bill_no_content]], colWidths=[238*mm, 50*mm])
-            to_table.setStyle(TableStyle([('LINEBELOW',(0,0),(-1,0),0.5,colors.black),
-                                        ("VALIGN",(0,0),(-1,-1),"TOP"),
-                                        ("ALIGN",(0,0),(0,0),"LEFT"),
-                                        ("ALIGN",(1,0),(1,0),"RIGHT"),
-                                        ("LEFTPADDING",(0,0),(-1,-1),0),
-                                        ("RIGHTPADDING",(0,0),(-1,-1),0)]))
+            to_table = Table([[to_content, bill_no_content]], colWidths=[222*mm, 50*mm])
+            to_table.setStyle(TableStyle([
+                ('LINEBELOW',(0,0),(-1,0),0.8,colors.black),
+                ("VALIGN",(0,0),(-1,-1),"TOP"),
+                ("ALIGN",(0,0),(0,0),"LEFT"),
+                ("ALIGN",(1,0),(1,0),"RIGHT"),
+                ("LEFTPADDING",(0,0),(-1,-1),2),
+                ("RIGHTPADDING",(0,0),(-1,-1),2),
+                ("TOPPADDING",(0,0),(-1,-1),4),
+                ("BOTTOMPADDING",(0,0),(-1,-1),4)
+            ]))
             elements.append(to_table)  
-            elements.append(Spacer(1,3))
-            elements.append(Paragraph("<center><b>PERTICULARS</b></center>", center_style))
-            elements.append(Spacer(1,3))
+            elements.append(Spacer(1,5))
+            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
+            elements.append(Spacer(1,5))
 
             # **Build table only ONCE per page**
             elements.append(build_table_page(dispatch_chunk, add_total_row=False, is_last_page=is_last_page, all_dispatches=dispatches))
-            elements.append(Spacer(1,8))
+            elements.append(Spacer(1,10))
 
             # Signature
             signature_data = [
@@ -1068,10 +1151,13 @@ def download_generate_invoice_pdf(request):
             signature_table = Table(signature_data, colWidths=[70*mm,70*mm,70*mm])
             signature_table.setStyle(TableStyle([
                     ("ALIGN",(0,0),(0,0),"LEFT"),
-                    ("ALIGN",(1,0),(1,0),"RIGHT"),
-                    ("ALIGN",(0,1),(0,1),"LEFT"),
-                    ("ALIGN",(1,1),(1,1),"RIGHT"),
-                    ("TOPPADDING",(0,0),(-1,-1),5)
+                    ("ALIGN",(1,0),(1,0),"CENTER"),
+                    ("ALIGN",(2,0),(2,0),"RIGHT"),
+                    ("VALIGN",(0,0),(-1,-1),"TOP"),
+                    ("TOPPADDING",(0,0),(-1,-1),8),
+                    ("BOTTOMPADDING",(0,0),(-1,-1),4),
+                    ("LEFTPADDING",(0,0),(-1,-1),2),
+                    ("RIGHTPADDING",(0,0),(-1,-1),2)
                 ]))
             elements.append(signature_table)
 

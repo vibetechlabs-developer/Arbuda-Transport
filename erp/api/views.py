@@ -588,17 +588,81 @@ def get_district_rate_details(request):
 
 @session_required
 def fetch_rates(request, client_id):
-    queryset = Rate.objects.filter(contract = client_id , company_id=request.session['company_info']['company_id'])
-    data = []
-    for r in queryset:
-        data.append({
-            "from_km": r.from_km,
-            "to_km": r.to_km,
-            "mt": r.mt,
-            "mt_per_km": r.mt_per_km,
-            "rate_type": r.rate_type if r.rate_type else "N/A",
-        })
-    return JsonResponse({"success": True, "data": data})
+    try:
+        company_id = request.session['company_info']['company_id']
+        
+        # Get the contract to determine rate_type
+        try:
+            contract = T_Contract.objects.get(id=client_id, company_id=company_id)
+            rate_type = contract.rate_type
+        except T_Contract.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Contract not found"}, status=404)
+        
+        data = []
+        
+        # Fetch rates based on contract rate_type
+        if rate_type == "Kilometer-Wise" or rate_type == "Slab-Wise":
+            queryset = Rate.objects.filter(contract=client_id, company_id=company_id)
+            for r in queryset:
+                data.append({
+                    "rate_type": r.rate_type if r.rate_type else rate_type,
+                    "from_km": str(r.from_km),
+                    "to_km": str(r.to_km),
+                    "mt": str(r.mt),
+                    "mt_per_km": str(r.mt_per_km),
+                    "display_type": "kilometer_slab"
+                })
+        
+        elif rate_type == "Taluka-Wise":
+            queryset = Rate_taluka.objects.filter(contract=client_id, company_id=company_id)
+            for r in queryset:
+                data.append({
+                    "rate_type": r.rate_type if r.rate_type else rate_type,
+                    "district_name": r.distric_name,
+                    "taluka_name": r.taluka_name,
+                    "mt": str(r.mt),
+                    "display_type": "taluka"
+                })
+        
+        elif rate_type == "Distric-Wise" or rate_type == "District-Wise":
+            queryset = Rate_District.objects.filter(contract=client_id, company_id=company_id)
+            for r in queryset:
+                data.append({
+                    "rate_type": r.rate_type if r.rate_type else rate_type,
+                    "district_name": r.distric_name,
+                    "mt": str(r.mt),
+                    "mt_per_km": str(r.mt_per_km),
+                    "display_type": "district"
+                })
+        
+        elif rate_type == "Incometax-Wise":
+            queryset = Rate_IncomeTax.objects.filter(contract=client_id, company_id=company_id)
+            for r in queryset:
+                data.append({
+                    "rate_type": rate_type,  # Use contract rate_type for display
+                    "from_km": str(r.from_km),
+                    "to_km": str(r.to_km),
+                    "mt": str(r.mt),
+                    "mt_per_km": str(r.mt_per_km),
+                    "display_type": "kilometer_slab"
+                })
+        
+        elif rate_type == "Cumulative-Wise":
+            queryset = Rate_Cumulative.objects.filter(contract=client_id, company_id=company_id)
+            for r in queryset:
+                data.append({
+                    "rate_type": rate_type,  # Use contract rate_type for display
+                    "from_km": str(r.from_km),
+                    "to_km": str(r.to_km),
+                    "mt": str(r.mt),
+                    "mt_per_km": str(r.mt_per_km),
+                    "display_type": "kilometer_slab"
+                })
+        
+        return JsonResponse({"success": True, "data": data, "rate_type": rate_type})
+    
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 
