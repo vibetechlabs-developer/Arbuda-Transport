@@ -56,7 +56,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="challan_no" class="form-label">Challan No. ( Shipment no. )</label>
                 <input type="text" class="form-control {% if challan_error %}is-invalid{% endif %}" id="challan_no" name="challan_no" placeholder="Enter challan no"
-                  onfocus="clearChallanError()" oninput="clearChallanError(); validateChallanNo(this.value)" required />
+                  oninput="validateChallanNo(this.value)" required />
                 {% if challan_error %}
                 <div class="invalid-feedback d-block" id="challan_error">
                   {{ challan_error }}
@@ -328,7 +328,7 @@
 
             <div class="row">
               <div class="col-sm-6">
-                <button class="btn btn-primary d-grid w-100">Save</button>
+                <button class="btn btn-primary d-grid w-100" id="save_dispatch_btn">Save</button>
               </div>
             </div>
           </form>
@@ -412,8 +412,8 @@
   }
 
   function clearForNewDispatch() {
-    // Keep contract + dep_date intact; clear everything else user should enter new
-    const keep = new Set(['contract_id', 'dep_date', 'from_center']);
+    // Keep only dep_date intact; clear everything else so it's like a fresh form
+    const keep = new Set(['dep_date']);
     DISPATCH_LOCK_FIELDS.forEach((id) => {
       if (keep.has(id)) return;
       const el = document.getElementById(id);
@@ -424,6 +424,20 @@
         el.value = '';
       }
     });
+
+    // Also clear contract selection and from_center explicitly
+    const contractSelect = document.getElementById('contract_id');
+    if (contractSelect) {
+      contractSelect.value = '';
+    }
+    if (contractTomSelect) {
+      contractTomSelect.clear(true);
+    }
+    const fromCenterInput = document.getElementById('from_center');
+    if (fromCenterInput) {
+      fromCenterInput.value = '';
+      fromCenterInput.removeAttribute('readonly');
+    }
 
     // Clear TomSelect selections too
     if (destinationTomSelect) destinationTomSelect.clear(true);
@@ -516,12 +530,18 @@
   function clearChallanError() {
     const challanInput = document.getElementById('challan_no');
     const errorDiv = document.getElementById('challan_error');
+    const saveBtn = document.getElementById('save_dispatch_btn');
     
     if (challanInput) {
       challanInput.classList.remove('invalid', 'is-invalid');
+      // Clear HTML5 validation message
+      challanInput.setCustomValidity('');
     }
     if (errorDiv) {
       errorDiv.style.display = 'none';
+    }
+    if (saveBtn) {
+      saveBtn.disabled = false;
     }
     // Clear any pending validation
     clearTimeout(challanValidationTimeout);
@@ -530,6 +550,8 @@
   function validateChallanNo(challanNo) {
     const challanInput = document.getElementById('challan_no');
     const errorDiv = document.getElementById('challan_error');
+    const saveBtn = document.getElementById('save_dispatch_btn');
+    const duplicateMsg = "This Challan No. already exists. Please enter a unique challan number.";
     
     // Clear previous timeout
     clearTimeout(challanValidationTimeout);
@@ -548,14 +570,29 @@
             // Show error
             challanInput.classList.add('is-invalid');
             if (errorDiv) {
-              errorDiv.textContent = `Challan No. '${challanNo}' already exists. Please use a different challan number.`;
+              errorDiv.textContent = duplicateMsg;
               errorDiv.style.display = 'block';
+            }
+            if (saveBtn) {
+              saveBtn.disabled = true;
+            }
+            // Set HTML5 validation message and show it
+            if (challanInput) {
+              challanInput.setCustomValidity(duplicateMsg);
+              challanInput.reportValidity();
             }
           } else {
             // Remove error
             challanInput.classList.remove('is-invalid');
             if (errorDiv) {
               errorDiv.style.display = 'none';
+            }
+            if (saveBtn) {
+              saveBtn.disabled = false;
+            }
+            // Clear HTML5 validation message
+            if (challanInput) {
+              challanInput.setCustomValidity('');
             }
           }
         })
@@ -702,6 +739,19 @@
       });
   }
 
+  // Helper: remove RR number part from FROM field text
+  function sanitizeFromCenter(raw) {
+    if (!raw) return '';
+    let txt = String(raw);
+    const upper = txt.toUpperCase();
+    const rrIndex = upper.indexOf('RR NO');
+    if (rrIndex !== -1) {
+      txt = txt.substring(0, rrIndex);
+    }
+    // Trim and drop trailing comma or hyphen
+    return txt.trim().replace(/[,-]\s*$/, '');
+  }
+
   function fecthContractDetails() {
     const contract_id = document.getElementById('contract_id').value;
     if (!contract_id) return;
@@ -712,7 +762,8 @@
         // Anytime contract changes, default back to static auto-fill mode
         dispatchMode = 'autofill';
         if (data.from) {
-          document.getElementById('from_center').value = data.from;
+          const baseFrom = sanitizeFromCenter(data.from);
+          document.getElementById('from_center').value = baseFrom;
           document.getElementById('from_center').setAttribute('readonly', true);
           document.getElementById('i_unloading_charge_1').value = data.unloading_charge_1;
           document.getElementById('i_unloading_charge_2').value = data.unloading_charge_2;
@@ -1253,7 +1304,7 @@
       }
     }
     if (formData['party_name']) document.getElementById('party_name').value = formData['party_name'];
-    if (formData['from_center']) document.getElementById('from_center').value = formData['from_center'];
+    if (formData['from_center']) document.getElementById('from_center').value = sanitizeFromCenter(formData['from_center']);
     if (formData['taluka']) document.getElementById('taluka').value = formData['taluka'];
     if (formData['district']) document.getElementById('district').value = formData['district'];
     if (formData['km']) document.getElementById('km').value = formData['km'];

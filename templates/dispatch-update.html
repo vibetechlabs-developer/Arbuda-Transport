@@ -35,7 +35,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="challan_no" class="form-label">Challan No. ( Shipment no. )</label>
                 <input type="text" class="form-control {% if challan_error %}is-invalid{% endif %}" id="challan_no" name="challan_no" placeholder="Enter challan no"
-                  onfocus="clearChallanErrorUpdate()" oninput="clearChallanErrorUpdate(); validateChallanNoUpdate(this.value)" value="{{ dispatch.challan_no }}" required />
+                  oninput="validateChallanNoUpdate(this.value)" value="{{ dispatch.challan_no }}" required />
                 {% if challan_error %}
                 <div class="invalid-feedback d-block" id="challan_error">
                   {{ challan_error }}
@@ -329,7 +329,7 @@
 
             <div class="row">
               <div class="col-sm-6">
-                <button class="btn btn-primary d-grid w-100">Update</button>
+                <button class="btn btn-primary d-grid w-100" id="update_dispatch_btn">Update</button>
               </div>
             </div>
           </form>
@@ -373,15 +373,29 @@
     });
   }
 
+  // Helper: remove RR number part from FROM field text
+  function sanitizeFromCenter(raw) {
+    if (!raw) return '';
+    let txt = String(raw);
+    const upper = txt.toUpperCase();
+    const rrIndex = upper.indexOf('RR NO');
+    if (rrIndex !== -1) {
+      txt = txt.substring(0, rrIndex);
+    }
+    // Trim and drop trailing comma or hyphen
+    return txt.trim().replace(/[,-]\s*$/, '');
+  }
+
   function fecthContractDetails() {
     const contract_id = document.getElementById('contract_id').value;
     if (!contract_id) return;
 
-    fetch(`get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
+    fetch(`/api/get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
       .then(response => response.json())
       .then(data => {
         if (data.from) {
-          document.getElementById('from_center').value = data.from;
+          const baseFrom = sanitizeFromCenter(data.from);
+          document.getElementById('from_center').value = baseFrom;
           document.getElementById('from_center').setAttribute('readonly', true);
           document.getElementById('i_unloading_charge_1').value = data.unloading_charge_1;
           document.getElementById('i_unloading_charge_2').value = data.unloading_charge_2;
@@ -424,7 +438,7 @@
 
   function fecthDestinationDetails(did) {
     if (!did) return;
-    fetch(`get-destination-details?did=${encodeURIComponent(did)}`)
+    fetch(`/api/get-destination-details?did=${encodeURIComponent(did)}`)
       .then(response => response.json())
       .then(data => {
         if (data.district && data.km) {
@@ -459,7 +473,7 @@
 
   function fecthrate(km) {
     let contract_no = document.getElementById("contract_id").value
-    fetch(`/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -482,7 +496,7 @@
   function fecthCumRate() {
     let contract_no = document.getElementById("contract_id").value
     let km = document.getElementById("km").value
-    fetch(`/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.amount) {
@@ -504,7 +518,7 @@
     let contract_no = document.getElementById("contract_id").value
     let ton = document.getElementById("weight").value
     let km = document.getElementById("km").value
-    fetch(`/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.amount) {
@@ -551,7 +565,7 @@
     let taluka_name = document.getElementById("taluka").value
     let district = document.getElementById("district").value
     if (taluka_name.length > 0 && district.length > 0) {
-      fetch(`/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}`)
+      fetch(`/api/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}`)
         .then(response => response.json())
         .then(data => {
           if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -577,7 +591,7 @@
     let taluka_name = document.getElementById("taluka").value
     let district = document.getElementById("district").value
     if (district.length > 0) {
-      fetch(`get-district-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}`)
+      fetch(`/api/get-district-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}`)
         .then(response => response.json())
         .then(data => {
           if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -689,12 +703,18 @@
   function clearChallanErrorUpdate() {
     const challanInput = document.getElementById('challan_no');
     const errorDiv = document.getElementById('challan_error');
+    const updateBtn = document.getElementById('update_dispatch_btn');
     
     if (challanInput) {
       challanInput.classList.remove('invalid', 'is-invalid');
+      // Clear HTML5 validation message
+      challanInput.setCustomValidity('');
     }
     if (errorDiv) {
       errorDiv.style.display = 'none';
+    }
+    if (updateBtn) {
+      updateBtn.disabled = false;
     }
     // Clear any pending validation
     clearTimeout(challanValidationTimeoutUpdate);
@@ -704,6 +724,8 @@
     const challanInput = document.getElementById('challan_no');
     const errorDiv = document.getElementById('challan_error');
     const dispatchId = '{{ dispatch.id }}'; // Get dispatch ID from template
+    const updateBtn = document.getElementById('update_dispatch_btn');
+    const duplicateMsg = "This Challan No. already exists. Please enter a unique challan number.";
     
     // Clear previous timeout
     clearTimeout(challanValidationTimeoutUpdate);
@@ -715,7 +737,7 @@
     
     // Debounce: wait 500ms after user stops typing
     challanValidationTimeoutUpdate = setTimeout(function() {
-      let url = `check-challan-duplicate?challan_no=${encodeURIComponent(challanNo)}`;
+      let url = `/api/check-challan-duplicate?challan_no=${encodeURIComponent(challanNo)}`;
       if (dispatchId) {
         url += `&dispatch_id=${dispatchId}`;
       }
@@ -726,14 +748,29 @@
             // Show error
             challanInput.classList.add('is-invalid');
             if (errorDiv) {
-              errorDiv.textContent = `Challan No. '${challanNo}' already exists. Please use a different challan number.`;
+              errorDiv.textContent = duplicateMsg;
               errorDiv.style.display = 'block';
+            }
+            if (updateBtn) {
+              updateBtn.disabled = true;
+            }
+            // Set HTML5 validation message and show it
+            if (challanInput) {
+              challanInput.setCustomValidity(duplicateMsg);
+              challanInput.reportValidity();
             }
           } else {
             // Remove error
             challanInput.classList.remove('is-invalid');
             if (errorDiv) {
               errorDiv.style.display = 'none';
+            }
+            if (updateBtn) {
+              updateBtn.disabled = false;
+            }
+            // Clear HTML5 validation message
+            if (challanInput) {
+              challanInput.setCustomValidity('');
             }
           }
         })
@@ -745,6 +782,11 @@
 
   // Initialize on page load
   window.addEventListener('DOMContentLoaded', function() {
+    // Clean existing FROM value (remove RR NO part if present)
+    const fromInput = document.getElementById('from_center');
+    if (fromInput && fromInput.value) {
+      fromInput.value = sanitizeFromCenter(fromInput.value);
+    }
     // Fetch contract details to populate hidden fields
     fecthContractDetails();
   });
