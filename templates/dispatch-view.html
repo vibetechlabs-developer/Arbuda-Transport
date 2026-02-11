@@ -159,7 +159,7 @@
                             <td>{{ dispatch.truck_no }}</td>
                             <td>{{ dispatch.product_name }}</td>
                             <td>{{ dispatch.party_name }}</td>
-                            <td>{{ dispatch.from_center }}</td>
+                            <td class="from-center-cell">{{ dispatch.from_center }}</td>
                             <td>{{ dispatch.destination }}</td>
                             <td>{{ dispatch.taluka }}</td>
                             <td>{{ dispatch.district }}</td>
@@ -236,6 +236,26 @@
         url.searchParams.set(key, value);
         window.location.href = url.toString(); // refresh page
     }
+
+    // Helper: remove RR number section from FROM text, showing only location
+    function sanitizeFromText(raw) {
+        if (!raw) return '';
+        let txt = String(raw);
+        const upper = txt.toUpperCase();
+        const rrIndex = upper.indexOf('RR NO');
+        if (rrIndex !== -1) {
+            txt = txt.substring(0, rrIndex);
+        }
+        // Trim and drop trailing comma, hyphen or brackets
+        return txt.trim().replace(/[,\-\[\]]\s*$/, '');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const fromCells = document.querySelectorAll('.from-center-cell');
+        fromCells.forEach(function (cell) {
+            cell.textContent = sanitizeFromText(cell.textContent);
+        });
+    });
 </script>
 
 
