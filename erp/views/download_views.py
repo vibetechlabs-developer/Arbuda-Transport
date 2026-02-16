@@ -292,9 +292,10 @@ def generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        # Compact typography for larger tables to reduce page breaks
-        # Enable compact mode from 15 rows onwards so at least 15 rows can fit on a page.
-        compact = len(dispatch_subset) >= 15
+        # Compact typography for tables to reduce page breaks
+        # For small invoices (<=15 dispatches in total), also force compact mode
+        total_dispatch_count = len(all_dispatches or dispatches)
+        compact = total_dispatch_count <= 15 or len(dispatch_subset) >= 15
         compact_fs = 6.5 if compact else None
         compact_leading = 9 if compact else None
 
@@ -833,9 +834,10 @@ def download_generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        # Compact typography for larger tables to reduce page breaks
-        # Enable compact mode from 15 rows onwards so at least 15 rows can fit on a page.
-        compact = len(dispatch_subset) >= 15
+        # Compact typography for tables to reduce page breaks
+        # For small invoices (<=15 dispatches in total), also force compact mode
+        total_dispatch_count = len(all_dispatches or dispatches)
+        compact = total_dispatch_count <= 15 or len(dispatch_subset) >= 15
         compact_fs = 6.5 if compact else None
         # Taller rows for readability (compact mode still tries to fit one page)
         compact_leading = 9 if compact else None
