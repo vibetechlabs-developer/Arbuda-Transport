@@ -243,7 +243,8 @@ def generate_invoice_pdf(request):
     ]))
 
     fields = contract.invoice_fields
-    chunk_size = int(request.POST.get('chunk', 10))  # dispatch per page
+    # Default: allow at least ~15 rows per page comfortably
+    chunk_size = int(request.POST.get('chunk', 15))  # dispatch per page
 
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
@@ -288,9 +289,10 @@ def generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        compact = len(dispatch_subset) >= 18
+        # Compact typography for larger tables to reduce page breaks
+        # Enable compact mode from 15 rows onwards so at least 15 rows can fit on a page.
+        compact = len(dispatch_subset) >= 15
         compact_fs = 6.5 if compact else None
-        
         compact_leading = 9 if compact else None
 
         center_style_desc_local = ParagraphStyle(
@@ -779,7 +781,8 @@ def download_generate_invoice_pdf(request):
     ]))
 
     fields = contract.invoice_fields
-    chunk_size = int(request.POST.get('chunk', 10))  # dispatch per page
+    # Default: allow at least ~15 rows per page comfortably
+    chunk_size = int(request.POST.get('chunk', 15))  # dispatch per page
 
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
@@ -825,7 +828,8 @@ def download_generate_invoice_pdf(request):
         center_fields = ["sr_no", "gc_note"]
 
         # Compact typography for larger tables to reduce page breaks
-        compact = len(dispatch_subset) >= 18
+        # Enable compact mode from 15 rows onwards so at least 15 rows can fit on a page.
+        compact = len(dispatch_subset) >= 15
         compact_fs = 6.5 if compact else None
         # Taller rows for readability (compact mode still tries to fit one page)
         compact_leading = 9 if compact else None
