@@ -320,6 +320,18 @@ def generate_invoice_pdf(request):
         # Initialize page totals
         total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = 0
 
+        def _num(val, decimals=3):
+            """
+            Safe numeric formatter for PDF cells.
+            Ensures missing/blank numeric values don't render as 'None' and don't break table structure.
+            """
+            try:
+                if val in (None, "", "None", "null", "NULL", "-"):
+                    return f"{0:.{decimals}f}"
+                return f"{float(val):.{decimals}f}"
+            except Exception:
+                return f"{0:.{decimals}f}"
+
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=1):
             total_amount = (float(d.totalfreight or 0) +
@@ -343,7 +355,8 @@ def generate_invoice_pdf(request):
                 elif field == "dc_field" or field == "None":
                     row.append(d.challan_no)
                 elif field in ("luggage", "totalfreight"):
-                    row.append(d.totalfreight)
+                    # keep invoice structure consistent even when freight is missing
+                    row.append(_num(d.totalfreight, decimals=2))
                 elif field in ("product_name", "product"):
                     row.append(d.product_name)
                 elif field == "amount":
@@ -354,8 +367,17 @@ def generate_invoice_pdf(request):
                     row.append(d.main_party or "")
                 elif field == "sub_party":
                     row.append(d.sub_party or "")
+                elif field in ("unloading_charge_1", "unloading_charge_2", "loading_charge"):
+                    # critical: when these are not present, PDF was looking like "error structure"
+                    row.append(_num(getattr(d, field, None), decimals=3))
+                elif field in ("weight",):
+                    row.append(_num(getattr(d, field, None), decimals=3))
+                elif field in ("km", "rate"):
+                    row.append(_num(getattr(d, field, None), decimals=2))
                 else:
-                    row.append(getattr(d, field, ""))
+                    # Avoid 'None' showing in PDF
+                    v = getattr(d, field, "")
+                    row.append("" if v in (None, "None", "null", "NULL") else v)
             data.append(row)                
 
         # Determine total row logic
@@ -816,6 +838,18 @@ def download_generate_invoice_pdf(request):
         # Initialize page totals
         total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = 0
 
+        def _num(val, decimals=3):
+            """
+            Safe numeric formatter for PDF cells.
+            Ensures missing/blank numeric values don't render as 'None' and don't break table structure.
+            """
+            try:
+                if val in (None, "", "None", "null", "NULL", "-"):
+                    return f"{0:.{decimals}f}"
+                return f"{float(val):.{decimals}f}"
+            except Exception:
+                return f"{0:.{decimals}f}"
+
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=1):
             total_amount = (float(d.totalfreight or 0) +
@@ -839,7 +873,7 @@ def download_generate_invoice_pdf(request):
                 elif field == "dc_field" or field == "None":
                     row.append(d.challan_no)
                 elif field in ("luggage", "totalfreight"):
-                    row.append(d.totalfreight)
+                    row.append(_num(d.totalfreight, decimals=2))
                 elif field in ("product_name", "product"):
                     row.append(d.product_name)
                 elif field == "amount":
@@ -850,8 +884,15 @@ def download_generate_invoice_pdf(request):
                     row.append(d.main_party or "")
                 elif field == "sub_party":
                     row.append(d.sub_party or "")
+                elif field in ("unloading_charge_1", "unloading_charge_2", "loading_charge"):
+                    row.append(_num(getattr(d, field, None), decimals=3))
+                elif field in ("weight",):
+                    row.append(_num(getattr(d, field, None), decimals=3))
+                elif field in ("km", "rate"):
+                    row.append(_num(getattr(d, field, None), decimals=2))
                 else:
-                    row.append(getattr(d, field, ""))
+                    v = getattr(d, field, "")
+                    row.append("" if v in (None, "None", "null", "NULL") else v)
             data.append(row)                
 
         # Determine total row logic
