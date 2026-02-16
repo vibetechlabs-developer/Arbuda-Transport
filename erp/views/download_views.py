@@ -245,6 +245,9 @@ def generate_invoice_pdf(request):
     fields = contract.invoice_fields
     # Default: allow at least ~15 rows per page comfortably
     chunk_size = int(request.POST.get('chunk', 15))  # dispatch per page
+    # If total dispatches are 15 or fewer, force them onto a single page
+    if len(dispatches) <= 15:
+        chunk_size = len(dispatches)
 
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
@@ -783,6 +786,9 @@ def download_generate_invoice_pdf(request):
     fields = contract.invoice_fields
     # Default: allow at least ~15 rows per page comfortably
     chunk_size = int(request.POST.get('chunk', 15))  # dispatch per page
+    # If total dispatches are 15 or fewer, force them onto a single page
+    if len(dispatches) <= 15:
+        chunk_size = len(dispatches)
 
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
