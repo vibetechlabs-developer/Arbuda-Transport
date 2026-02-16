@@ -247,7 +247,24 @@ def generate_invoice_pdf(request):
 
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
-   
+
+        # Dynamically hide loading/unloading columns when they are not used at all
+        loading_related_fields = {"unloading_charge_1", "unloading_charge_2", "loading_charge"}
+        unused_loading_fields = set()
+        for f in loading_related_fields:
+            if f in fields:
+                try:
+                    if all(
+                        (getattr(d, f, None) in (None, "", 0, 0.0, "0", "0.0"))
+                        for d in (all_dispatches or dispatches)
+                    ):
+                        unused_loading_fields.add(f)
+                except Exception:
+                    # If anything goes wrong, keep the field rather than breaking layout
+                    pass
+
+        active_fields = [f for f in fields if f not in unused_loading_fields]
+
         # Header row
         label_map = {
             "sr_no": "Sr No",
@@ -265,10 +282,10 @@ def generate_invoice_pdf(request):
             "totalfreight": "Freight",
             "gc_note": "GC Note",
         }
-        data = [[label_map.get(f, f.replace("_", " ").title()) for f in fields]]
+        data = [[label_map.get(f, f.replace("_", " ").title()) for f in active_fields]]
 
         numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
-                        "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
+                          "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
         compact = len(dispatch_subset) >= 18
@@ -347,7 +364,7 @@ def generate_invoice_pdf(request):
             total_weight += float(d.weight or 0)
 
             row = []
-            for field in fields:
+            for field in active_fields:
                 if field == "sr_no":
                     row.append(idx)
                 elif field in ("depature_date", "dep_date"):
@@ -408,7 +425,7 @@ def generate_invoice_pdf(request):
                 total_amount_sum += total_amount
                 total_weight += float(d.weight or 0)
 
-            for i, field in enumerate(fields):
+            for i, field in enumerate(active_fields):
                 if field == "weight":
                     total_row.append(f"{total_weight:.3f}")
                 elif field in ("luggage", "totalfreight"):
@@ -481,7 +498,7 @@ def generate_invoice_pdf(request):
         # Format cells
         for i, row in enumerate(data):
             for j, cell in enumerate(row):
-                field_name = fields[j]
+                field_name = active_fields[j]
                 if i == 0:  # header - use uniform style for all column names
                     row[j] = Paragraph(f"<b>{cell}</b>", header_style_uniform)
                 elif add_total and i == len(data) - 1:  # total/grand total row
@@ -765,7 +782,24 @@ def download_generate_invoice_pdf(request):
 
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None):
-   
+
+        # Dynamically hide loading/unloading columns when they are not used at all
+        loading_related_fields = {"unloading_charge_1", "unloading_charge_2", "loading_charge"}
+        unused_loading_fields = set()
+        for f in loading_related_fields:
+            if f in fields:
+                try:
+                    if all(
+                        (getattr(d, f, None) in (None, "", 0, 0.0, "0", "0.0"))
+                        for d in (all_dispatches or dispatches)
+                    ):
+                        unused_loading_fields.add(f)
+                except Exception:
+                    # If anything goes wrong, keep the field rather than breaking layout
+                    pass
+
+        active_fields = [f for f in fields if f not in unused_loading_fields]
+
         # Header row
         label_map = {
             "sr_no": "Sr No",
@@ -783,10 +817,10 @@ def download_generate_invoice_pdf(request):
             "totalfreight": "Freight",
             "gc_note": "GC Note",
         }
-        data = [[label_map.get(f, f.replace("_", " ").title()) for f in fields]]
+        data = [[label_map.get(f, f.replace("_", " ").title()) for f in active_fields]]
 
         numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
-                        "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
+                          "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
         # Compact typography for larger tables to reduce page breaks
@@ -865,7 +899,7 @@ def download_generate_invoice_pdf(request):
             total_weight += float(d.weight or 0)
 
             row = []
-            for field in fields:
+            for field in active_fields:
                 if field == "sr_no":
                     row.append(idx)
                 elif field in ("depature_date", "dep_date"):
@@ -923,7 +957,7 @@ def download_generate_invoice_pdf(request):
                 total_amount_sum += total_amount
                 total_weight += float(d.weight or 0)
 
-            for i, field in enumerate(fields):
+            for i, field in enumerate(active_fields):
                 if field == "weight":
                     total_row.append(f"{total_weight:.3f}")
                 elif field in ("luggage", "totalfreight"):
@@ -995,7 +1029,7 @@ def download_generate_invoice_pdf(request):
         # Format cells
         for i, row in enumerate(data):
             for j, cell in enumerate(row):
-                field_name = fields[j]
+                field_name = active_fields[j]
                 if i == 0:  # header - use uniform style for all column names
                     row[j] = Paragraph(f"<b>{cell}</b>", header_style_uniform)
                 elif add_total and i == len(data) - 1:  # total/grand total row
