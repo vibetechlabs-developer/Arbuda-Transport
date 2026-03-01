@@ -683,7 +683,7 @@
     }
 
     if (data.party_name) document.getElementById('party_name').value = data.party_name;
-    if (data.from_center) document.getElementById('from_center').value = data.from_center;
+    if (data.from_center) document.getElementById('from_center').value = sanitizeFromCenter(data.from_center);
     if (data.truck_no) document.getElementById('truck_no').value = data.truck_no;
     if (data.main_party) document.getElementById('main_party').value = data.main_party;
     if (data.sub_party) document.getElementById('sub_party').value = data.sub_party;
@@ -740,15 +740,21 @@
   }
 
   // Helper: remove RR number part from FROM field text
+  // Examples it should clean:
+  //   "ABC PLANT, RR No. 123"      -> "ABC PLANT"
+  //   "XYZ - rr no 45"             -> "XYZ"
+  //   "MAIN DEPOT RR.NO: 77"       -> "MAIN DEPOT"
   function sanitizeFromCenter(raw) {
     if (!raw) return '';
     let txt = String(raw);
-    const upper = txt.toUpperCase();
-    const rrIndex = upper.indexOf('RR NO');
-    if (rrIndex !== -1) {
-      txt = txt.substring(0, rrIndex);
+
+    // Strip anything starting from "RR No", "RR.NO", "RRNO", etc. (case-insensitive)
+    const match = txt.match(/^(.*?)(RR\.?\s*NO.*)$/i);
+    if (match) {
+      txt = match[1];
     }
-    // Trim and drop trailing comma or hyphen
+
+    // Trim and drop trailing comma or hyphen after removing RR section
     return txt.trim().replace(/[,-]\s*$/, '');
   }
 
