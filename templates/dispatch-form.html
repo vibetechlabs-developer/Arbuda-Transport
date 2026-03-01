@@ -739,23 +739,24 @@
       });
   }
 
-  // Helper: remove RR number part from FROM field text
+  // Helper: remove RR number / bracket part from FROM field text
   // Examples it should clean:
-  //   "ABC PLANT, RR No. 123"      -> "ABC PLANT"
-  //   "XYZ - rr no 45"             -> "XYZ"
-  //   "MAIN DEPOT RR.NO: 77"       -> "MAIN DEPOT"
+  //   "ABC PLANT, RR No. 123"          -> "ABC PLANT"
+  //   "XYZ - rr no 45"                 -> "XYZ"
+  //   "MAIN DEPOT RR.NO: 77"           -> "MAIN DEPOT"
+  //   "KANKARIA R/H [ RR NO. 107 ]"    -> "KANKARIA R/H"
   function sanitizeFromCenter(raw) {
     if (!raw) return '';
     let txt = String(raw);
 
-    // Strip anything starting from "RR No", "RR.NO", "RRNO", etc. (case-insensitive)
-    const match = txt.match(/^(.*?)(RR\.?\s*NO.*)$/i);
-    if (match) {
-      txt = match[1];
-    }
+    // 1) Strip anything from "RR No"/"RR.NO"/"RRNO" onward (case-insensitive)
+    txt = txt.replace(/RR\.?\s*NO.*$/i, '');
 
-    // Trim and drop trailing comma or hyphen after removing RR section
-    return txt.trim().replace(/[,-]\s*$/, '');
+    // 2) If there is any trailing bracket section like " [ ...", drop it too
+    txt = txt.replace(/[\[\(].*$/, '');
+
+    // 3) Trim and drop trailing comma / hyphen / bracket leftovers
+    return txt.trim().replace(/[,\-\[\]\(\)]\s*$/, '');
   }
 
   function fecthContractDetails() {
