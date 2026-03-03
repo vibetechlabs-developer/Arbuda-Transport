@@ -15,6 +15,7 @@ from transport.models import (
 )
 import re
 from decimal import Decimal
+from datetime import datetime
 
 ## CONTRACT DETAILS FETCHING ##
 
@@ -685,6 +686,145 @@ def get_dispacth_product(request):
         return JsonResponse({
            'error': 'not dispatch found' 
         })
+
+
+@session_required
+def get_report_dispatches(request):
+    """
+    Return dispatch list for reports (client + internal) so that the
+    front-end can display exactly what will be in the downloaded PDF report.
+    
+    This matches the exact filtering logic from download_report() and download_our_report().
+
+    Query params:
+    - contract-id : required
+    - type        : "date_wise" | "product_wise" (same as report form)
+    - d_from_date / d_to_date : for date_wise (both required)
+    - product_name, p_from_date, p_to_date : for product_wise (all required)
+    - internal    : optional "true" to indicate internal report
+                    (currently only affects which fields frontend adds)
+    """
+    contract_id = request.GET.get("contract-id")
+    report_type = request.GET.get("type")
+    company_id = request.session["company_info"]["company_id"]
+
+    if not contract_id or not report_type:
+        return JsonResponse(
+            {"error": "contract-id and type are required"},
+            status=400,
+        )
+
+    try:
+        contract = T_Contract.objects.get(id=contract_id, company_id=company_id)
+    except T_Contract.DoesNotExist:
+        return JsonResponse({"error": "Contract not found"}, status=404)
+
+    # Apply filters based on report type, EXACTLY matching download_report logic
+    if report_type == "product_wise":
+        product_name = request.GET.get("product_name")
+        p_from_date = request.GET.get("p_from_date")
+        p_to_date = request.GET.get("p_to_date")
+        
+        if not product_name or not p_from_date or not p_to_date:
+            return JsonResponse(
+                {"error": "product_name, p_from_date, and p_to_date are required for product_wise"},
+                status=400,
+            )
+        
+        # Parse dates same way as download_report (line 74-75)
+        try:
+            f_from_date = datetime.strptime(p_from_date, "%Y-%m-%d").date() if p_from_date else None
+            f_to_date = datetime.strptime(p_to_date, "%Y-%m-%d").date() if p_to_date else None
+        except ValueError:
+            return JsonResponse(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=400,
+            )
+        
+        # Match exact filter from download_report line 76-80
+        qs = Dispatch.objects.filter(
+            contract_id=contract_id,
+            product_name=product_name,
+            dep_date__range=(f_from_date, f_to_date),
+            company_id=company_id
+        ).order_by('dep_date')
+
+    elif report_type == "date_wise":
+        d_from_date = request.GET.get("d_from_date")
+        d_to_date = request.GET.get("d_to_date")
+        
+        if not d_from_date or not d_to_date:
+            return JsonResponse(
+                {"error": "d_from_date and d_to_date are required for date_wise"},
+                status=400,
+            )
+        
+        # Parse dates same way as download_report (line 84-85)
+        try:
+            f_from_date = datetime.strptime(d_from_date, "%Y-%m-%d").date() if d_from_date else None
+            f_to_date = datetime.strptime(d_to_date, "%Y-%m-%d").date() if d_to_date else None
+        except ValueError:
+            return JsonResponse(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=400,
+            )
+        
+        # Match exact filter from download_report line 86-89
+        qs = Dispatch.objects.filter(
+            contract_id=contract_id,
+            dep_date__range=(f_from_date, f_to_date),
+            company_id=company_id
+        ).order_by('dep_date')
+    else:
+        return JsonResponse({"error": "Invalid report type"}, status=400)
+
+    # Get all dispatch fields needed for the report (matching what download_report uses)
+    dispatches_list = []
+    for d in qs:
+        # Calculate amount same way as download_report (line 198-201)
+        total_amount = (float(d.totalfreight or 0) +
+                       float(d.unloading_charge_1 or 0) +
+                       float(d.unloading_charge_2 or 0) +
+                       float(d.loading_charge or 0))
+        
+        dispatch_data = {
+            "id": d.id,
+            "challan_no": d.challan_no,
+            "dep_date": d.dep_date.strftime("%Y-%m-%d") if d.dep_date else "",
+            "truck_no": d.truck_no,
+            "product_name": d.product_name,
+            "party_name": d.party_name,
+            "from_center": d.from_center,
+            "destination": d.destination,
+            "taluka": d.taluka,
+            "district": d.district,
+            "km": float(d.km) if d.km else 0,
+            "weight": float(d.weight) if d.weight else 0,
+            "rate": float(d.rate) if d.rate else 0,
+            "totalfreight": float(d.totalfreight) if d.totalfreight else 0,
+            "unloading_charge_1": float(d.unloading_charge_1) if d.unloading_charge_1 else 0,
+            "unloading_charge_2": float(d.unloading_charge_2) if d.unloading_charge_2 else 0,
+            "loading_charge": float(d.loading_charge) if d.loading_charge else 0,
+            "grand_total": total_amount,  # Use calculated amount
+            "gc_note_no": d.gc_note_no,
+            # Internal report fields
+            "truck_booking_rate": float(d.truck_booking_rate) if d.truck_booking_rate else 0,
+            "total_paid_truck_onwer": float(d.total_paid_truck_onwer) if d.total_paid_truck_onwer else 0,
+            "advance_paid": float(d.advance_paid) if d.advance_paid else 0,
+            "panding_amount": float(d.panding_amount) if d.panding_amount else 0,
+            "net_profit": float(d.net_profit) if d.net_profit else 0,
+        }
+        dispatches_list.append(dispatch_data)
+
+    # Base fields are invoice_fields; internal report will append more on frontend
+    base_fields = contract.invoice_fields or []
+
+    return JsonResponse(
+        {
+            "fields": base_fields,
+            "destinations": dispatches_list,
+        }
+    )
 
     
 @session_required

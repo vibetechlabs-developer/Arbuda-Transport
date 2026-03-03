@@ -73,8 +73,17 @@
             <div class="row mb-3">
               <div class="col-sm-6">
                 <label class="form-label">Enter Dispacthes Per Page</label>
-                <!-- Default 15 so one page can comfortably show ~15 rows -->
-                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="15" required>
+                <!-- Locked to 10 so invoice PDF fits header + 10 rows + TOTAL + signatures on one page -->
+                <input
+                  type="number"
+                  name="chunk"
+                  id="chunk"
+                  class="form-control"
+                  min="10"
+                  max="10"
+                  value="10"
+                  readonly
+                >
               </div>
             </div>
             <div class="row">

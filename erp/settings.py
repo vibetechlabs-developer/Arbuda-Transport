@@ -11,7 +11,9 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY') or 'dev-insecure-secret-key-change-m
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG') == 'True'
+# Parse DEBUG more robustly - handle 'True', 'true', '1', etc.
+debug_value = os.getenv('DJANGO_DEBUG', '').strip().lower()
+DEBUG = debug_value in ('true', '1', 'yes', 'on')
 
 # ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 # ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1','localhost').split(',')
@@ -35,9 +37,17 @@ if 'localhost' not in ALLOWED_HOSTS:
 # ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1').split(',')
 
 
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+# For local development, always disable secure cookies (requires HTTPS)
+# These should only be True in production with HTTPS enabled
+SESSION_COOKIE_SECURE = False if DEBUG else True
+CSRF_COOKIE_SECURE = False if DEBUG else True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# Disable HTTPS redirect in development
+SECURE_SSL_REDIRECT = False
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
 
 
 # Application definition

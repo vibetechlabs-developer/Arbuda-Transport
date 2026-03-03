@@ -26,6 +26,7 @@ urlpatterns = [
 
 
     path("get-dispacth-product", views.get_dispacth_product, name="get-dispacth-product"), # from invoice
+    path("get-report-dispacth", views.get_report_dispatches, name="get-report-dispacth"), # for report preview tables
     path("get-last-dispatch-details", views.get_last_dispatch_details, name="get-last-dispatch-details"),
     path("get-dispatch-list", views.get_dispatch_list_for_contract, name="get-dispatch-list"),
     path("get-dispatch-details", views.get_dispatch_details, name="get-dispatch-details"),

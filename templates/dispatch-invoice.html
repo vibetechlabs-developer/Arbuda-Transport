@@ -104,7 +104,17 @@
             <div class="row mb-3">
               <div class="col-sm-6">
                 <label class="form-label">Enter Dispacthes Per Page</label>
-                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="{% if form_data.chunk %}{{ form_data.chunk }}{% else %}15{% endif %}" required>
+                <!-- Tuned to 10 so header + 10 rows + TOTAL + signatures fit nicely on one page -->
+                <input
+                  type="number"
+                  name="chunk"
+                  id="chunk"
+                  class="form-control"
+                  min="10"
+                  max="10"
+                  value="10"
+                  readonly
+                >
               </div>
             </div>
             <h5 class="text-primary fw-semibold mb-3">Search</h5>

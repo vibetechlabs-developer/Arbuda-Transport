@@ -30,7 +30,7 @@
                 </select>
               </div>
               <div class="mb-3 col-sm-6 d-flex align-items-end gap-2">
-                <button type="button" class="btn btn-outline-primary w-100" id="btnToggleNewDispatch" disabled>
+                <button type="button" class="btn btn-outline-primary w-100" id="btnToggleNewDispatch">
                   Add New
                 </button>
               </div>
@@ -345,6 +345,7 @@
   let isAutoFillingDispatch = false;
   let dispatchMode = 'autofill'; // 'autofill' (static) | 'new' (editable)
   let isDispatchModeApplying = false;
+  let autoFillToken = 0; // used to ignore stale autofill fetches when switching to "Add New"
 
   const DISPATCH_LOCK_FIELDS = [
     'challan_no',
@@ -403,7 +404,8 @@
 
       const btn = document.getElementById('btnToggleNewDispatch');
       if (btn) {
-        btn.disabled = !document.getElementById('contract_id')?.value;
+        // Button should always remain enabled (as per requirement),
+        // we only toggle its label based on current mode.
         btn.textContent = isStatic ? 'Add New' : 'Use Fetched Details';
       }
     } finally {
@@ -412,8 +414,9 @@
   }
 
   function clearForNewDispatch() {
-    // Keep only dep_date intact; clear everything else so it's like a fresh form
-    const keep = new Set(['dep_date']);
+    // Keep dep_date + from_center intact (from_center is contract-defined)
+    // Also keep contract_id (we don't want to force the user to re-select it).
+    const keep = new Set(['dep_date', 'from_center']);
     DISPATCH_LOCK_FIELDS.forEach((id) => {
       if (keep.has(id)) return;
       const el = document.getElementById(id);
@@ -425,29 +428,9 @@
       }
     });
 
-    // Also clear contract selection and from_center explicitly
-    const contractSelect = document.getElementById('contract_id');
-    if (contractSelect) {
-      contractSelect.value = '';
-    }
-    if (contractTomSelect) {
-      contractTomSelect.clear(true);
-    }
-    const fromCenterInput = document.getElementById('from_center');
-    if (fromCenterInput) {
-      fromCenterInput.value = '';
-      fromCenterInput.removeAttribute('readonly');
-    }
-
     // Clear TomSelect selections too
     if (destinationTomSelect) destinationTomSelect.clear(true);
     if (productTomSelect) productTomSelect.clear(true);
-
-    // Hide optional party rows until contract details decide to show them
-    const mainPartyRow = document.getElementById('main_party_row');
-    const subPartyRow = document.getElementById('sub_party_row');
-    if (mainPartyRow) mainPartyRow.style.display = 'none';
-    if (subPartyRow) subPartyRow.style.display = 'none';
 
     // Remove challan duplicate error UI
     clearChallanError();
@@ -502,11 +485,11 @@
     const btn = document.getElementById('btnToggleNewDispatch');
     if (btn) {
       btn.addEventListener('click', function () {
-        const contractVal = document.getElementById('contract_id')?.value;
-        if (!contractVal) return;
-
         if (dispatchMode === 'autofill') {
           dispatchMode = 'new';
+          // Cancel/ignore any pending autofill request
+          autoFillToken++;
+          isAutoFillingDispatch = false;
           setDispatchStatic(false);
           clearForNewDispatch();
           // Keep from_center locked (it’s contract-defined)
@@ -719,6 +702,8 @@
   function autoFillFromLastDispatch(includeProductAndChallan) {
     const contract_id = document.getElementById('contract_id').value;
     if (!contract_id) return;
+    // Only autofill when we're in autofill mode (never in "Add New" mode)
+    if (dispatchMode !== 'autofill') return;
 
     const selectedProduct = productTomSelect ? productTomSelect.getValue() : '';
     const params = new URLSearchParams();
@@ -727,15 +712,26 @@
       params.append('product_name', selectedProduct);
     }
 
+    const myToken = ++autoFillToken;
+    isAutoFillingDispatch = true;
     fetch(`/api/get-last-dispatch-details?${params.toString()}`)
       .then(response => response.json())
       .then(data => {
+        // If user switched to "Add New" (or a newer request started), ignore this result
+        if (myToken !== autoFillToken) return;
+        if (dispatchMode !== 'autofill') return;
         // Auto-fill fields based on last dispatch.
         // includeProductAndChallan tells whether to also copy challan_no + product_name.
         applyLastDispatchDetails(data, !!includeProductAndChallan);
       })
       .catch(err => {
         console.error('Error fetching last dispatch details:', err);
+      })
+      .finally(() => {
+        // only clear if this is still the latest request
+        if (myToken === autoFillToken) {
+          isAutoFillingDispatch = false;
+        }
       });
   }
 
@@ -766,8 +762,18 @@
     fetch(`/api/get-contract-details?contract_id=${encodeURIComponent(contract_id)}`)
       .then(response => response.json())
       .then(data => {
-        // Anytime contract changes, default back to static auto-fill mode
-        dispatchMode = 'autofill';
+        // If user explicitly switched to "Add New", keep the form editable even after changing Contract ID.
+        // Otherwise default to static auto-fill mode.
+        const shouldKeepNewMode = (dispatchMode === 'new');
+        if (!shouldKeepNewMode) {
+          dispatchMode = 'autofill';
+        }
+
+        // If we're in new mode and contract changes, clear user-entered fields (but keep from/dep_date).
+        if (shouldKeepNewMode) {
+          clearForNewDispatch();
+        }
+
         if (data.from) {
           const baseFrom = sanitizeFromCenter(data.from);
           document.getElementById('from_center').value = baseFrom;
@@ -803,13 +809,10 @@
           .then(pdata => {
             if (pdata.product_list) {
               updateProducts(pdata.product_list);
-              // After products are updated, auto-fill with last dispatch details, then lock fields (static)
+              // After products are updated, auto-fill with last dispatch details (view-only) by default
               setTimeout(function() {
                 if (dispatchMode === 'autofill') {
                   autoFillFromLastDispatch(true);
-                  setDispatchStatic(true);
-                } else {
-                  setDispatchStatic(false);
                 }
               }, 100);
             } else {
@@ -826,6 +829,17 @@
             if (productTomSelect) {
               productTomSelect.clear();
               productTomSelect.clearOptions();
+            }
+          })
+          .finally(() => {
+            // After contract + product data load, enforce correct lock state:
+            // - In autofill mode: fields locked (view-only)
+            // - In new mode: fields editable, but from_center always readonly
+            if (dispatchMode === 'autofill') {
+              setDispatchStatic(true);
+            } else {
+              setDispatchStatic(false);
+              setElementReadOnly('from_center', true);
             }
           });
         if (data.rate_type == "Taluka-Wise") {

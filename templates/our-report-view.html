@@ -100,6 +100,55 @@
                 if (productSelect) {
                   productSelect.required = (value === "product_wise");
                 }
+                
+                // Refresh preview when report type changes
+                setTimeout(() => {
+                  fetchReportPreviewInternal();
+                }, 100);
+              });
+              
+              // Add event listeners for date fields to trigger preview
+              document.addEventListener("DOMContentLoaded", function() {
+                const dFromDate = document.getElementById("d_from_date");
+                const dToDate = document.getElementById("d_to_date");
+                const pFromDate = document.getElementById("p_from_date");
+                const pToDate = document.getElementById("p_to_date");
+                
+                if (dFromDate) {
+                  dFromDate.addEventListener("change", fetchReportPreviewInternal);
+                }
+                if (dToDate) {
+                  dToDate.addEventListener("change", fetchReportPreviewInternal);
+                }
+                if (pFromDate) {
+                  pFromDate.addEventListener("change", fetchReportPreviewInternal);
+                }
+                if (pToDate) {
+                  pToDate.addEventListener("change", fetchReportPreviewInternal);
+                }
+                
+                // Try to fetch preview on page load if all required fields are filled
+                setTimeout(() => {
+                  const contract_id = contractTomSelect ? contractTomSelect.getValue() : document.getElementById("contract_no")?.value;
+                  const reportType = document.getElementById("type_of_report")?.value;
+                  
+                  if (contract_id && reportType) {
+                    if (reportType === "date_wise") {
+                      const from = dFromDate?.value;
+                      const to = dToDate?.value;
+                      if (from && to) {
+                        fetchReportPreviewInternal();
+                      }
+                    } else if (reportType === "product_wise") {
+                      const productName = tomSelectInstance ? tomSelectInstance.getValue() : (document.getElementById("select-beast")?.value || "");
+                      const from = pFromDate?.value;
+                      const to = pToDate?.value;
+                      if (productName && from && to) {
+                        fetchReportPreviewInternal();
+                      }
+                    }
+                  }
+                }, 500);
               });
 
             </script>
@@ -111,6 +160,7 @@
               </div>
             </div>
 
+            <h5 class="text-primary fw-semibold mb-3 mt-3">Report Preview</h5>
             <div class="row">
               <div class="table-responsive mb-3">
                 <table id="dispatchTable" class="table table-bordered ">
@@ -138,6 +188,8 @@
 <script>
   let contractTomSelect = null;
   let tomSelectInstance = null;
+  let allDispatches = []; // store fetched data globally
+  let allfield;
 
   // Initialize contract dropdown with TomSelect and store reference
   const contractSelect = document.getElementById("contract_no");
@@ -186,6 +238,12 @@
           direction: "asc"
         },
         placeholder: "Select Product Name",
+        onChange: function(value) {
+          // Refresh preview when product changes
+          setTimeout(() => {
+            fetchReportPreviewInternal();
+          }, 50);
+        }
       });
       console.log('TomSelect initialized successfully');
     } catch(e) {
@@ -265,6 +323,10 @@
         fecthproduct("product_wise");
       }, 50);
     }
+    // Refresh preview when contract changes
+    setTimeout(() => {
+      fetchReportPreviewInternal();
+    }, 100);
   }
 
   function updateDestinations(product_list) {
@@ -310,22 +372,101 @@
     }
   }
 
-  let allDispatches = []; // store fetched data globally
-  let allfield
+  function fetchReportPreviewInternal() {
+    const contractSelectEl = document.getElementById("contract_no");
+    const typeEl = document.getElementById("type_of_report");
+    if (!contractSelectEl || !typeEl) return;
 
-  function fetchDispacth() {
-    const contract_id = document.getElementById('contract_no').value;
-    if (!contract_id) return;
+    const contract_id = contractTomSelect ? contractTomSelect.getValue() : contractSelectEl.value;
+    const reportType = typeEl.value;
 
-    fetch(`/api/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
-      .then(response => response.json())
+    if (!contract_id || !reportType) {
+      allDispatches = [];
+      if (allfield && allfield.length) {
+        renderTable([], allfield);
+      }
+      return;
+    }
+
+    let url = `/api/get-report-dispacth?contract-id=${encodeURIComponent(contract_id)}&type=${encodeURIComponent(reportType)}`;
+
+    if (reportType === "date_wise") {
+      const from = document.getElementById("d_from_date").value;
+      const to = document.getElementById("d_to_date").value;
+      if (!from || !to) {
+        return;
+      }
+      url += `&d_from_date=${encodeURIComponent(from)}&d_to_date=${encodeURIComponent(to)}`;
+    } else if (reportType === "product_wise") {
+      const productName = tomSelectInstance ? tomSelectInstance.getValue() : (document.getElementById("select-beast")?.value || "");
+      const from = document.getElementById("p_from_date").value;
+      const to = document.getElementById("p_to_date").value;
+      if (!productName || !from || !to) {
+        return;
+      }
+      url += `&product_name=${encodeURIComponent(productName)}&p_from_date=${encodeURIComponent(from)}&p_to_date=${encodeURIComponent(to)}`;
+    }
+
+    console.log('Fetching report preview from:', url);
+    fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(err => {
+            throw new Error(err.error || `HTTP error! status: ${response.status}`);
+          });
+        }
+        return response.json();
+      })
       .then(data => {
-        if (data.product_list) {
-          updateProduct(data.product_list)
+        console.log('Report preview data received:', data);
+        if (data.error) {
+          console.error('API error:', data.error);
+          // Clear table on error
+          allDispatches = [];
+          const tableHeader = document.getElementById("tableHeader");
+          const tableBody = document.getElementById("tableBody");
+          const tableFooterRow = document.getElementById("tableFooterRow");
+          if (tableHeader) tableHeader.innerHTML = "";
+          if (tableBody) tableBody.innerHTML = "";
+          if (tableFooterRow) tableFooterRow.innerHTML = "";
+          return;
+        }
+        
+        if (data.destinations && Array.isArray(data.destinations)) {
+          allDispatches = data.destinations;
+          const baseFields = data.fields || [];
+          const extraFields = ["truck_booking_rate", "total_paid_truck_onwer", "advance_paid", "panding_amount", "net_profit"];
+          allfield = baseFields.concat(extraFields);
+          console.log('Rendering table with', allDispatches.length, 'dispatches and', allfield.length, 'fields');
+          renderTable(allDispatches, allfield);
+        } else {
+          console.warn('No destinations in response or invalid format');
+          allDispatches = [];
+          const baseFields = data.fields || [];
+          const extraFields = ["truck_booking_rate", "total_paid_truck_onwer", "advance_paid", "panding_amount", "net_profit"];
+          allfield = baseFields.concat(extraFields);
+          if (allfield && allfield.length) {
+            renderTable([], allfield);
+          } else {
+            const tableHeader = document.getElementById("tableHeader");
+            const tableBody = document.getElementById("tableBody");
+            const tableFooterRow = document.getElementById("tableFooterRow");
+            if (tableHeader) tableHeader.innerHTML = "";
+            if (tableBody) tableBody.innerHTML = "";
+            if (tableFooterRow) tableFooterRow.innerHTML = "";
+          }
         }
       })
       .catch(err => {
-        console.error('Error fetching Slip details:', err);
+        console.error('Error fetching internal report preview:', err);
+        // Clear table on error
+        allDispatches = [];
+        const tableHeader = document.getElementById("tableHeader");
+        const tableBody = document.getElementById("tableBody");
+        const tableFooterRow = document.getElementById("tableFooterRow");
+        if (tableHeader) tableHeader.innerHTML = "";
+        if (tableBody) tableBody.innerHTML = "";
+        if (tableFooterRow) tableFooterRow.innerHTML = "";
       });
   }
   function updateProduct(product_list) {
@@ -355,33 +496,10 @@
 
   let currentSearch = "";
 
+  // Optional hook for future local filtering
   function filterTable() {
-    const from = document.getElementById("fromDate").value;
-    const to = document.getElementById("toDate").value;
-
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to) : null;
-
-    currentSearch = document.getElementById("searchBox").value.toLowerCase();
-
-    const filtered = allDispatches.filter(item => {
-      // Text search
-      const matchesSearch =
-        (item.challan_no && item.challan_no.toLowerCase().includes(currentSearch)) ||
-        (item.product_name && item.product_name.toLowerCase().includes(currentSearch)) ||
-        (item.destination && item.destination.toLowerCase().includes(currentSearch)) ||
-        (item.party_name && item.party_name.toLowerCase().includes(currentSearch));
-
-      // Date filter (assuming your date field is `dep_date` in format "YYYY-MM-DD")
-      const itemDate = item.dep_date ? new Date(item.dep_date) : null;
-      const matchesDate =
-        (!fromDate || (itemDate && itemDate >= fromDate)) &&
-        (!toDate || (itemDate && itemDate <= toDate));
-
-      return matchesSearch && matchesDate; // must match both
-    });
-
-    renderTable(filtered, allfield);
+    if (!allfield || !allfield.length) return;
+    renderTable(allDispatches, allfield);
   }
   function isNumericValue(value) {
     if (value === null || value === undefined || value === "") return false;
@@ -500,6 +618,19 @@
     const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
     return text.replace(regex, `<mark>$1</mark>`);
   }
+
+  // Hook up preview refresh when date/product filters change
+  document.addEventListener("DOMContentLoaded", function () {
+    const dFrom = document.getElementById("d_from_date");
+    const dTo = document.getElementById("d_to_date");
+    const pFrom = document.getElementById("p_from_date");
+    const pTo = document.getElementById("p_to_date");
+
+    if (dFrom) dFrom.addEventListener("change", fetchReportPreviewInternal);
+    if (dTo) dTo.addEventListener("change", fetchReportPreviewInternal);
+    if (pFrom) pFrom.addEventListener("change", fetchReportPreviewInternal);
+    if (pTo) pTo.addEventListener("change", fetchReportPreviewInternal);
+  });
 
 </script>
 
