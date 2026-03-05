@@ -12,94 +12,97 @@
     font-weight: bold;
     border-radius: 2px;
   }
+
+  /* Summary page: use full available width (avoid auth-page centering / max-width constraints) */
+  .summary-page.container-fluid {
+    max-width: 100%;
+  }
 </style>
 
-<div class="container-xxl"> 
-  <div class="header d-flex justify-content-between align-items-center mt-2">
-    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Summary</h4>
-  </div>
-  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
-    <div class="authentication-inner w-100" style="max-width: 100%;">
-      <!-- Register Card -->
-      <div class="card">
-        <div class="card-body">
-          <form id="formAuthentication" class="mb-3" method="POST" action="{% url 'generate-summary-pdf' %}">
-            {% csrf_token %}
-            <h5 class="text-primary fw-semibold mb-3">Summary Details</h5>
-            <div class="row">
-              <div class="mb-3 col-sm-6">
-                <label for="contract_no" class="form-label">Contract no.</label>
-                <select class="form-select ts-select" name="contract_no" id="contract_no"
-                  placeholder="Select contract no" autocomplete="off" onchange="fetchBills()" required>
-                  <option value="" disabled selected>Select contract no</option>
-                  {% for contract in allcontract %}
-                  <option value="{{ contract.id }}">
-                    {{ contract.company_name }} -- {{ contract.contract_no }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="mb-3 col-sm-6">
-                <label for="summary_date" class="form-label">Summary Date</label>
-                <input type="date" class="form-control" id="summary_date" name="summary_date" autofocus
-                  oninput="this.classList.remove('invalid')" required />
-              </div>
+<div class="content-wrapper">
+  <div class="summary-page container-fluid px-3 container-p-y pt-0">
+    <div class="header d-flex justify-content-between align-items-center mt-2">
+      <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Summary</h4>
+    </div>
+
+    <div class="card w-100">
+      <div class="card-body">
+        <form id="formAuthentication" class="mb-3" method="POST" action="{% url 'generate-summary-pdf' %}">
+          {% csrf_token %}
+          <h5 class="text-primary fw-semibold mb-3">Summary Details</h5>
+          <div class="row">
+            <div class="mb-3 col-sm-6">
+              <label for="contract_no" class="form-label">Contract no.</label>
+              <select class="form-select ts-select" name="contract_no" id="contract_no" placeholder="Select contract no"
+                autocomplete="off" onchange="fetchBills()" required>
+                <option value="" disabled selected>Select contract no</option>
+                {% for contract in allcontract %}
+                <option value="{{ contract.id }}">
+                  {{ contract.company_name }} -- {{ contract.contract_no }}</option>
+                {% endfor %}
+              </select>
             </div>
-            <div class="row">
-              <div class="mb-3 col-sm-6">
-                <label for="from_center" class="form-label">From</label>
-                <input type="text" class="form-control" id="from_center" name="from_center" autofocus
-                  oninput="this.classList.remove('invalid')" placeholder="From center" required readonly />
-              </div>
-              <div class="mb-3 col-sm-6">
-                <label for="product_name" class="form-label">Product</label>
-                <input type="text" class="form-control" id="product_name" name="product_name" autofocus
-                  oninput="this.classList.remove('invalid')" placeholder="Product name" required readonly />
-              </div>
+            <div class="mb-3 col-sm-6">
+              <label for="summary_date" class="form-label">Summary Date</label>
+              <input type="date" class="form-control" id="summary_date" name="summary_date" autofocus
+                oninput="this.classList.remove('invalid')" required />
             </div>
-            <h5 class="text-primary fw-semibold mb-3 mt-4">Select Bills</h5>
-            <div class="row">
-              <div class="table-responsive mb-3">
-                <table id="billsTable" class="table table-bordered">
-                  <thead>
-                    <tr>
-                      <th>
-                        <input type="checkbox" id="selectAll" onchange="toggleAllBills()" />
-                      </th>
-                      <th>Sr.</th>
-                      <th>Bill No.</th>
-                      <th>Bill Date</th>
-                      <th>M.T</th>
-                      <th>Bill Amount</th>
-                      <th>Loading Charge</th>
-                      <th>Unloading 1</th>
-                      <th>Unloading 2</th>
-                      <th>Grand Total</th>
-                    </tr>
-                  </thead>
-                  <tbody id="billsTableBody">
-                    <tr>
-                      <td colspan="10" class="text-center">Please select a contract to view bills</td>
-                    </tr>
-                  </tbody>
-                  <tfoot>
-                    <tr id="billsTableFooter">
-                      <td colspan="4" class="text-end fw-bold">Total:</td>
-                      <td id="totalMT" class="fw-bold">0.000</td>
-                      <td id="totalBillAmount" class="fw-bold">0.00</td>
-                      <td id="totalLoading" class="fw-bold">0.00</td>
-                      <td id="totalUnloading1" class="fw-bold">0.00</td>
-                      <td id="totalUnloading2" class="fw-bold">0.00</td>
-                      <td id="totalGrandTotal" class="fw-bold">0.00</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+          </div>
+          <div class="row">
+            <div class="mb-3 col-sm-6">
+              <label for="from_center" class="form-label">From</label>
+              <input type="text" class="form-control" id="from_center" name="from_center" autofocus
+                oninput="this.classList.remove('invalid')" placeholder="From center" required readonly />
             </div>
-            <div class="col-sm-6">
-              <button type="submit" class="btn btn-primary d-grid w-100">Generate Summary PDF</button>
+            <div class="mb-3 col-sm-6">
+              <label for="product_name" class="form-label">Product</label>
+              <input type="text" class="form-control" id="product_name" name="product_name" autofocus
+                oninput="this.classList.remove('invalid')" placeholder="Product name" required readonly />
             </div>
-          </form>
-        </div>
+          </div>
+          <h5 class="text-primary fw-semibold mb-3 mt-4">Select Bills</h5>
+          <div class="row">
+            <div class="table-responsive mb-3">
+              <table id="billsTable" class="table table-bordered w-100">
+                <thead>
+                  <tr>
+                    <th>
+                      <input type="checkbox" id="selectAll" onchange="toggleAllBills()" />
+                    </th>
+                    <th>Sr.</th>
+                    <th>Bill No.</th>
+                    <th>Bill Date</th>
+                    <th>M.T</th>
+                    <th>Bill Amount</th>
+                    <th>Loading Charge</th>
+                    <th>Unloading 1</th>
+                    <th>Unloading 2</th>
+                    <th>Grand Total</th>
+                  </tr>
+                </thead>
+                <tbody id="billsTableBody">
+                  <tr>
+                    <td colspan="10" class="text-center">Please select a contract to view bills</td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr id="billsTableFooter">
+                    <td colspan="4" class="text-end fw-bold">Total:</td>
+                    <td id="totalMT" class="fw-bold">0.000</td>
+                    <td id="totalBillAmount" class="fw-bold">0.00</td>
+                    <td id="totalLoading" class="fw-bold">0.00</td>
+                    <td id="totalUnloading1" class="fw-bold">0.00</td>
+                    <td id="totalUnloading2" class="fw-bold">0.00</td>
+                    <td id="totalGrandTotal" class="fw-bold">0.00</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <button type="submit" class="btn btn-primary d-grid w-100">Generate Summary PDF</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
