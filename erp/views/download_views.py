@@ -242,7 +242,7 @@ def generate_invoice_pdf(request):
     header_data = [
         [Paragraph(f"<font color='black' size='16'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
         [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
-        [Paragraph("<b>Invoice</b>", title_style)],
+        [Paragraph("<b>Tax Invoice</b>", title_style)],
     ]
     header_table = Table(header_data, colWidths=[available_width])
     header_table.setStyle(TableStyle([
@@ -359,14 +359,14 @@ def generate_invoice_pdf(request):
             leading=compact_leading or to_style_desc.leading,
             # Prevent mid-word breaks like "AHMEDABA" + "D" in tight columns
             splitLongWords=0,
-            wordWrap="LTR",
+            wordWrap="NOBREAK",  # keep cell text on a single line
         )
         district_style_local = ParagraphStyle(
             name="DistrictCell",
             parent=to_style_desc_local,
             alignment=1,  # center short district names
             splitLongWords=0,
-            wordWrap="LTR",
+            wordWrap="NOBREAK",  # keep long district names on a single line
         )
         # Uniform header style for all column names - prevent wrapping
         header_style_uniform = ParagraphStyle(
@@ -530,8 +530,8 @@ def generate_invoice_pdf(request):
         base_widths = {
             "Sr\u00A0No": 10,  # Match label_map with non-breaking space
             ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 14,
-            "Truck\u00A0No": 22,  # Slightly wider
-            "Party\u00A0Name": 24,  # Wider to keep on one line
+            "Truck\u00A0No": 20,
+            "Party\u00A0Name": 28,  # Wider to keep on one line
             "Product": 16,
             "GC\u00A0Note": 20,  # Wider so header text stays on a single line
             # Give numeric columns a bit more width so totals never wrap (e.g. 1698.000)
@@ -545,8 +545,8 @@ def generate_invoice_pdf(request):
             "Freight": 14,
             "Amount": 20,
             "Dep\u00A0Date": 20,  # Match label_map with non-breaking space
-            "Dest.": 22,
-            "Dist.": 22,  # wider so "AHMEDABAD" fits on one line
+            "Dest.": 24,
+            "Dist.": 26,  # wider so "AHMEDABAD" fits on one line
             "Tal.": 16,
             "Main\u00A0Party": 20,  # Match label_map with non-breaking space
             "Sub\u00A0Party": 20,  # Match label_map with non-breaking space
@@ -678,14 +678,17 @@ def generate_invoice_pdf(request):
                     Paragraph(f"{contract.company_name},", to_style),
                     Paragraph(f"{contract.billing_address}, {contract.billing_city}", to_style),
                     Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
-                    Paragraph(f"GST NO. : {contract.gst_number}", to_style)
+                    Paragraph(f"GST NO. : {contract.gst_number}", to_style),
                 ]
+                # Include RR No. (if provided) with bill details on every page
+                rr_display = request.POST.get("rr_number", "").strip()
                 bill_no_content = [
                     Paragraph(f"Bill No : {i_bill_no}", to_style),
-                    Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
+                    Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
+                    Paragraph(f"RR No : {rr_display}" if rr_display else "RR No : -", to_style),
                     Paragraph(f"From : {contract.from_center}", to_style),
                     Paragraph(f"District : {district}", to_style),
-                    Paragraph(f"Page : {page_no} ", to_style)
+                    Paragraph(f"Page : {page_no} ", to_style),
                 ]
                 
                 # Calculate widths based on available space
@@ -729,13 +732,16 @@ def generate_invoice_pdf(request):
                 Paragraph(f"{contract.company_name},", to_style),
                 Paragraph(f"{contract.billing_address}, {contract.billing_city}", to_style),
                 Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
-                Paragraph(f"GST NO. : {contract.gst_number}", to_style)
+                Paragraph(f"GST NO. : {contract.gst_number}", to_style),
             ]
+            # Include RR No. (if provided) with bill details on every page
+            rr_display = request.POST.get("rr_number", "").strip()
             bill_no_content = [
                 Paragraph(f"Bill No : {i_bill_no}", to_style),
-                Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
+                Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
+                Paragraph(f"RR No : {rr_display}" if rr_display else "RR No : -", to_style),
                 Paragraph(f"From : {contract.from_center}", to_style),
-                Paragraph(f"Page : {page_no} of {total_pages}", to_style)
+                Paragraph(f"Page : {page_no} of {total_pages}", to_style),
             ]
             # Calculate widths based on available space
             to_table_width = available_width
@@ -891,7 +897,7 @@ def download_generate_invoice_pdf(request):
     header_data = [
         [Paragraph(f"<font color='black' size='16'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
         [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
-        [Paragraph("<b>Invoice</b>", title_style)],
+        [Paragraph("<b>Tax Invoice</b>", title_style)],
     ]
     header_table = Table(header_data, colWidths=[available_width])
     header_table.setStyle(TableStyle([
@@ -1007,14 +1013,14 @@ def download_generate_invoice_pdf(request):
             fontSize=compact_fs or to_style_desc.fontSize,
             leading=compact_leading or to_style_desc.leading,
             splitLongWords=0,
-            wordWrap="LTR",
+            wordWrap="NOBREAK",  # keep cell text on a single line
         )
         district_style_local = ParagraphStyle(
             name="DistrictCellDl",
             parent=to_style_desc_local,
             alignment=1,
             splitLongWords=0,
-            wordWrap="LTR",
+            wordWrap="NOBREAK",  # keep long district names on a single line
         )
         to_right_style_desc_local = ParagraphStyle(
             name="ToRightDescLocalDl",
@@ -1175,8 +1181,8 @@ def download_generate_invoice_pdf(request):
         base_widths = {
             "Sr\u00A0No": 10,  # Match label_map with non-breaking space
             ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 16,
-            "Truck\u00A0No": 22,  # Slightly wider
-            "Party\u00A0Name": 24,  # Wider to keep on one line
+            "Truck\u00A0No": 20,
+            "Party\u00A0Name": 28,  # Wider to keep on one line
             "Product": 18,
             "GC\u00A0Note": 20,  # Wider so header text stays on a single line
             # Give numeric columns a bit more width so totals never wrap (e.g. 1698.000)
@@ -1190,8 +1196,8 @@ def download_generate_invoice_pdf(request):
             "Freight": 14,
             "Amount": 20,
             "Dep\u00A0Date": 22,  # Slightly wider to avoid wrapping
-            "Dest.": 24,
-            "Dist.": 22,
+            "Dest.": 26,
+            "Dist.": 26,
             "Tal.": 16,
             "Main\u00A0Party": 20,  # Match label_map with non-breaking space
             "Sub\u00A0Party": 20,  # Match label_map with non-breaking space
