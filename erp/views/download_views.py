@@ -303,11 +303,21 @@ def generate_invoice_pdf(request):
                 pass
 
         # Header row (short, standard labels so nothing breaks into 2 lines)
+        # Sanitize dc_field label so very long custom labels (e.g. "Shipment Number") don't overflow.
+        dc_raw = getattr(contract, "dc_field", None)
+        if dc_raw in [None, "None", "null", ""]:
+            dc_label = "Challan\u00A0No"
+        else:
+            dc_label = str(dc_raw).strip()
+            # If label is long, prefer the first word (e.g. "Shipment") to keep header compact.
+            if len(dc_label) > 10:
+                dc_label = dc_label.split()[0]
+            dc_label = dc_label.replace(" ", "\u00A0")
         label_map = {
             "sr_no": "Sr\u00A0No",  # Non-breaking space
             "depature_date": "Dep\u00A0Date",  # Non-breaking space
             "dep_date": "Dep\u00A0Date",  # Non-breaking space
-            "dc_field": ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))),  # Non-breaking space
+            "dc_field": dc_label,
             "truck_no": "Truck\u00A0No",  # Non-breaking space
             "party_name": "Party\u00A0Name",  # Non-breaking space
             "product_name": "Product",
@@ -959,11 +969,20 @@ def download_generate_invoice_pdf(request):
                 pass
 
         # Header row (short, standard labels so nothing breaks into 2 lines)
+        # Sanitize dc_field label so very long custom labels (e.g. "Shipment Number") don't overflow.
+        dc_raw = getattr(contract, "dc_field", None)
+        if dc_raw in [None, "None", "null", ""]:
+            dc_label = "Challan\u00A0No"
+        else:
+            dc_label = str(dc_raw).strip()
+            if len(dc_label) > 10:
+                dc_label = dc_label.split()[0]
+            dc_label = dc_label.replace(" ", "\u00A0")
         label_map = {
             "sr_no": "Sr\u00A0No",  # Non-breaking space
             "depature_date": "Dep\u00A0Date",  # Non-breaking space
             "dep_date": "Dep\u00A0Date",  # Non-breaking space
-            "dc_field": ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))),  # Non-breaking space
+            "dc_field": dc_label,
             "truck_no": "Truck\u00A0No",  # Non-breaking space
             "party_name": "Party\u00A0Name",  # Non-breaking space
             "product_name": "Product",
