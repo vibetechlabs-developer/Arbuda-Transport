@@ -329,13 +329,12 @@ def generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        # Improved typography - optimized for exactly 12 rows per page
-        # Always use compact mode to ensure exactly 12 rows fit per page
+        # Improved typography - optimized so header + rows + TOTAL + signatures stay on one page
+        # Use slightly tighter text for download PDF to guarantee signatures do not spill to a new page.
         total_dispatch_count = len(all_dispatches or dispatches)
-        compact = True  # Always use compact mode for 12 rows per page
-        # Compact typography so 12 rows + TOTAL + signatures comfortably fit on one page
-        compact_fs = 8.5
-        compact_leading = 10
+        compact = True  # Always use compact mode for up to 12 rows per page
+        compact_fs = 8.0
+        compact_leading = 9
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocal",
@@ -588,13 +587,13 @@ def generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Optimized padding for exactly 12 rows per page - minimal spacing
-            ("LEFTPADDING", (0,0), (-1,-1), 2),
-            ("RIGHTPADDING", (0,0), (-1,-1), 2),
-            ("TOPPADDING", (0,0), (-1,0), 2),
-            ("BOTTOMPADDING", (0,0), (-1,0), 2),
-            ("TOPPADDING", (0,1), (-1,-2), 1),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 1),
+            # Slightly tighter padding so there is enough room for signatures on the same page
+            ("LEFTPADDING", (0,0), (-1,-1), 1.5),
+            ("RIGHTPADDING", (0,0), (-1,-1), 1.5),
+            ("TOPPADDING", (0,0), (-1,0), 1.5),
+            ("BOTTOMPADDING", (0,0), (-1,0), 1.5),
+            ("TOPPADDING", (0,1), (-1,-2), 0.5),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 0.5),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -1248,13 +1247,13 @@ def download_generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Optimized padding for exactly 12 rows per page - minimal spacing
-            ("LEFTPADDING", (0,0), (-1,-1), 2),
-            ("RIGHTPADDING", (0,0), (-1,-1), 2),
-            ("TOPPADDING", (0,0), (-1,0), 2),
-            ("BOTTOMPADDING", (0,0), (-1,0), 2),
-            ("TOPPADDING", (0,1), (-1,-2), 1),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 1),
+            # Slightly tighter padding so there is enough room for signatures on the same page
+            ("LEFTPADDING", (0,0), (-1,-1), 1.5),
+            ("RIGHTPADDING", (0,0), (-1,-1), 1.5),
+            ("TOPPADDING", (0,0), (-1,0), 1.5),
+            ("BOTTOMPADDING", (0,0), (-1,0), 1.5),
+            ("TOPPADDING", (0,1), (-1,-2), 0.5),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 0.5),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
