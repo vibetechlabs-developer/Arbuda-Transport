@@ -196,7 +196,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="taluka" class="form-label">Freigth Amount</label>
                 <input type="number" class="form-control" id="totalfreight" name="totalfreight"
-                  placeholder="Enter Freight Amount" />
+                  placeholder="Enter Freight Amount" step="any" />
               </div>
 
               <div class="mb-3 col-sm-6">
@@ -330,6 +330,9 @@
               <div class="col-sm-6">
                 <button class="btn btn-primary d-grid w-100" id="save_dispatch_btn">Save</button>
               </div>
+              <div class="col-sm-6">
+                <button type="button" class="btn btn-outline-secondary d-grid w-100" id="clear_dispatch_btn">Clear</button>
+              </div>
             </div>
           </form>
         </div>
@@ -346,6 +349,9 @@
   let dispatchMode = 'autofill'; // 'autofill' (static) | 'new' (editable)
   let isDispatchModeApplying = false;
   let autoFillToken = 0; // used to ignore stale autofill fetches when switching to "Add New"
+  // Keep track of the last fetched dispatch date (YYYY-MM-DD) for display in autofill mode.
+  // In "Add New" mode we always reset dep_date to today as per requirement.
+  let lastFetchedDepDate = '';
 
   const DISPATCH_LOCK_FIELDS = [
     'challan_no',
@@ -434,6 +440,114 @@
 
     // Remove challan duplicate error UI
     clearChallanError();
+
+    // When user clicks "Add New", clear previous date and set today's date.
+    const depDateInput = document.getElementById('dep_date');
+    if (depDateInput) {
+      const today = new Date().toISOString().split('T')[0];
+      depDateInput.value = today;
+    }
+  }
+
+  function clearFormData() {
+    // Store contract_id value to preserve it
+    const contractIdValue = document.getElementById('contract_id').value;
+    
+    // Clear all fields except contract_id
+    const fieldsToClear = [
+      'dep_date',
+      'challan_no',
+      'truck_no',
+      'product_name',
+      'party_name',
+      'from_center',
+      'main_party',
+      'sub_party',
+      'destination',
+      'taluka',
+      'district',
+      'km',
+      'weight',
+      'rate',
+      'totalfreight',
+      'loading_charge',
+      'unloading_charge_1',
+      'unloading_charge_2',
+      'grand_total',
+      'truck_booking_rate',
+      'total_paid_truck_onwer',
+      'advance_paid',
+      'panding_amount',
+      'net_profit'
+    ];
+
+    fieldsToClear.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      
+      if (el.tagName === 'SELECT') {
+        el.value = '';
+      } else if (el.tagName === 'INPUT') {
+        if (el.type === 'radio') {
+          // Reset radio buttons to default (No)
+          if (id === 'loading_rate') {
+            document.getElementById('loadingNo').checked = true;
+            if (typeof toggleloadingInput === 'function') toggleloadingInput();
+          } else if (id === 'unloading_rate_1') {
+            document.getElementById('unloadingNo_1').checked = true;
+            if (typeof toggleunloadingInput_1 === 'function') toggleunloadingInput_1();
+          } else if (id === 'unloading_rate_2') {
+            document.getElementById('unloadingNo_2').checked = true;
+            if (typeof toggleunloadingInput_2 === 'function') toggleunloadingInput_2();
+          }
+        } else {
+          el.value = '';
+          el.removeAttribute('readonly');
+        }
+      }
+    });
+
+    // Clear TomSelect dropdowns (but keep contract_id)
+    if (destinationTomSelect) destinationTomSelect.clear(true);
+    if (productTomSelect) productTomSelect.clear(true);
+
+    // Reset dep_date to today
+    const depDateInput = document.getElementById('dep_date');
+    if (depDateInput) {
+      const today = new Date().toISOString().split('T')[0];
+      depDateInput.value = today;
+    }
+
+    // Clear rate calculation display
+    const rateCalculation = document.getElementById('rate_calculation');
+    if (rateCalculation) {
+      rateCalculation.innerHTML = '';
+    }
+
+    // Hide income slab link
+    const incomeSlab = document.getElementById('income-slab');
+    if (incomeSlab) {
+      incomeSlab.classList.add('d-none');
+    }
+
+    // Clear hidden fields
+    document.getElementById('i_unloading_charge_1').value = '0';
+    document.getElementById('i_unloading_charge_2').value = '0';
+    document.getElementById('i_loading_charge').value = '0';
+
+    // Hide main_party and sub_party rows
+    const mainPartyRow = document.getElementById('main_party_row');
+    const subPartyRow = document.getElementById('sub_party_row');
+    if (mainPartyRow) mainPartyRow.style.display = 'none';
+    if (subPartyRow) subPartyRow.style.display = 'none';
+
+    // Remove challan duplicate error UI
+    clearChallanError();
+
+    // Restore contract_id value
+    if (contractIdValue && contractTomSelect) {
+      contractTomSelect.setValue(contractIdValue, true);
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -492,12 +606,22 @@
           isAutoFillingDispatch = false;
           setDispatchStatic(false);
           clearForNewDispatch();
-          // Keep from_center locked (it’s contract-defined)
+          // Keep from_center locked (it's contract-defined)
           setElementReadOnly('from_center', true);
         } else {
           dispatchMode = 'autofill';
           setDispatchStatic(true);
           autoFillFromLastDispatch(true);
+        }
+      });
+    }
+
+    // Clear button handler
+    const clearBtn = document.getElementById('clear_dispatch_btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        if (confirm('Are you sure you want to clear all form data? Contract ID will be preserved.')) {
+          clearFormData();
         }
       });
     }
@@ -593,7 +717,7 @@
     destinations.forEach(dest => {
       destinationTomSelect.addOption({
         value: dest.id,
-        text: `${dest.destination} -- ${dest.km}`,
+        text: `${dest.destination}`,
         data_id: dest.id
       });
     });
@@ -627,6 +751,14 @@
 
   function applyLastDispatchDetails(data, includeProductAndChallan) {
     if (!data || !data.found) return;
+
+    // Previous-data display date should come from the previously saved dispatch
+    // (in autofill mode only). Backend returns YYYY-MM-DD for <input type="date">.
+    if (data.dep_date) {
+      const depDateInput = document.getElementById('dep_date');
+      lastFetchedDepDate = data.dep_date;
+      if (depDateInput) depDateInput.value = data.dep_date;
+    }
 
     // Optionally copy challan_no and product from last dispatch
     if (includeProductAndChallan) {
@@ -722,7 +854,16 @@
         if (dispatchMode !== 'autofill') return;
         // Auto-fill fields based on last dispatch.
         // includeProductAndChallan tells whether to also copy challan_no + product_name.
-        applyLastDispatchDetails(data, !!includeProductAndChallan);
+        if (data && data.found) {
+          applyLastDispatchDetails(data, !!includeProductAndChallan);
+        } else {
+          // No previous dispatch for this contract/product => default to today's date
+          const depDateInput = document.getElementById('dep_date');
+          if (depDateInput) {
+            const today = new Date().toISOString().split('T')[0];
+            depDateInput.value = today;
+          }
+        }
       })
       .catch(err => {
         console.error('Error fetching last dispatch details:', err);
@@ -1108,30 +1249,36 @@
       });
   }
 
+  function toExactAmount(val) {
+    const n = parseFloat(val);
+    if (isNaN(n) || !isFinite(n)) return '0';
+    const clean = Math.round(n * 1e6) / 1e6;
+    const s = clean.toString();
+    return s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+  }
+
   function calculate_rent() {
-    let weight = document.getElementById('weight').value
-    let rate = document.getElementById('rate').value
+    let weight = parseFloat(document.getElementById('weight').value) || 0
+    let rate = parseFloat(document.getElementById('rate').value) || 0
     let rate_calculation = document.getElementById('i_rate_calculation').innerHTML
     let totalfreight = document.getElementById('totalfreight')
-    let km = document.getElementById('km').value
-    let unloading_charge_1 = document.getElementById("i_unloading_charge_1").value
-    let unloading_charge_2 = document.getElementById("i_unloading_charge_2").value
-    let loading_charge = document.getElementById("i_loading_charge").value
+    let km = parseFloat(document.getElementById('km').value) || 0
+    let unloading_charge_1 = parseFloat(document.getElementById("i_unloading_charge_1").value) || 0
+    let unloading_charge_2 = parseFloat(document.getElementById("i_unloading_charge_2").value) || 0
+    let loading_charge = parseFloat(document.getElementById("i_loading_charge").value) || 0
     let unload_amount_1 = document.getElementById("unloading_charge_1")
     let unload_amount_2 = document.getElementById("unloading_charge_2")
     let load_amount = document.getElementById("loading_charge")
     let grand_total = document.getElementById('grand_total')
 
-
+    let freightAmount;
     if (rate_calculation == "MT/KM") {
-      totalfreight.value = (weight * rate * km).toFixed(2);
-      totalfreight.setAttribute("readonly", true)
+      freightAmount = weight * rate * km;
+    } else {
+      freightAmount = weight * rate;
     }
-    else {
-      totalfreight.value = (weight * rate).toFixed(2);
-      totalfreight.setAttribute("readonly", true)
-
-    }
+    totalfreight.value = toExactAmount(freightAmount);
+    totalfreight.setAttribute("readonly", true)
     unload_amount_1.value = (unloading_charge_1 * weight).toFixed(2);
     unload_amount_1.setAttribute('readonly', true)
 
@@ -1143,7 +1290,7 @@
     load_amount.setAttribute('readonly', true)
 
 
-    grand_total.value = parseFloat(totalfreight.value).toFixed(2);
+    grand_total.value = toExactAmount(parseFloat(totalfreight.value));
     grand_total.setAttribute("readonly", true)
 
   }
@@ -1189,7 +1336,7 @@
       grand_total += load_amount;
     }
 
-    document.getElementById('grand_total').value = grand_total.toFixed(2);
+    document.getElementById('grand_total').value = toExactAmount(grand_total);
 
   }
 

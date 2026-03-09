@@ -14,6 +14,9 @@
             <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span> Rate Master</h4>
             <!-- <button type="button" class="btn btn-primary" style="height: 40px;"><a href="rate-master-form"
                     class="text-white text-decoration-none">Add Rate</a></button> -->
+            <button type="button" class="btn btn-outline-primary" style="height: 40px;" onclick="exportRateCsv()">
+                Export CSV
+            </button>
         </div>
         <!-- <div class="filter-tab mb-4 d-flex align-items-center gap-2">
             <h5 class="mb-0 me-2">Filters </h5>
@@ -254,6 +257,15 @@
                         </tr>
                     `;
                 });
+        }
+
+        function exportRateCsv() {
+            const clientId = document.getElementById("contract_no").value;
+            if (!clientId || clientId === "") {
+                alert("Please select a contract first.");
+                return;
+            }
+            window.location.href = `/api/rates/${clientId}/?format=csv`;
         }
 
     </script>

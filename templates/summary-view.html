@@ -23,6 +23,9 @@
   <div class="summary-page container-fluid px-3 container-p-y pt-0">
     <div class="header d-flex justify-content-between align-items-center mt-2">
       <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Summary</h4>
+      <button type="button" class="btn btn-outline-primary" style="height: 40px;" onclick="exportSummaryCsv()">
+        Export CSV
+      </button>
     </div>
 
     <div class="card w-100">
@@ -157,6 +160,21 @@
       });
   }
 
+  function exportSummaryCsv() {
+    const contract_id = getContractValue();
+    if (!contract_id) {
+      alert("Please select a contract first.");
+      return;
+    }
+    window.location.href = `/api/get-contract-bills?contract-id=${encodeURIComponent(contract_id)}&format=csv`;
+  }
+
+  function toExactStr(n) {
+    const c = Math.round(n * 1e6) / 1e6;
+    const s = c.toString();
+    return (s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") || "0");
+  }
+
   function renderBillsTable() {
     const tbody = document.getElementById("billsTableBody");
     tbody.innerHTML = "";
@@ -177,7 +195,7 @@
       checkbox.name = "bill_ids";
       checkbox.value = bill.id;
       checkbox.classList.add("bill-checkbox");
-      checkbox.checked = true; // Default to checked
+      checkbox.checked = false; // Default to unchecked
       checkbox.onchange = updateTotals;
       checkboxTd.appendChild(checkbox);
       tr.appendChild(checkboxTd);
@@ -202,9 +220,9 @@
       mtTd.textContent = parseFloat(bill.total_weight || 0).toFixed(3);
       tr.appendChild(mtTd);
 
-      // Bill Amount
+      // Bill Amount (freight - exact calculated amount, no rounding)
       const billAmountTd = document.createElement("td");
-      billAmountTd.textContent = parseFloat(bill.total_freight || 0).toFixed(2);
+      billAmountTd.textContent = toExactStr(parseFloat(bill.total_freight || 0));
       tr.appendChild(billAmountTd);
 
       // Loading Charge
@@ -222,13 +240,13 @@
       unloading2Td.textContent = parseFloat(bill.total_unloading2 || 0).toFixed(2);
       tr.appendChild(unloading2Td);
 
-      // Grand Total
+      // Grand Total (exact sum, no rounding)
       const grandTotalTd = document.createElement("td");
       const grandTotal = parseFloat(bill.total_freight || 0) + 
                         parseFloat(bill.total_loading || 0) + 
                         parseFloat(bill.total_unloading1 || 0) + 
                         parseFloat(bill.total_unloading2 || 0);
-      grandTotalTd.textContent = grandTotal.toFixed(2);
+      grandTotalTd.textContent = toExactStr(grandTotal);
       tr.appendChild(grandTotalTd);
 
       tbody.appendChild(tr);
@@ -274,7 +292,7 @@
     document.getElementById("totalLoading").textContent = totalLoading.toFixed(2);
     document.getElementById("totalUnloading1").textContent = totalUnloading1.toFixed(2);
     document.getElementById("totalUnloading2").textContent = totalUnloading2.toFixed(2);
-    document.getElementById("totalGrandTotal").textContent = totalGrandTotal.toFixed(2);
+    document.getElementById("totalGrandTotal").textContent = toExactStr(totalGrandTotal);
   }
 
   // Ensure TomSelect-selected contract_no is submitted

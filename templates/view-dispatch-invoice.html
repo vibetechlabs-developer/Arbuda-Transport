@@ -17,6 +17,9 @@
 <div class="container-xxl"> 
   <div class="header d-flex justify-content-between align-items-center mt-2">
     <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>View & Download Invoice</h4>
+    <button type="button" class="btn btn-outline-primary" style="height: 40px;" onclick="exportInvoiceCsv()">
+      Export CSV
+    </button>
   </div>
   <div class="authentication-wrapper authentication-basic container-p-y pt-0">
     <div class="authentication-inner w-100" style="max-width: 100%;">
@@ -323,6 +326,15 @@
         console.error('Error fetching Slip details:', err);
       });
   }
+
+  function exportInvoiceCsv() {
+    const billId = getBillNoValue();
+    if (!billId) {
+      alert("Please select a Bill No first.");
+      return;
+    }
+    window.location.href = `/api/get-invoice?bill-id=${encodeURIComponent(billId)}&format=csv`;
+  }
   // function filterTable() {
   //   const search = document.getElementById("searchBox").value.toLowerCase();
 
@@ -377,7 +389,15 @@ function isNumericValue(value) {
 function formatNumber(value) {
   return Number.isInteger(value) ? value : Number(value).toFixed(2);
 }
-function renderTable(dispatches, fields) {
+function formatExactAmount(value) {
+  if (value === null || value === undefined || value === "") return "0";
+  const n = parseFloat(value);
+  if (isNaN(n) || !isFinite(n)) return "0";
+  const clean = Math.round(n * 1e6) / 1e6;
+  const s = clean.toString();
+  return s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") || "0";
+}
+  function renderTable(dispatches, fields) {
     const tableHeader = document.getElementById("tableHeader");
     const tableBody = document.getElementById("tableBody");
     const tableFooterRow = document.getElementById("tableFooterRow");
@@ -385,6 +405,12 @@ function renderTable(dispatches, fields) {
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
     if (tableFooterRow) tableFooterRow.innerHTML = "";
+
+    // Ensure selectAll checkbox is unchecked when rendering table
+    const selectAll = document.getElementById("selectAll");
+    if (selectAll) {
+      selectAll.checked = false;
+    }
 
     const totals = {};
     const numericFields = new Set();
@@ -399,7 +425,11 @@ function renderTable(dispatches, fields) {
     // Header
     const th1 = document.createElement("th");
     th1.style.display = 'none';
-    th1.textContent = "Select Challan";
+    const selectAllCheckbox = document.createElement("input");
+    selectAllCheckbox.type = "checkbox";
+    selectAllCheckbox.id = "selectAll";
+    selectAllCheckbox.onchange = toggleAllDispatches;
+    th1.appendChild(selectAllCheckbox);
     tableHeader.appendChild(th1);
 
     fields.forEach(field => {
@@ -419,7 +449,7 @@ function renderTable(dispatches, fields) {
       checkbox.type = "checkbox";
       checkbox.name = "dispatch_ids";
       checkbox.value = dest.id;
-      checkbox.setAttribute("checked", true);
+      checkbox.checked = false; // Default to unchecked
       checkboxTd.style.display = "none";
       checkbox.classList.add("row-checkbox");
       checkboxTd.appendChild(checkbox);
@@ -484,7 +514,7 @@ function renderTable(dispatches, fields) {
           field !== "dc_field"
         ) {
           const totalValue = totals[field] || 0;
-          td.textContent = formatNumber(totalValue);
+          td.textContent = (field === "luggage" || field === "totalfreight") ? formatExactAmount(totalValue) : formatNumber(totalValue);
         } else if (index === 0) {
           td.textContent = "Totals";
         } else {
@@ -499,6 +529,14 @@ function renderTable(dispatches, fields) {
   const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
   return text.replace(regex, `<mark>$1</mark>`);
 }
+
+  function toggleAllDispatches() {
+    const selectAll = document.getElementById("selectAll");
+    const checkboxes = document.querySelectorAll(".row-checkbox");
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = selectAll.checked;
+    });
+  }
 
 </script>
 

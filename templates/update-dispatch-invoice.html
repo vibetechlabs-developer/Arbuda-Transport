@@ -323,9 +323,19 @@ function renderTable(dispatches, fields) {
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
 
+    // Ensure selectAll checkbox is unchecked when rendering table
+    const selectAll = document.getElementById("selectAll");
+    if (selectAll) {
+      selectAll.checked = false;
+    }
+
     // Header
     const th1 = document.createElement("th");
-    th1.textContent = "Select Challan";
+    const selectAllCheckbox = document.createElement("input");
+    selectAllCheckbox.type = "checkbox";
+    selectAllCheckbox.id = "selectAll";
+    selectAllCheckbox.onchange = toggleAllDispatches;
+    th1.appendChild(selectAllCheckbox);
     tableHeader.appendChild(th1);
 
     fields.forEach(field => {
@@ -351,7 +361,7 @@ function renderTable(dispatches, fields) {
       checkbox.type = "checkbox";
       checkbox.name = "dispatch_ids";
       checkbox.value = dest.id;
-      checkbox.setAttribute("checked", true);
+      checkbox.checked = false; // Default to unchecked
       checkbox.classList.add("row-checkbox");
       checkboxTd.appendChild(checkbox);
       tr.appendChild(checkboxTd);
@@ -478,9 +488,19 @@ function renderTable(dispatches, fields) {
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
 
+    // Ensure selectAll-ninv checkbox is unchecked when rendering table
+    const selectAllNinv = document.getElementById("selectAll-ninv");
+    if (selectAllNinv) {
+      selectAllNinv.checked = false;
+    }
+
     // Header
     const th1 = document.createElement("th");
-    th1.textContent = "Select Challan";
+    const selectAllCheckbox = document.createElement("input");
+    selectAllCheckbox.type = "checkbox";
+    selectAllCheckbox.id = "selectAll-ninv";
+    selectAllCheckbox.onchange = toggleAllDispatchesNinv;
+    th1.appendChild(selectAllCheckbox);
     tableHeader.appendChild(th1);
 
     fields.forEach(field => {
@@ -563,6 +583,22 @@ function renderTable(dispatches, fields) {
       editBtn.style.cursor = "pointer";
 
       tableBody.appendChild(tr);
+    });
+  }
+
+  function toggleAllDispatches() {
+    const selectAll = document.getElementById("selectAll");
+    const checkboxes = document.querySelectorAll("#tableBody .row-checkbox");
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = selectAll.checked;
+    });
+  }
+
+  function toggleAllDispatchesNinv() {
+    const selectAllNinv = document.getElementById("selectAll-ninv");
+    const checkboxes = document.querySelectorAll("#tableBody-ninv .row-checkbox");
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = selectAllNinv.checked;
     });
   }
 </script>

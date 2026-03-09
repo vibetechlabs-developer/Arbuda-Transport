@@ -88,7 +88,7 @@ class Dispatch(models.Model):
 
     weight = models.DecimalField(max_digits=10, decimal_places=3)
     rate = models.DecimalField(max_digits=10, decimal_places=4)
-    totalfreight = models.DecimalField(max_digits=12, decimal_places=2)
+    totalfreight = models.DecimalField(max_digits=12, decimal_places=6)
     unloading_charge_1 = models.DecimalField(max_digits=12, decimal_places=3, default=0)
     unloading_charge_2 = models.DecimalField(max_digits=10, decimal_places=3, blank=True, null=True)
     loading_charge = models.DecimalField(max_digits=10, decimal_places=3, blank=True, null=True)

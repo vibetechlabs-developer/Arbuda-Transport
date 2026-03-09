@@ -7,6 +7,9 @@ from django.db import transaction, IntegrityError
 from erp.utils.decorators import session_required
 from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year, get_financial_year_start_end
 from django.db.models import Func, Sum, Count, Max, Subquery, OuterRef, Q
+from django.http import HttpResponse
+
+from erp.utils.csv_export import csv_response
 
 
 
@@ -475,6 +478,55 @@ def new_contract_view_2(request):
         messages.error(request, "Contract does not exist!")
         return redirect('dashboard')  
 
+    # CSV export (backup)
+    if (request.GET.get("export") or "").lower() == "csv":
+        header = [
+            "Contract No",
+            "Vendor Code",
+            "Company Name",
+            "GST No",
+            "PAN No",
+            "Bill Series From",
+            "Bill Series To",
+            "Rate Type",
+            "From Center",
+            "Contract Start Date",
+            "Contract End Date",
+            "Unloading Charge 1",
+            "Unloading Charge 2",
+            "Loading Charge",
+            "Contact Person Designation",
+            "Contact Email",
+            "Contact Mobile",
+            "Address",
+            "Created At",
+        ]
+        rows = (
+            (
+                c.contract_no,
+                c.vendor_code,
+                c.company_name,
+                c.gst_number,
+                c.pan_number,
+                c.bill_series_from,
+                c.bill_series_to,
+                c.rate_type,
+                c.from_center,
+                c.c_start_date,
+                c.c_end_date,
+                c.unloading_charge_1,
+                c.unloading_charge_2,
+                c.loading_charge,
+                c.c_designation,
+                c.c_email,
+                c.c_number,
+                c.billing_address,
+                c.created_at,
+            )
+            for c in contract
+        )
+        return csv_response(filename="contracts_backup", header=header, rows=rows)
+
     return render(request, 'new-contract-view-2.html', alldata)
 
 
@@ -826,12 +878,82 @@ def dispatch_view(request):
         company_id=company['company_id'],
     ).order_by('-Bill_date', '-id').values('Bill_no')[:1]
 
-    # ✅ Final ordering: Challan number in ascending numeric series (e.g., 1, 2, 3, 4)
+    # ✅ Final ordering: Latest date first (descending), then challan number ascending (21, 22, 23, 24)
     # Cast challan_no to a number for correct ordering if it contains numeric values
     dispatch_qs = dispatch_qs.annotate(
         challan_int=Func('challan_no', function='CAST', template='CAST(%(expressions)s AS UNSIGNED)'),
         ebill_no=Subquery(invoice_subquery),
-    ).order_by('challan_int')
+    ).order_by('-dep_date', 'challan_int')
+
+    # CSV export (backup) - respects current filters
+    if (request.GET.get("export") or "").lower() == "csv":
+        header = [
+            "Dep Date",
+            "Challan No",
+            "E-Bill No",
+            "Bill Series",
+            "Truck No",
+            "Product Name",
+            "Party Name",
+            "From",
+            "Destination",
+            "Taluka",
+            "District",
+            "KM",
+            "Weight",
+            "Rate",
+            "Total Freight",
+            "Unloading 1",
+            "Unloading 2",
+            "Loading",
+            "Grand Total",
+            "Truck Booking Rate",
+            "Total Paid",
+            "Advance Paid",
+            "Pending Amount",
+            "Net Profit",
+            "Created At",
+        ]
+
+        def _bill_series(d):
+            try:
+                if getattr(d, "ebill_no", None) and getattr(d.contract_id, "bill_series_from", None):
+                    return d.contract_id.bill_series_from
+            except Exception:
+                pass
+            return ""
+
+        rows = (
+            (
+                d.dep_date,
+                d.challan_no,
+                getattr(d, "ebill_no", "") or "",
+                _bill_series(d),
+                d.truck_no,
+                d.product_name,
+                d.party_name,
+                d.from_center,
+                d.destination,
+                d.taluka,
+                d.district,
+                d.km,
+                d.weight,
+                d.rate,
+                d.totalfreight,
+                d.unloading_charge_1,
+                d.unloading_charge_2,
+                d.loading_charge,
+                d.grand_total,
+                d.truck_booking_rate,
+                d.total_paid_truck_onwer,
+                d.advance_paid,
+                d.panding_amount,
+                d.net_profit,
+                d.created_at,
+            )
+            for d in dispatch_qs
+        )
+        return csv_response(filename="dispatch_register_backup", header=header, rows=rows)
 
     alldata["all_dispatch"] = dispatch_qs
     alldata["has_dispatch"] = dispatch_qs.exists()
@@ -1134,6 +1256,33 @@ def rout_view(request):
             except T_Contract.DoesNotExist:
                 messages.error(request, "Contract not found!")
         
+        # CSV export (backup) - respects contract_id filter if provided
+        if (request.GET.get("export") or "").lower() == "csv":
+            header = [
+                "ID",
+                "Contract No",
+                "Company Name",
+                "From Center",
+                "Destination",
+                "Delivery Taluka",
+                "Delivery District",
+                "KM",
+            ]
+            rows = (
+                (
+                    r.id,
+                    getattr(r.contract_id, "contract_no", ""),
+                    getattr(r.contract_id, "company_name", ""),
+                    r.from_center,
+                    r.destination,
+                    r.taluka,
+                    r.district,
+                    r.km,
+                )
+                for r in allroute
+            )
+            return csv_response(filename="routes_backup", header=header, rows=rows)
+
         alldata['all_routes'] = allroute
     except Destination.DoesNotExist:
         messages.error(request , 'Route not fonded')
@@ -1256,6 +1405,20 @@ def product_master_view(request):
         )
         .order_by("product_name")
     )
+
+    # CSV export (backup)
+    if (request.GET.get("export") or "").lower() == "csv":
+        header = ["Product Name", "Contracts Used In", "Total Dispatches", "Last Dispatch Date"]
+        rows = (
+            (
+                p.get("product_name", ""),
+                p.get("contract_count", 0),
+                p.get("total_dispatches", 0),
+                p.get("last_dispatch_date", ""),
+            )
+            for p in products
+        )
+        return csv_response(filename="product_master_backup", header=header, rows=rows)
 
     return render(request, "product-master-view.html", {"products": products})
 

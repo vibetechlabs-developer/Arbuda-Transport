@@ -260,11 +260,16 @@ def download_report(request):
                     if field == "weight":
                         total_row.append(f"{total_weight:.3f}")
                     elif field == "km":
-                        total_row.append(f"{total_km:.3f}")
+                        total_row.append("")  # No total for km
                     elif field == "rate":
-                        total_row.append(f"{total_rate:.2f}")
+                        total_row.append("")  # No total for rate
+                    elif field in ("depature_date", "dep_date"):
+                        total_row.append("")  # No total for date
+                    elif field in ("dc_field", "challan_no"):
+                        total_row.append("")  # No total for challan no
                     elif field in ("luggage", "totalfreight"):
-                        total_row.append(f"{total_freight_sum:.2f}")
+                        s = f"{total_freight_sum:.6f}".rstrip('0').rstrip('.')
+                        total_row.append(s if s else "0")
                     elif field == "unloading_charge_1":
                         total_row.append(f"{total_unloading_sum_1:.3f}")
                     elif field == "unloading_charge_2":
@@ -763,11 +768,16 @@ def download_our_report(request):
                     if field == "weight":
                         total_row.append(f"{total_weight:.3f}")
                     elif field == "km":
-                        total_row.append(f"{total_km:.3f}")
+                        total_row.append("")  # No total for km
                     elif field == "rate":
-                        total_row.append(f"{total_rate:.2f}")
+                        total_row.append("")  # No total for rate
+                    elif field in ("depature_date", "dep_date"):
+                        total_row.append("")  # No total for date
+                    elif field in ("dc_field", "challan_no"):
+                        total_row.append("")  # No total for challan no
                     elif field in ("luggage", "totalfreight"):
-                        total_row.append(f"{total_freight_sum:.2f}")
+                        s = f"{total_freight_sum:.6f}".rstrip('0').rstrip('.')
+                        total_row.append(s if s else "0")
                     elif field == "unloading_charge_1":
                         total_row.append(f"{total_unloading_sum_1:.3f}")
                     elif field == "unloading_charge_2":

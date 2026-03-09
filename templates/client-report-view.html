@@ -531,15 +531,31 @@
     const numericFields = new Set();
 
     const recordTotal = (field, rawValue) => {
+      // Skip totals for date, challan no, km, and rate
+      if (field === "depature_date" || field === "dep_date" || 
+          field === "dc_field" || field === "challan_no" || 
+          field === "km" || field === "rate") {
+        return;
+      }
       if (!isNumericValue(rawValue)) return;
       const num = parseFloat(rawValue);
       totals[field] = (totals[field] || 0) + num;
       numericFields.add(field);
     };
 
+    // Ensure selectAll checkbox is unchecked when rendering table
+    const selectAll = document.getElementById("selectAll");
+    if (selectAll) {
+      selectAll.checked = false;
+    }
+
     // Header
     const th1 = document.createElement("th");
-    th1.textContent = "Select Challan";
+    const selectAllCheckbox = document.createElement("input");
+    selectAllCheckbox.type = "checkbox";
+    selectAllCheckbox.id = "selectAll";
+    selectAllCheckbox.onchange = toggleAllDispatches;
+    th1.appendChild(selectAllCheckbox);
     tableHeader.appendChild(th1);
 
     fields.forEach(field => {
@@ -624,6 +640,14 @@
     if (!search) return text; // if no search, return plain text
     const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
     return text.replace(regex, `<mark>$1</mark>`);
+  }
+
+  function toggleAllDispatches() {
+    const selectAll = document.getElementById("selectAll");
+    const checkboxes = document.querySelectorAll(".row-checkbox");
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = selectAll.checked;
+    });
   }
 
   // Hook up preview refresh when date/product filters change

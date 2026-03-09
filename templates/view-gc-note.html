@@ -15,6 +15,9 @@
 <div class="container-xxl">
   <div class="header d-flex justify-content-between align-items-center mt-2">
     <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>View & Download GC Note</h4>
+    <button type="button" class="btn btn-outline-primary" style="height: 40px;" onclick="exportGcCsv()">
+      Export CSV
+    </button>
   </div>
   <div class="authentication-wrapper authentication-basic container-p-y pt-0">
     <div class="authentication-inner w-100" style="max-width: 100%;">
@@ -251,7 +254,7 @@
     const bill_no = document.getElementById('bill_no').value;
     if (!bill_no) return;
 
-    fetch(`/get-gc?bill-id=${encodeURIComponent(bill_no)}`)
+    fetch(`/api/get-gc?bill-id=${encodeURIComponent(bill_no)}`)
       .then(response => response.json())
       .then(data => {
         if (data.destinations) {
@@ -265,6 +268,15 @@
       .catch(err => {
         console.error('Error fetching Slip details:', err);
       });
+  }
+
+  function exportGcCsv() {
+    const billId = document.getElementById('bill_no') ? document.getElementById('bill_no').value : '';
+    if (!billId) {
+      alert("Please select a Bill No first.");
+      return;
+    }
+    window.location.href = `/api/get-gc?bill-id=${encodeURIComponent(billId)}&format=csv`;
   }
   // function filterTable() {
   //   const search = document.getElementById("searchBox").value.toLowerCase();

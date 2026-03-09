@@ -531,9 +531,19 @@
       numericFields.add(field);
     };
 
+    // Ensure selectAll checkbox is unchecked when rendering table
+    const selectAll = document.getElementById("selectAll");
+    if (selectAll) {
+      selectAll.checked = false;
+    }
+
     // Header
     const th1 = document.createElement("th");
-    th1.textContent = "Select Challan";
+    const selectAllCheckbox = document.createElement("input");
+    selectAllCheckbox.type = "checkbox";
+    selectAllCheckbox.id = "selectAll";
+    selectAllCheckbox.onchange = toggleAllDispatches;
+    th1.appendChild(selectAllCheckbox);
     tableHeader.appendChild(th1);
 
     fields.forEach(field => {
@@ -630,6 +640,14 @@
     if (!search) return text; // if no search, return plain text
     const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
     return text.replace(regex, `<mark>$1</mark>`);
+  }
+
+  function toggleAllDispatches() {
+    const selectAll = document.getElementById("selectAll");
+    const checkboxes = document.querySelectorAll(".row-checkbox");
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = selectAll.checked;
+    });
   }
 
   // Clear error on input for contract_no

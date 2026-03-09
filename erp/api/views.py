@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+from erp.utils.csv_export import csv_response
 from erp.utils.decorators import session_required
 from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year
 from transport.models import (
@@ -315,6 +316,47 @@ def get_ninv_dispacth(request):                  # ninv means not in invoice dis
 @session_required
 def get_gc(request):  
     bill_id = request.GET.get('bill-id')
+    if (request.GET.get("format") or "").lower() == "csv":
+        # Export GC notes for the selected invoice as CSV
+        gc_qs = (
+            GC_Note.objects.filter(
+                bill_id_id=bill_id,
+                company_id=request.session['company_info']['company_id'],
+            )
+            .order_by("gc_no")
+        )
+        header = [
+            "GC No",
+            "Bill No",
+            "GC Date",
+            "Consignor",
+            "Consignee",
+            "DC Field",
+            "Dispatch From",
+            "Destination",
+            "District",
+            "Product Name",
+            "Truck No",
+            "Weight",
+        ]
+        rows = (
+            (
+                g.gc_no,
+                g.bill_no,
+                g.gc_date,
+                g.consignor,
+                g.consignee,
+                g.dc_field,
+                g.dispatch_from,
+                g.destination,
+                g.district,
+                g.product_name,
+                g.truck_no,
+                g.weight,
+            )
+            for g in gc_qs
+        )
+        return csv_response(filename="gc_notes_backup", header=header, rows=rows)
     try:
         gc = GC_Note.objects.filter(bill_id_id=bill_id , company_id = request.session['company_info']['company_id']).values().order_by('gc_no')   
         fields = [
@@ -362,6 +404,56 @@ def get_invoice(request):
                                                       'km', 'weight', 'rate', 'totalfreight', 'unloading_charge_1',
                                                       'unloading_charge_2', 'loading_charge', 'grand_total', 
                                                       'gc_note_no', 'inv_status', 'main_party', 'sub_party').order_by('dep_date')
+            if (request.GET.get("format") or "").lower() == "csv":
+                header = [
+                    "Challan No",
+                    "Dep Date",
+                    "Truck No",
+                    "Product Name",
+                    "Party Name",
+                    "From",
+                    "Destination",
+                    "Taluka",
+                    "District",
+                    "KM",
+                    "Weight",
+                    "Rate",
+                    "Total Freight",
+                    "Unloading 1",
+                    "Unloading 2",
+                    "Loading",
+                    "Grand Total",
+                    "GC Note No",
+                    "Main Party",
+                    "Sub Party",
+                ]
+                rows = (
+                    (
+                        d.get("challan_no", ""),
+                        d.get("dep_date", ""),
+                        d.get("truck_no", ""),
+                        d.get("product_name", ""),
+                        d.get("party_name", ""),
+                        d.get("from_center", ""),
+                        d.get("destination", ""),
+                        d.get("taluka", ""),
+                        d.get("district", ""),
+                        d.get("km", ""),
+                        d.get("weight", ""),
+                        d.get("rate", ""),
+                        d.get("totalfreight", ""),
+                        d.get("unloading_charge_1", ""),
+                        d.get("unloading_charge_2", ""),
+                        d.get("loading_charge", ""),
+                        d.get("grand_total", ""),
+                        d.get("gc_note_no", ""),
+                        d.get("main_party", ""),
+                        d.get("sub_party", ""),
+                    )
+                    for d in dispatch
+                )
+                safe_bill = str(invoice.Bill_no or "invoice").replace("/", "-")
+                return csv_response(filename=f"invoice_{safe_bill}_backup", header=header, rows=rows)
             return JsonResponse({
            'bill_date': invoice.Bill_date,  
             'contract_no' : contract.contract_no, 
@@ -660,6 +752,44 @@ def fetch_rates(request, client_id):
                     "display_type": "kilometer_slab"
                 })
         
+        if (request.GET.get("format") or "").lower() == "csv":
+            # Export the same data as shown in the rate master table
+            if rate_type == "Taluka-Wise":
+                header = ["Rate Type", "District Name", "Taluka Name", "MT"]
+                rows = (
+                    (
+                        r.get("rate_type", rate_type),
+                        r.get("district_name", ""),
+                        r.get("taluka_name", ""),
+                        r.get("mt", ""),
+                    )
+                    for r in data
+                )
+            elif rate_type in ("Distric-Wise", "District-Wise"):
+                header = ["Rate Type", "District Name", "MT", "MT/KM"]
+                rows = (
+                    (
+                        r.get("rate_type", rate_type),
+                        r.get("district_name", ""),
+                        r.get("mt", ""),
+                        r.get("mt_per_km", ""),
+                    )
+                    for r in data
+                )
+            else:
+                header = ["Rate Type", "From Km", "To Km", "MT", "MT/KM"]
+                rows = (
+                    (
+                        r.get("rate_type", rate_type),
+                        r.get("from_km", ""),
+                        r.get("to_km", ""),
+                        r.get("mt", ""),
+                        r.get("mt_per_km", ""),
+                    )
+                    for r in data
+                )
+            return csv_response(filename="rate_master_backup", header=header, rows=rows)
+
         return JsonResponse({"success": True, "data": data, "rate_type": rate_type})
     
     except Exception as e:
@@ -879,6 +1009,8 @@ def _serialize_dispatch_details(dispatch_obj, company_id):
     return {
         "found": True,
         "id": dispatch_obj.id,
+        # Dispatch date (HTML <input type="date"> expects YYYY-MM-DD)
+        "dep_date": dispatch_obj.dep_date.strftime("%Y-%m-%d") if dispatch_obj.dep_date else "",
         "challan_no": dispatch_obj.challan_no,
         "product_name": dispatch_obj.product_name,
         "party_name": dispatch_obj.party_name,
@@ -1015,6 +1147,36 @@ def get_contract_bills(request):
             product_name = dispatches.first().product_name
             break
     
+    if (request.GET.get("format") or "").lower() == "csv":
+        header = [
+            "Bill No",
+            "Bill Date",
+            "M.T",
+            "Bill Amount",
+            "Loading Charge",
+            "Unloading 1",
+            "Unloading 2",
+            "Grand Total",
+        ]
+        rows = (
+            (
+                b.get("bill_no", ""),
+                b.get("bill_date", ""),
+                b.get("total_weight", 0),
+                b.get("total_freight", 0),
+                b.get("total_loading", 0),
+                b.get("total_unloading1", 0),
+                b.get("total_unloading2", 0),
+                float(b.get("total_freight", 0) or 0)
+                + float(b.get("total_loading", 0) or 0)
+                + float(b.get("total_unloading1", 0) or 0)
+                + float(b.get("total_unloading2", 0) or 0),
+            )
+            for b in bills_data
+        )
+        safe_contract = str(contract.contract_no or "contract").replace("/", "-")
+        return csv_response(filename=f"summary_{safe_contract}_bills_backup", header=header, rows=rows)
+
     return JsonResponse({
         'contract': {
             'id': contract.id,

@@ -15,6 +15,9 @@
             <div class="d-flex gap-3">
                 <!-- <button type="button" class="btn btn-primary" style="height: 40px;"><a href="download-excel"
                         class="text-white text-decoration-none">Export To Excel</a></button> -->
+                <button type="button" class="btn btn-outline-primary" style="height: 40px;">
+                    <a class="text-decoration-none" href="{% url 'dispatch-view' %}?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv">Export CSV</a>
+                </button>
                 <button type="button" class="btn btn-primary" style="height: 40px;"><a href="dispatch-form"
                         class="text-white text-decoration-none">Add Dispatch</a></button>
             </div>

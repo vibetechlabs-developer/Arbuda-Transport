@@ -106,7 +106,7 @@
                 <select id="select-beast" name="destination" class="form-select" placeholder="Enter Destination"
                   onchange="fecthDestinationDetails(this.value)" required>
                   {% for destination in alldestination %}
-                  <option value="{{ destination.id }}" {% if destination.id == current_destination_id %}selected{% endif %}>{{ destination.destination }} -- {{ destination.km }}</option>
+                  <option value="{{ destination.id }}" {% if destination.id == current_destination_id %}selected{% endif %}>{{ destination.destination }}</option>
                   {% endfor %}
                   {% if not current_destination_id and dispatch.destination %}
                   <option value="{{ dispatch.destination }}" selected>{{ dispatch.destination }}</option>
@@ -367,7 +367,7 @@
     destinations.forEach(dest => {
       tomSelectInstance.addOption({
         value: dest.id,
-        text: `${dest.destination} -- ${dest.km}`,
+        text: `${dest.destination}`,
         data_id: dest.id
       });
     });
@@ -693,7 +693,7 @@
       grand_total += load_amount;
     }
 
-    document.getElementById('grand_total').value = grand_total.toFixed(2);
+    document.getElementById('grand_total').value = toExactAmount(grand_total);
   }
 
   // Real-time challan number validation for update form
