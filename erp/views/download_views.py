@@ -333,9 +333,9 @@ def generate_invoice_pdf(request):
         # Always use compact mode to ensure exactly 12 rows fit per page
         total_dispatch_count = len(all_dispatches or dispatches)
         compact = True  # Always use compact mode for 12 rows per page
-        # Compact typography so 12 rows + TOTAL + signatures comfortably fit on one page
-        compact_fs = 8.5
-        compact_leading = 10
+        # Slightly larger compact typography so rows stay readable but still fit on one page
+        compact_fs = 9
+        compact_leading = 11
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocal",
@@ -360,12 +360,12 @@ def generate_invoice_pdf(request):
             wordWrap="NOBREAK",  # keep long district names on a single line
         )
         # Uniform header style for all column names.
-        # Allow wrapping so headers don't visually overwrite when many columns are enabled.
+        # Slightly larger for better readability while still fitting in one line.
         header_style_uniform = ParagraphStyle(
             name="HeaderUniform",
             parent=to_right_style_desc_heading,
-            fontSize=8.5,
-            leading=10,
+            fontSize=9,
+            leading=11,
             alignment=1,  # Center all headers
             splitLongWords=0,
         )
@@ -991,9 +991,9 @@ def download_generate_invoice_pdf(request):
         # Always use compact mode to ensure exactly 12 rows fit per page
         total_dispatch_count = len(all_dispatches or dispatches)
         compact = True  # Always use compact mode for 12 rows per page
-        # Compact typography so 12 rows + TOTAL + signatures comfortably fit on one page
-        compact_fs = 8.5
-        compact_leading = 10
+        # Slightly larger compact typography so rows stay readable but still fit on one page
+        compact_fs = 9
+        compact_leading = 11
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocalDl",
@@ -1024,12 +1024,12 @@ def download_generate_invoice_pdf(request):
             splitLongWords=0,  # don't split long numbers
         )
         # Uniform header style for all column names.
-        # Allow controlled wrapping so long labels don't overflow or clip in narrow columns.
+        # Slightly larger for better readability while still fitting in one line.
         header_style_uniform = ParagraphStyle(
             name="HeaderUniformDl",
             parent=to_right_style_desc_heading,
-            fontSize=8.5,
-            leading=10,
+            fontSize=9,
+            leading=11,
             alignment=1,  # Center all headers
             splitLongWords=0,
         )
