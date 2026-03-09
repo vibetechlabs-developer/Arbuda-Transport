@@ -329,20 +329,13 @@ def generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        # Improved typography - optimized for up to 12 rows per page
-        # Use slightly larger fonts for invoices with fewer rows so they visually fill the page more.
+        # Improved typography - optimized for exactly 12 rows per page
+        # Always use compact mode to ensure exactly 12 rows fit per page
         total_dispatch_count = len(all_dispatches or dispatches)
         compact = True  # Always use compact mode for 12 rows per page
-        row_count = len(dispatch_subset)
-        if total_dispatch_count <= 8:
-            compact_fs = 10.5
-            compact_leading = 13
-        elif total_dispatch_count <= 10:
-            compact_fs = 10
-            compact_leading = 12
-        else:
-            compact_fs = 9
-            compact_leading = 11
+        # Compact typography so 12 rows + TOTAL + signatures comfortably fit on one page
+        compact_fs = 8.5
+        compact_leading = 10
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocal",
@@ -589,29 +582,19 @@ def generate_invoice_pdf(request):
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
         # Table styles - simple, elegant, standard structure (no background colors)
-        # For fewer rows, increase cell padding so the table visually fills more of the page.
-        body_top_pad = body_bottom_pad = 1
-        header_top_pad = header_bottom_pad = 2
-        if row_count <= 8:
-            body_top_pad = body_bottom_pad = 4
-            header_top_pad = header_bottom_pad = 3
-        elif row_count <= 10:
-            body_top_pad = body_bottom_pad = 3
-            header_top_pad = header_bottom_pad = 3
-
         styles = [
             # Header styling
             ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Optimized padding (dynamic based on row count)
+            # Optimized padding for exactly 12 rows per page - minimal spacing
             ("LEFTPADDING", (0,0), (-1,-1), 2),
             ("RIGHTPADDING", (0,0), (-1,-1), 2),
-            ("TOPPADDING", (0,0), (-1,0), header_top_pad),
-            ("BOTTOMPADDING", (0,0), (-1,0), header_bottom_pad),
-            ("TOPPADDING", (0,1), (-1,-2), body_top_pad),
-            ("BOTTOMPADDING", (0,1), (-1,-2), body_bottom_pad),
+            ("TOPPADDING", (0,0), (-1,0), 2),
+            ("BOTTOMPADDING", (0,0), (-1,0), 2),
+            ("TOPPADDING", (0,1), (-1,-2), 1),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 1),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -807,8 +790,8 @@ def generate_invoice_pdf(request):
         ]
     ]
     sig_col_width = available_width / 3 - 2
-    # Slightly smaller fixed height so signatures sit closer to the table and reduce empty space.
-    signature_table = Table(signature_data, colWidths=[sig_col_width, sig_col_width, sig_col_width], rowHeights=[80])
+    # Fixed height tuned so header + 12 rows + TOTAL + signatures fit on a single page.
+    signature_table = Table(signature_data, colWidths=[sig_col_width, sig_col_width, sig_col_width], rowHeights=[105])
     signature_table.setStyle(TableStyle([
         ("ALIGN", (0,0), (0,0), "CENTER"),
         ("ALIGN", (1,0), (1,0), "CENTER"),
@@ -819,7 +802,7 @@ def generate_invoice_pdf(request):
         ("LEFTPADDING", (0,0), (-1,-1), 4),
         ("RIGHTPADDING", (0,0), (-1,-1), 4),
     ]))
-    elements.append(Spacer(1, 6))
+    elements.append(Spacer(1, 12))
     elements.append(KeepTogether([signature_table]))
 
     # --- Build PDF ---
@@ -1047,12 +1030,11 @@ def download_generate_invoice_pdf(request):
             splitLongWords=0,  # don't split long numbers
         )
         # Uniform header style for all column names.
-        # Slightly larger for better readability while still fitting in one line.
         header_style_uniform = ParagraphStyle(
             name="HeaderUniformDl",
             parent=to_right_style_desc_heading,
-            fontSize=9,
-            leading=11,
+            fontSize=8.5,
+            leading=10,
             alignment=1,  # Center all headers
             splitLongWords=0,
         )
@@ -1260,29 +1242,19 @@ def download_generate_invoice_pdf(request):
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
         # Table styles - simple, elegant, standard structure (no background colors)
-        # For fewer rows, increase cell padding so the table visually fills more of the page.
-        body_top_pad = body_bottom_pad = 1
-        header_top_pad = header_bottom_pad = 2
-        if row_count <= 8:
-            body_top_pad = body_bottom_pad = 4
-            header_top_pad = header_bottom_pad = 3
-        elif row_count <= 10:
-            body_top_pad = body_bottom_pad = 3
-            header_top_pad = header_bottom_pad = 3
-
         styles = [
             # Header styling
             ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Optimized padding (dynamic based on row count)
+            # Optimized padding for exactly 12 rows per page - minimal spacing
             ("LEFTPADDING", (0,0), (-1,-1), 2),
             ("RIGHTPADDING", (0,0), (-1,-1), 2),
-            ("TOPPADDING", (0,0), (-1,0), header_top_pad),
-            ("BOTTOMPADDING", (0,0), (-1,0), header_bottom_pad),
-            ("TOPPADDING", (0,1), (-1,-2), body_top_pad),
-            ("BOTTOMPADDING", (0,1), (-1,-2), body_bottom_pad),
+            ("TOPPADDING", (0,0), (-1,0), 2),
+            ("BOTTOMPADDING", (0,0), (-1,0), 2),
+            ("TOPPADDING", (0,1), (-1,-2), 1),
+            ("BOTTOMPADDING", (0,1), (-1,-2), 1),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
