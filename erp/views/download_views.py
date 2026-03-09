@@ -526,10 +526,11 @@ def generate_invoice_pdf(request):
         num_cols = len(headers)
 
         # Base column widths - will be scaled to fill full width
-        # Keys MUST match the actual header text (from label_map) so widths apply correctly
+        # Keys MUST match the actual header text (from label_map) so widths apply correctly.
+        # Use the same dc_label we computed for header so the Shipment/Challan column gets an appropriate width.
         base_widths = {
             "Sr\u00A0No": 10,  # Match label_map with non-breaking space
-            ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 14,
+            dc_label: 26,  # Wider so "Shipment" or custom labels fit on one line
             "Truck\u00A0No": 20,
             "Party\u00A0Name": 28,  # Wider to keep on one line
             "Product": 16,
@@ -1194,11 +1195,11 @@ def download_generate_invoice_pdf(request):
         num_cols = len(headers)
 
         # Base column widths - will be scaled to fill full width
-        # Keys MUST match the actual header text (from label_map) so widths apply correctly
-        # Keep this mapping identical to generate_invoice_pdf so both PDFs have the same layout.
+        # Keys MUST match the actual header text (from label_map) so widths apply correctly.
+        # Keep this mapping in sync with generate_invoice_pdf so both PDFs have the same layout.
         base_widths = {
             "Sr\u00A0No": 10,  # Match label_map with non-breaking space
-            ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 14,
+            dc_label: 26,  # Wider so "Shipment" or custom labels fit on one line
             "Truck\u00A0No": 20,
             "Party\u00A0Name": 28,  # Wider to keep on one line
             "Product": 16,
