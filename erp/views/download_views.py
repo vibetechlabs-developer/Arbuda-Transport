@@ -329,13 +329,20 @@ def generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        # Improved typography - optimized for exactly 12 rows per page
-        # Always use compact mode to ensure exactly 12 rows fit per page
+        # Improved typography - optimized for up to 12 rows per page
+        # Use slightly larger fonts for invoices with fewer rows so they visually fill the page more.
         total_dispatch_count = len(all_dispatches or dispatches)
         compact = True  # Always use compact mode for 12 rows per page
-        # Slightly larger compact typography so rows stay readable but still fit on one page
-        compact_fs = 9
-        compact_leading = 11
+        row_count = len(dispatch_subset)
+        if total_dispatch_count <= 8:
+            compact_fs = 10.5
+            compact_leading = 13
+        elif total_dispatch_count <= 10:
+            compact_fs = 10
+            compact_leading = 12
+        else:
+            compact_fs = 9
+            compact_leading = 11
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocal",
@@ -987,13 +994,20 @@ def download_generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        # Improved typography - optimized for exactly 12 rows per page
-        # Always use compact mode to ensure exactly 12 rows fit per page
+        # Improved typography - optimized for up to 12 rows per page
+        # Use slightly larger fonts for invoices with fewer rows so they visually fill the page more.
         total_dispatch_count = len(all_dispatches or dispatches)
         compact = True  # Always use compact mode for 12 rows per page
-        # Slightly larger compact typography so rows stay readable but still fit on one page
-        compact_fs = 9
-        compact_leading = 11
+        row_count = len(dispatch_subset)
+        if total_dispatch_count <= 8:
+            compact_fs = 10.5
+            compact_leading = 13
+        elif total_dispatch_count <= 10:
+            compact_fs = 10
+            compact_leading = 12
+        else:
+            compact_fs = 9
+            compact_leading = 11
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocalDl",
@@ -1409,7 +1423,16 @@ def download_generate_invoice_pdf(request):
             elements.append(Spacer(1, 1))
 
             # **Build table only ONCE per page**
-            elements.append(build_table_page(dispatch_chunk, add_total_row=True, is_last_page=is_last_page, all_dispatches=dispatches))
+            # Use start_index so Sr No continues across pages (13 after 12, etc.)
+            elements.append(
+                build_table_page(
+                    dispatch_chunk,
+                    add_total_row=True,
+                    is_last_page=is_last_page,
+                    all_dispatches=dispatches,
+                    start_index=(i + 1),
+                )
+            )
 
     # ---- Signature (show ONCE after full invoice) ----
     # Create signature styles with larger fonts
