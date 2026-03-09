@@ -820,7 +820,6 @@ def generate_invoice_pdf(request):
 def download_generate_invoice_pdf(request):
     if request.method == "POST":     
         contract_id = request.POST.get("contract_id")
-        dispatch_ids =  [int(i) for i in request.POST.getlist("dispatch_ids")]
         i_bill_no = request.POST.get("bill_no")
 
         # Fetch contract and dispatch data
@@ -838,8 +837,22 @@ def download_generate_invoice_pdf(request):
         except Invoice.DoesNotExist:
             messages.error(request, "Invoice not found!")
             return redirect("view-dispatch-invoice")
-   
-        dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
+
+        # --- Decide which dispatches to include in the PDF ---
+        # On the "View & Download Invoice" screen, checkboxes are hidden; in that case,
+        # no dispatch_ids are posted and we should include all dispatches attached to the invoice.
+        dispatch_ids_raw = request.POST.getlist("dispatch_ids")
+        if dispatch_ids_raw:
+            try:
+                dispatch_ids = [int(i) for i in dispatch_ids_raw]
+                dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
+            except (TypeError, ValueError):
+                # Fallback to all invoice dispatches if anything goes wrong with IDs
+                dispatches = invoice.dispatch_list.all().order_by('dep_date')
+        else:
+            # No explicit selection → use all dispatch rows for this invoice
+            dispatches = invoice.dispatch_list.all().order_by('dep_date')
+
         # Sort by challan_no in ascending order
         dispatches = sort_dispatches_by_challan_asc(dispatches)
    
@@ -1010,14 +1023,14 @@ def download_generate_invoice_pdf(request):
             leading=compact_leading or to_right_style_desc.leading,
             splitLongWords=0,  # don't split long numbers
         )
-        # Uniform header style for all column names
+        # Uniform header style for all column names.
+        # Allow controlled wrapping so long labels don't overflow or clip in narrow columns.
         header_style_uniform = ParagraphStyle(
             name="HeaderUniformDl",
             parent=to_right_style_desc_heading,
             fontSize=8.5,
             leading=10,
             alignment=1,  # Center all headers
-            wordWrap='NOBREAK',  # Prevent header text from wrapping
             splitLongWords=0,
         )
         to_right_style_desc_heading_local = ParagraphStyle(
@@ -1159,12 +1172,13 @@ def download_generate_invoice_pdf(request):
 
         # Base column widths - will be scaled to fill full width
         # Keys MUST match the actual header text (from label_map) so widths apply correctly
+        # Keep this mapping identical to generate_invoice_pdf so both PDFs have the same layout.
         base_widths = {
             "Sr\u00A0No": 10,  # Match label_map with non-breaking space
-            ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 16,
+            ("Challan\u00A0No" if getattr(contract, "dc_field", None) in [None, "None", "null", ""] else str(getattr(contract, "dc_field"))): 14,
             "Truck\u00A0No": 20,
             "Party\u00A0Name": 28,  # Wider to keep on one line
-            "Product": 18,
+            "Product": 16,
             "GC\u00A0Note": 20,  # Wider so header text stays on a single line
             # Give numeric columns a bit more width so totals never wrap (e.g. 1698.000)
             "Weight": 16,
@@ -1176,9 +1190,9 @@ def download_generate_invoice_pdf(request):
             "Loading": 14,
             "Freight": 14,
             "Amount": 20,
-            "Dep\u00A0Date": 22,  # Slightly wider to avoid wrapping
-            "Dest.": 26,
-            "Dist.": 26,
+            "Dep\u00A0Date": 20,  # Match creation-invoice PDF
+            "Dest.": 24,
+            "Dist.": 26,  # wider so "AHMEDABAD" fits on one line
             "Tal.": 16,
             "Main\u00A0Party": 20,  # Match label_map with non-breaking space
             "Sub\u00A0Party": 20,  # Match label_map with non-breaking space
@@ -1243,9 +1257,8 @@ def download_generate_invoice_pdf(request):
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
             # Grid lines for all cells - simple and standard
             ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            # Prevent text wrapping in cells - especially for dates
-            # Prevent text wrapping - keep text on single line
-            ("WORDWRAP", (0,0), (-1,-1), "NOBREAK"),
+            # Allow wrapping inside cells so long text never visually overwrites or clips
+            ("WORDWRAP", (0,0), (-1,-1), "CJK"),
         ]
         # No zebra striping - clean and simple
         if add_total:
