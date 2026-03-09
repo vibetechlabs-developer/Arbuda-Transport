@@ -281,35 +281,26 @@ def generate_invoice_pdf(request):
 
         active_fields = [f for f in fields if f not in unused_loading_fields]
 
-        # Handle main_party and sub_party columns based on gc_note presence
-        has_gc_note = "gc_note" in active_fields
+        # Always keep main_party and sub_party (if enabled in invoice_fields)
+        # and reposition them so they appear directly after dc_field.
         main_party_in_fields = "main_party" in active_fields
         sub_party_in_fields = "sub_party" in active_fields
-        
-        # If gc_note is not present, remove main_party and sub_party
-        if not has_gc_note:
-            active_fields = [f for f in active_fields if f not in ("main_party", "sub_party")]
-        else:
-            # If gc_note is present and main_party/sub_party exist, reorder them to appear after dc_field
-            if main_party_in_fields or sub_party_in_fields:
-                # Remove main_party and sub_party from their current positions
-                active_fields = [f for f in active_fields if f not in ("main_party", "sub_party")]
-                
-                # Find the index of dc_field
-                try:
-                    dc_field_idx = active_fields.index("dc_field")
-                    # Insert main_party and sub_party right after dc_field
-                    if main_party_in_fields:
-                        active_fields.insert(dc_field_idx + 1, "main_party")
-                    if sub_party_in_fields:
-                        # Insert sub_party after main_party (or after dc_field if main_party not present)
-                        insert_idx = dc_field_idx + 1
-                        if main_party_in_fields:
-                            insert_idx = active_fields.index("main_party") + 1
-                        active_fields.insert(insert_idx, "sub_party")
-                except ValueError:
-                    # If dc_field is not found, keep original order
-                    pass
+        if main_party_in_fields or sub_party_in_fields:
+            try:
+                # Remove from current positions
+                active_fields = [
+                    f for f in active_fields if f not in ("main_party", "sub_party")
+                ]
+                dc_field_idx = active_fields.index("dc_field")
+                insert_idx = dc_field_idx + 1
+                if main_party_in_fields:
+                    active_fields.insert(insert_idx, "main_party")
+                    insert_idx += 1
+                if sub_party_in_fields:
+                    active_fields.insert(insert_idx, "sub_party")
+            except ValueError:
+                # If dc_field is not present, keep original order
+                pass
 
         # Header row (short, standard labels so nothing breaks into 2 lines)
         label_map = {
@@ -368,14 +359,14 @@ def generate_invoice_pdf(request):
             splitLongWords=0,
             wordWrap="NOBREAK",  # keep long district names on a single line
         )
-        # Uniform header style for all column names - prevent wrapping
+        # Uniform header style for all column names.
+        # Allow wrapping so headers don't visually overwrite when many columns are enabled.
         header_style_uniform = ParagraphStyle(
             name="HeaderUniform",
             parent=to_right_style_desc_heading,
             fontSize=8.5,
             leading=10,
             alignment=1,  # Center all headers
-            wordWrap='NOBREAK',  # Prevent header text from wrapping
             splitLongWords=0,
         )
         to_right_style_desc_local = ParagraphStyle(
@@ -611,9 +602,8 @@ def generate_invoice_pdf(request):
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
             # Grid lines for all cells - simple and standard
             ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            # Prevent text wrapping in cells - especially for dates
-            # Prevent text wrapping - keep text on single line
-            ("WORDWRAP", (0,0), (-1,-1), "NOBREAK"),
+            # Allow wrapping inside cells so text doesn't visually overwrite in narrow columns
+            ("WORDWRAP", (0,0), (-1,-1), "CJK"),
         ]
         # No zebra striping - clean and simple
         if add_total:
@@ -936,35 +926,26 @@ def download_generate_invoice_pdf(request):
 
         active_fields = [f for f in fields if f not in unused_loading_fields]
 
-        # Handle main_party and sub_party columns based on gc_note presence
-        has_gc_note = "gc_note" in active_fields
+        # Always keep main_party and sub_party (if enabled in invoice_fields)
+        # and reposition them so they appear directly after dc_field.
         main_party_in_fields = "main_party" in active_fields
         sub_party_in_fields = "sub_party" in active_fields
-        
-        # If gc_note is not present, remove main_party and sub_party
-        if not has_gc_note:
-            active_fields = [f for f in active_fields if f not in ("main_party", "sub_party")]
-        else:
-            # If gc_note is present and main_party/sub_party exist, reorder them to appear after dc_field
-            if main_party_in_fields or sub_party_in_fields:
-                # Remove main_party and sub_party from their current positions
-                active_fields = [f for f in active_fields if f not in ("main_party", "sub_party")]
-                
-                # Find the index of dc_field
-                try:
-                    dc_field_idx = active_fields.index("dc_field")
-                    # Insert main_party and sub_party right after dc_field
-                    if main_party_in_fields:
-                        active_fields.insert(dc_field_idx + 1, "main_party")
-                    if sub_party_in_fields:
-                        # Insert sub_party after main_party (or after dc_field if main_party not present)
-                        insert_idx = dc_field_idx + 1
-                        if main_party_in_fields:
-                            insert_idx = active_fields.index("main_party") + 1
-                        active_fields.insert(insert_idx, "sub_party")
-                except ValueError:
-                    # If dc_field is not found, keep original order
-                    pass
+        if main_party_in_fields or sub_party_in_fields:
+            try:
+                # Remove from current positions
+                active_fields = [
+                    f for f in active_fields if f not in ("main_party", "sub_party")
+                ]
+                dc_field_idx = active_fields.index("dc_field")
+                insert_idx = dc_field_idx + 1
+                if main_party_in_fields:
+                    active_fields.insert(insert_idx, "main_party")
+                    insert_idx += 1
+                if sub_party_in_fields:
+                    active_fields.insert(insert_idx, "sub_party")
+            except ValueError:
+                # If dc_field is not present, keep original order
+                pass
 
         # Header row (short, standard labels so nothing breaks into 2 lines)
         label_map = {
