@@ -114,8 +114,8 @@
                             <td>{{ contract.bill_series_from }} - {{ contract.bill_series_to }}</td>
                             <td>{{ contract.rate_type }}</td>
                             <td>{{ contract.from_center }}</td>
-                            <td>{{ contract.c_start_date|date:'Y-m-d' }}</td>
-                            <td>{{ contract.c_end_date|date:'Y-m-d' }}</td>
+                            <td>{{ contract.c_start_date|date:'d-m-Y' }}</td>
+                            <td>{{ contract.c_end_date|date:'d-m-Y' }}</td>
                             <td>{{ contract.unloading_charge_1 }}</td>
                             <td>{{ contract.unloading_charge_2 }}</td>
                             <td>{{ contract.loading_charge }}</td>
@@ -123,7 +123,7 @@
                             <td>{{ contract.c_email }}</td>
                             <td>{{ contract.c_number }}</td>
                             <td>{{ contract.billing_address }}</td>
-                            <td>{{ contract.created_at }}</td>
+                            <td>{{ contract.created_at|date:'d-m-Y' }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

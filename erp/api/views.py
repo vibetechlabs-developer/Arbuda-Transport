@@ -920,7 +920,7 @@ def get_report_dispatches(request):
         dispatch_data = {
             "id": d.id,
             "challan_no": d.challan_no,
-            "dep_date": d.dep_date.strftime("%Y-%m-%d") if d.dep_date else "",
+            "dep_date": d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "",
             "truck_no": d.truck_no,
             "product_name": d.product_name,
             "party_name": d.party_name,
@@ -1131,7 +1131,7 @@ def get_contract_bills(request):
             bills_data.append({
                 'id': invoice.id,
                 'bill_no': invoice.Bill_no,
-                'bill_date': invoice.Bill_date.strftime('%Y-%m-%d') if invoice.Bill_date else '',
+                'bill_date': invoice.Bill_date.strftime('%d-%m-%Y') if invoice.Bill_date else '',
                 'total_weight': float(total_weight),
                 'total_freight': float(total_freight),
                 'total_loading': float(total_loading),

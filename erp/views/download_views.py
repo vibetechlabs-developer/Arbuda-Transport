@@ -1538,7 +1538,7 @@ def download_gc_pdf(request):
         ]))  
 
         details_table_data = [
-            [Paragraph(f"<b>Date</b>",styles["font9"]),":",Paragraph(f"{gc.gc_date}",styles["font9"]), Paragraph(f"<b>Truck No. </b>", styles["font9"]),":", Paragraph(f"{gc.truck_no}",styles["font9"])],
+            [Paragraph(f"<b>Date</b>",styles["font9"]),":",Paragraph(f"{gc.gc_date.strftime('%d-%m-%Y') if gc.gc_date else ''}",styles["font9"]), Paragraph(f"<b>Truck No. </b>", styles["font9"]),":", Paragraph(f"{gc.truck_no}",styles["font9"])],
             [Paragraph(f"<b>Consignor</b>",styles["font9"]),":",Paragraph(f"{gc.consignor}",styles["font9"]), "", "" , ""],
             [Paragraph(f"<b>Depacth From</b>",styles["font9"]),":",Paragraph(f"{gc.dispatch_from}",styles["font9"]), Paragraph(f"<b>Weight</b>",styles["font9"]), ":" , Paragraph(f"{gc.weight}",styles["font9"])],
             [Paragraph(f"<b>Consignee</b>",styles["font9"]),":",Paragraph(f"{gc.consignee}",styles["font9"]),Paragraph(f"<b>Products</b>",styles["font9"]),":",Paragraph(f"{gc.product_name}",styles["font9"])],
@@ -1778,7 +1778,7 @@ def generate_summary_pdf(request):
     elements.append(Spacer(1, 8))
 
     # ---- To + Date row ----
-    date_str = summary_date.strftime("%d.%m.%Y")
+    date_str = summary_date.strftime("%d-%m-%Y")
     to_lines = [
         Paragraph("To,", normal),
         Paragraph("The State Manager", normal_bold),

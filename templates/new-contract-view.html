@@ -80,13 +80,13 @@
                                 {% endif %}
                             </td>
                             <td>{{ contract.bill_no }}</td>
-                            <td>{{ contract.bill_date }}</td>
+                            <td>{{ contract.bill_date|date:'d-m-Y' }}</td>
                             <td>{{ contract.client_name }}</td>
                             <td>{{ contract.c_address }}</td>
                             <td>{{ contract.c_gst }}</td>
                             <td>{{ contract.product }}</td>
                             <td>{{ contract.chalan_no }}</td>
-                            <td>{{ contract.loading_date }}</td>
+                            <td>{{ contract.loading_date|date:'d-m-Y' }}</td>
                             <td>{{ contract.truck_no }}</td>
                             <td>{{ contract.party_name }}</td>
                             <td>{{ contract.hsn_code }}</td>
@@ -100,7 +100,7 @@
                             <td>{{ contract.loading_amount }}</td>
                             <td>{{ contract.de_unloading_amount }}</td>
                             <td>{{ contract.grand_total }}</td>
-                            <td>{{ contract.due_date }}</td>
+                            <td>{{ contract.due_date|date:'d-m-Y' }}</td>
                             <td style="text-align: center; ">
 
                                 <!-- <a href="contract-form-update?update={{ contract.id }}">

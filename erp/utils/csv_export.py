@@ -12,8 +12,8 @@ def _to_str(value) -> str:
         # Excel: avoid "#######" caused by narrow columns + date/number formatting
         # by exporting dates as TEXT (leading apostrophe is hidden by Excel).
         if isinstance(value, datetime):
-            return "'" + value.strftime("%Y-%m-%d %H:%M:%S")
-        return "'" + value.strftime("%Y-%m-%d")
+            return "'" + value.strftime("%d-%m-%Y %H:%M:%S")
+        return "'" + value.strftime("%d-%m-%Y")
     return str(value)
 
 

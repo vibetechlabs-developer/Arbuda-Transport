@@ -179,7 +179,7 @@
                             <td>{{ dispatch.advance_paid }}</td>
                             <td>{{ dispatch.panding_amount }}</td>
                             <td>{{ dispatch.net_profit }}</td>
-                            <td>{{ dispatch.created_at }}</td>
+                            <td>{{ dispatch.created_at|date:'d-m-Y' }}</td>
                         </tr>
                         {% endfor %}
                         {% else %}
