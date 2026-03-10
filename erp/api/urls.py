@@ -35,6 +35,7 @@ urlpatterns = [
     # others master
     path("get-destination-details", views.get_destination_details, name="get-destination-details"),
     path("get-taluka-district", views.get_taluka_district, name="get-taluka-district"),
+    path("get-truck-numbers", views.get_truck_numbers, name="get-truck-numbers"),
     
     # validation
     path("check-challan-duplicate", views.check_challan_duplicate, name="check-challan-duplicate"),

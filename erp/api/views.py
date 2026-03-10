@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+from django.core.cache import cache
 from erp.utils.csv_export import csv_response
 from erp.utils.decorators import session_required
 from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year
@@ -1095,6 +1096,56 @@ def get_dispatch_details(request):
 
     data = _serialize_dispatch_details(dispatch_obj, company_id)
     return JsonResponse(data)
+
+@session_required
+def get_truck_numbers(request):
+    """
+    Fetch unique truck numbers from Dispatch records for the current company,
+    sorted in ascending order. Used for autocomplete in dispatch form.
+    Results are cached for 1 hour to improve performance.
+    """
+    company_id = request.session['company_info']['company_id']
+    search_query = request.GET.get('q', '').strip()
+    
+    # Create cache key based on company_id
+    cache_key = f'truck_numbers_{company_id}'
+    
+    # Try to get from cache first
+    cached_truck_numbers = cache.get(cache_key)
+    
+    if cached_truck_numbers is None:
+        # Cache miss - fetch from database
+        truck_numbers = Dispatch.objects.filter(
+            company_id=company_id
+        ).exclude(
+            truck_no__isnull=True
+        ).exclude(
+            truck_no__exact=''
+        ).values_list('truck_no', flat=True).distinct()
+        
+        # Sort in ascending order and convert to list
+        truck_numbers = sorted(set(truck_numbers), key=str.lower)
+        truck_numbers = list(truck_numbers)
+        
+        # Cache for 1 hour (3600 seconds)
+        cache.set(cache_key, truck_numbers, 3600)
+        cached_truck_numbers = truck_numbers
+    
+    # Filter by search query if provided (filter cached results)
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_truck_numbers = [
+            truck_no for truck_no in cached_truck_numbers
+            if search_lower in truck_no.lower()
+        ]
+        truck_numbers = filtered_truck_numbers
+    else:
+        truck_numbers = cached_truck_numbers
+    
+    return JsonResponse({
+        'truck_numbers': truck_numbers,
+    })
+
 
 @session_required
 def get_contract_bills(request):

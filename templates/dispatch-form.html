@@ -67,8 +67,10 @@
               </div>
               <div class="mb-3 col-sm-6">
                 <label for="truck_no" class="form-label">Truck No.</label>
-                <input type="text" class="form-control" id="truck_no" name="truck_no" placeholder="Enter truck no"
-                  autofocus oninput=" this.classList.remove('invalid')" required />
+                <select class="form-select" id="truck_no" name="truck_no" placeholder="Enter truck no"
+                  autocomplete="off" required>
+                  <option value="" selected disabled>Select truck no</option>
+                </select>
               </div>
             </div>
             <div class="row">
@@ -345,6 +347,7 @@
   let contractTomSelect = null;
   let destinationTomSelect = null;
   let productTomSelect = null;
+  let truckTomSelect = null;
   let isAutoFillingDispatch = false;
   let dispatchMode = 'autofill'; // 'autofill' (static) | 'new' (editable)
   let isDispatchModeApplying = false;
@@ -382,6 +385,13 @@
     const el = document.getElementById(id);
     if (!el) return;
 
+    // Handle TomSelect controls separately
+    if (id === 'truck_no' && truckTomSelect) {
+      if (isReadOnly) truckTomSelect.disable();
+      else truckTomSelect.enable();
+      return;
+    }
+
     // Inputs/selects handled differently
     if (el.tagName === 'SELECT') {
       el.disabled = !!isReadOnly;
@@ -398,7 +408,7 @@
     try {
       DISPATCH_LOCK_FIELDS.forEach((id) => setElementReadOnly(id, isStatic));
 
-      // TomSelect controls (destination/product)
+      // TomSelect controls (destination/product/truck)
       if (destinationTomSelect) {
         if (isStatic) destinationTomSelect.disable();
         else destinationTomSelect.enable();
@@ -406,6 +416,10 @@
       if (productTomSelect) {
         if (isStatic) productTomSelect.disable();
         else productTomSelect.enable();
+      }
+      if (truckTomSelect) {
+        if (isStatic) truckTomSelect.disable();
+        else truckTomSelect.enable();
       }
 
       const btn = document.getElementById('btnToggleNewDispatch');
@@ -437,6 +451,7 @@
     // Clear TomSelect selections too
     if (destinationTomSelect) destinationTomSelect.clear(true);
     if (productTomSelect) productTomSelect.clear(true);
+    if (truckTomSelect) truckTomSelect.clear(true);
 
     // Remove challan duplicate error UI
     clearChallanError();
@@ -510,6 +525,7 @@
     // Clear TomSelect dropdowns (but keep contract_id)
     if (destinationTomSelect) destinationTomSelect.clear(true);
     if (productTomSelect) productTomSelect.clear(true);
+    if (truckTomSelect) truckTomSelect.clear(true);
 
     // Reset dep_date to today
     const depDateInput = document.getElementById('dep_date');
@@ -591,6 +607,66 @@
           if (dispatchMode === 'new') return; // in new mode we don't overwrite user input
           // When product is changed, auto-fill using last dispatch for this contract + product
           autoFillFromLastDispatch();
+        }
+      });
+    }
+
+    // Truck number dropdown (TomSelect with autocomplete)
+    const truckEl = document.getElementById('truck_no');
+    if (truckEl) {
+      truckTomSelect = new TomSelect(truckEl, {
+        create: true,              // allow adding new truck numbers
+        createOnBlur: true,
+        persist: false,
+        allowEmptyOption: true,
+        maxItems: 1,
+        closeAfterSelect: true,
+        placeholder: "Select or enter truck no",
+        sortField: {
+          field: "text",
+          direction: "asc"
+        },
+        load: function(query, callback) {
+          // Always fetch from API (cached on server side)
+          const url = `/api/get-truck-numbers${query ? '?q=' + encodeURIComponent(query) : ''}`;
+          fetch(url)
+            .then(response => response.json())
+            .then(data => {
+              if (data.truck_numbers && data.truck_numbers.length > 0) {
+                const options = data.truck_numbers.map(truckNo => ({
+                  value: truckNo,
+                  text: truckNo
+                }));
+                callback(options);
+              } else {
+                callback();
+              }
+            })
+            .catch(() => {
+              callback();
+            });
+        },
+        onInitialize: function() {
+          // Load all truck numbers on initialization (pre-populate dropdown)
+          fetch('/api/get-truck-numbers')
+            .then(response => response.json())
+            .then(data => {
+              if (data.truck_numbers && data.truck_numbers.length > 0) {
+                const options = data.truck_numbers.map(truckNo => ({
+                  value: truckNo,
+                  text: truckNo
+                }));
+                truckTomSelect.addOptions(options);
+                truckTomSelect.refreshOptions(false);
+              }
+            })
+            .catch(err => {
+              console.error('Error loading truck numbers:', err);
+            });
+        },
+        onFocus: function() {
+          // Show all options when field is focused
+          truckTomSelect.refreshOptions(false);
         }
       });
     }
@@ -799,7 +875,18 @@
 
     if (data.party_name) document.getElementById('party_name').value = data.party_name;
     if (data.from_center) document.getElementById('from_center').value = sanitizeFromCenter(data.from_center);
-    if (data.truck_no) document.getElementById('truck_no').value = data.truck_no;
+    if (data.truck_no) {
+      if (truckTomSelect) {
+        // Add option if it doesn't exist, then set value
+        truckTomSelect.addOption({
+          value: data.truck_no,
+          text: data.truck_no
+        });
+        truckTomSelect.setValue(data.truck_no, true);
+      } else {
+        document.getElementById('truck_no').value = data.truck_no;
+      }
+    }
     if (data.main_party) document.getElementById('main_party').value = data.main_party;
     if (data.sub_party) document.getElementById('sub_party').value = data.sub_party;
 
@@ -1457,7 +1544,18 @@
       document.getElementById('challan_error').textContent = '{{ challan_error|escapejs }}';
       {% endif %}
     }
-    if (formData['truck_no']) document.getElementById('truck_no').value = formData['truck_no'];
+    if (formData['truck_no']) {
+      if (truckTomSelect) {
+        // Add option if it doesn't exist, then set value
+        truckTomSelect.addOption({
+          value: formData['truck_no'],
+          text: formData['truck_no']
+        });
+        truckTomSelect.setValue(formData['truck_no'], true);
+      } else {
+        document.getElementById('truck_no').value = formData['truck_no'];
+      }
+    }
     if (formData['product_name']) {
       const productSelectEl = document.getElementById('product_name');
       if (productSelectEl) {

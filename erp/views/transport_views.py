@@ -1,5 +1,6 @@
 from django.shortcuts import render ,redirect ,get_object_or_404
 from django.contrib import messages
+from django.core.cache import cache
 from company.models import Company_user , Company_profile
 from transport.models import Rate , T_Contract ,Dispatch ,Destination ,Rate_taluka , Rate_District ,Rate_IncomeTax , Rate_Cumulative , Invoice , GC_Note
 from datetime import datetime
@@ -641,6 +642,12 @@ def dispatch_form(request):
             taluka=request.POST.get("taluka"),
             km=km_value,
         )
+        
+        # Invalidate truck numbers cache for this company
+        company_id = request.session['company_info']['company_id']
+        cache_key = f'truck_numbers_{company_id}'
+        cache.delete(cache_key)
+        
         messages.success(request, "Dispatch Added successfully")
         return redirect("dispatch-view")
 
@@ -830,6 +837,11 @@ def dispatch_update(request):
                 taluka=request.POST.get("taluka"),
                 defaults={"km": request.POST.get("km") or 0},
             )
+
+            # Invalidate truck numbers cache for this company
+            company_id = request.session['company_info']['company_id']
+            cache_key = f'truck_numbers_{company_id}'
+            cache.delete(cache_key)
 
             messages.success(request, "Dispatch updated successfully")
             return redirect("dispatch-view")
