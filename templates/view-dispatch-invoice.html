@@ -114,7 +114,10 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script>
   document.querySelectorAll('.ts-select').forEach((el) => {
-    let settings = {};
+    // Show all invoices in the dropdown (no 50-option limit)
+    let settings = {
+      maxOptions: 100000  // effectively unlimited for typical usage
+    };
     new TomSelect(el, settings);
   });
 </script>

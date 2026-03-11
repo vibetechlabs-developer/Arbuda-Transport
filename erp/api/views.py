@@ -240,9 +240,12 @@ def get_dispacth(request):
     try:
         contract = T_Contract.objects.get(id=dcontract_id)
         try:
+            # Only fetch dispatches which are **not** already linked to any invoice
+            # so that already-billed entries do not appear again on invoice creation.
             dispatch = Dispatch.objects.filter(
                 contract_id=dcontract_id,
-                company_id=request.session['company_info']['company_id']
+                company_id=request.session['company_info']['company_id'],
+                inv_status=False,
             )
             
             # Filter by financial year

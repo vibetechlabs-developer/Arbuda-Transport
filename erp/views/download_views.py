@@ -325,9 +325,20 @@ def generate_invoice_pdf(request):
         }
         data = [[label_map.get(f, f.replace("_", " ").title()) for f in active_fields]]
 
-        numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
-                          "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
-        center_fields = ["sr_no", "gc_note"]
+        # Treat only true amount/quantity columns as numeric-right aligned.
+        # Keep KM, shipment (dc_field) and truck no centered for better readability
+        # and to avoid visual mixing of values under adjacent headers.
+        numeric_fields = [
+            "weight",
+            "rate",
+            "luggage",
+            "unloading_charge_1",
+            "amount",
+            "loading_charge",
+            "totalfreight",
+            "unloading_charge_2",
+        ]
+        center_fields = ["sr_no", "gc_note", "km", "dc_field", "truck_no"]
 
         # Improved typography - optimized so header + rows + TOTAL + signatures stay on one page
         # Use slightly tighter text for download PDF to guarantee signatures do not spill to a new page.
@@ -1011,9 +1022,20 @@ def download_generate_invoice_pdf(request):
         }
         data = [[label_map.get(f, f.replace("_", " ").title()) for f in active_fields]]
 
-        numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
-                          "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
-        center_fields = ["sr_no", "gc_note"]
+        # Same alignment rules as invoice creation PDF:
+        # numeric amount/quantity columns right aligned,
+        # KM, shipment (dc_field) and truck no centered.
+        numeric_fields = [
+            "weight",
+            "rate",
+            "luggage",
+            "unloading_charge_1",
+            "amount",
+            "loading_charge",
+            "totalfreight",
+            "unloading_charge_2",
+        ]
+        center_fields = ["sr_no", "gc_note", "km", "dc_field", "truck_no"]
 
         # Fixed compact sizing so header + up to 12 rows + TOTAL + footer
         # reliably fit on a single landscape A4 page without text breaking across lines.
