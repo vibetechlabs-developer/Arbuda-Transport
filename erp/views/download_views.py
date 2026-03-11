@@ -765,58 +765,55 @@ def generate_invoice_pdf(request):
 
             page_no += 1
 
-    # ---- Signature (show ONCE after full invoice) ----
-    # Create signature styles with larger fonts
-    sig_label_style = ParagraphStyle(
-        name="SignatureLabel",
-        fontName="Helvetica-Bold",
-        fontSize=11,
-        alignment=1,  # center
-        leading=14,
-        spaceAfter=6
-    )
-    sig_name_style = ParagraphStyle(
-        name="SignatureName",
-        fontName="Helvetica",
-        fontSize=10,
-        alignment=1,  # center
-        leading=12,
-        spaceAfter=2
-    )
-    sig_right_style_sig = ParagraphStyle(
-        name="SignatureRight",
-        fontName="Helvetica-Bold",
-        fontSize=11,
-        alignment=2,  # right
-        leading=14,
-        spaceAfter=6
-    )
-    
-    signature_data = [
-        [
-            Paragraph(f"<b>Verified By</b><br/><br/><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u><br/><br/><br/>{request.POST.get('v_by_name') or ''}", sig_label_style),
-            Paragraph(f"<b>Recommended By</b><br/><br/><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u><br/><br/><br/>{request.POST.get('r_by_name') or ''}", sig_label_style),
-            Paragraph(f"<b>For, {request.session['company_info']['company_name']}</b><br/><br/><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>", sig_right_style_sig),
-        ]
-    ]
-    sig_col_width = available_width / 3 - 2
-    # Fixed height tuned so header + 12 rows + TOTAL + signatures fit on a single page.
-    signature_table = Table(signature_data, colWidths=[sig_col_width, sig_col_width, sig_col_width], rowHeights=[105])
-    signature_table.setStyle(TableStyle([
-        ("ALIGN", (0,0), (0,0), "CENTER"),
-        ("ALIGN", (1,0), (1,0), "CENTER"),
-        ("ALIGN", (2,0), (2,0), "CENTER"),
-        ("VALIGN", (0,0), (-1,-1), "TOP"),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("LEFTPADDING", (0,0), (-1,-1), 4),
-        ("RIGHTPADDING", (0,0), (-1,-1), 4),
-    ]))
-    elements.append(Spacer(1, 12))
-    elements.append(KeepTogether([signature_table]))
+    # ---- Signature footer (show on EVERY page) ----
+    # Capture names once so they can be reused in the page footer callback
+    v_by_name = request.POST.get("v_by_name") or ""
+    r_by_name = request.POST.get("r_by_name") or ""
+
+    def invoice_footer(canvas, doc):
+        """
+        Draw "Verified By / Recommended By / For, <Company>" footer
+        at the bottom of every invoice page.
+        """
+        canvas.saveState()
+        # Slightly higher so it visually matches the earlier design
+        footer_y = 25 * mm
+
+        # 3 equal sections across the printable width (same as table width)
+        x_start = doc.leftMargin
+        usable_width = doc.width
+        col_width = usable_width / 3.0
+
+        labels = ["Verified By", "Recommended By", f"For, {request.session['company_info']['company_name']}"]
+        names = [v_by_name, r_by_name, ""]
+
+        canvas.setFont("Helvetica-Bold", 11)
+        for idx in range(3):
+            col_x_center = x_start + col_width * (idx + 0.5)
+
+            # Label (above the line)
+            canvas.drawCentredString(col_x_center, footer_y + 8, labels[idx])
+
+            # Signature line (fixed, similar to original design width)
+            line_half = 25 * mm
+            canvas.setLineWidth(0.7)
+            canvas.line(
+                col_x_center - line_half,
+                footer_y + 2,
+                col_x_center + line_half,
+                footer_y + 2,
+            )
+
+            # Name text (under the line) – skip for company column
+            if names[idx]:
+                canvas.setFont("Helvetica", 9)
+                canvas.drawCentredString(col_x_center, footer_y - 6, names[idx])
+                canvas.setFont("Helvetica-Bold", 11)
+
+        canvas.restoreState()
 
     # --- Build PDF ---
-    doc.build(elements)
+    doc.build(elements, onFirstPage=invoice_footer, onLaterPages=invoice_footer)
     buffer.seek(0)
     filename = f"{contract.company_name}_{i_bill_no.replace('/','-')}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
@@ -1442,57 +1439,49 @@ def download_generate_invoice_pdf(request):
                 )
             )
 
-    # ---- Signature (show ONCE after full invoice) ----
-    # Create signature styles with larger fonts
-    sig_label_style_dl = ParagraphStyle(
-        name="SignatureLabelDL",
-        fontName="Helvetica-Bold",
-        fontSize=11,
-        alignment=1,  # center
-        leading=14,
-        spaceAfter=6
-    )
-    sig_name_style_dl = ParagraphStyle(
-        name="SignatureNameDL",
-        fontName="Helvetica",
-        fontSize=10,
-        alignment=1,  # center
-        leading=12,
-        spaceAfter=2
-    )
-    sig_right_style_dl = ParagraphStyle(
-        name="SignatureRightDL",
-        fontName="Helvetica-Bold",
-        fontSize=11,
-        alignment=2,  # right
-        leading=14,
-        spaceAfter=6
-    )
-    
-    signature_data = [
-        [
-            Paragraph(f"<b>Verified By</b><br/><br/><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u><br/><br/><br/>{request.POST.get('v_by_name') or ''}", sig_label_style_dl),
-            Paragraph(f"<b>Recommended By</b><br/><br/><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u><br/><br/><br/>{request.POST.get('r_by_name') or ''}", sig_label_style_dl),
-            Paragraph(f"<b>For, {request.session['company_info']['company_name']}</b><br/><br/><u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>", sig_right_style_dl),
-        ]
-    ]
-    sig_col_width = available_width / 3 - 2
-    signature_table = Table(signature_data, colWidths=[sig_col_width, sig_col_width, sig_col_width], rowHeights=[105])
-    signature_table.setStyle(TableStyle([
-        ("ALIGN", (0,0), (0,0), "CENTER"),
-        ("ALIGN", (1,0), (1,0), "CENTER"),
-        ("ALIGN", (2,0), (2,0), "CENTER"),
-        ("VALIGN", (0,0), (-1,-1), "TOP"),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("LEFTPADDING", (0,0), (-1,-1), 4),
-        ("RIGHTPADDING", (0,0), (-1,-1), 4),
-    ]))
-    elements.append(Spacer(1, 12))
-    elements.append(KeepTogether([signature_table]))
+    # ---- Signature footer (show on EVERY page) ----
+    v_by_name_dl = request.POST.get("v_by_name") or ""
+    r_by_name_dl = request.POST.get("r_by_name") or ""
+
+    def invoice_footer_dl(canvas, doc):
+        """
+        Draw "Verified By / Recommended By / For, <Company>" footer
+        at the bottom of every downloaded invoice page.
+        """
+        canvas.saveState()
+        footer_y = 25 * mm
+
+        x_start = doc.leftMargin
+        usable_width = doc.width
+        col_width = usable_width / 3.0
+
+        labels = ["Verified By", "Recommended By", f"For, {request.session['company_info']['company_name']}"]
+        names = [v_by_name_dl, r_by_name_dl, ""]
+
+        canvas.setFont("Helvetica-Bold", 11)
+        for idx in range(3):
+            col_x_center = x_start + col_width * (idx + 0.5)
+
+            canvas.drawCentredString(col_x_center, footer_y + 8, labels[idx])
+
+            line_half = 25 * mm
+            canvas.setLineWidth(0.7)
+            canvas.line(
+                col_x_center - line_half,
+                footer_y + 2,
+                col_x_center + line_half,
+                footer_y + 2,
+            )
+
+            if names[idx]:
+                canvas.setFont("Helvetica", 9)
+                canvas.drawCentredString(col_x_center, footer_y - 6, names[idx])
+                canvas.setFont("Helvetica-Bold", 11)
+
+        canvas.restoreState()
 
     # --- Build PDF ---
-    doc.build(elements)
+    doc.build(elements, onFirstPage=invoice_footer_dl, onLaterPages=invoice_footer_dl)
     buffer.seek(0)
     filename = f"{contract.company_name}_{invoice.Bill_no.replace('/','-')}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
