@@ -625,7 +625,8 @@
           field !== "depature_date" &&
           field !== "dep_date" &&
           field !== "dc_field" &&
-          field !== "km"
+          field !== "km" &&
+          field !== "weight" // Do not show total for weight in invoice footer
         ) {
           const totalValue = totals[field] || 0;
           td.textContent = formatNumber(totalValue);
