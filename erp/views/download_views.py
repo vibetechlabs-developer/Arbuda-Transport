@@ -265,22 +265,11 @@ def generate_invoice_pdf(request):
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=1):
 
-        # Dynamically hide loading/unloading columns when they are not used at all
-        loading_related_fields = {"unloading_charge_1", "unloading_charge_2", "loading_charge"}
-        unused_loading_fields = set()
-        for f in loading_related_fields:
-            if f in fields:
-                try:
-                    if all(
-                        (getattr(d, f, None) in (None, "", 0, 0.0, "0", "0.0"))
-                        for d in (all_dispatches or dispatches)
-                    ):
-                        unused_loading_fields.add(f)
-                except Exception:
-                    # If anything goes wrong, keep the field rather than breaking layout
-                    pass
-
-        active_fields = [f for f in fields if f not in unused_loading_fields]
+        # Use exactly the fields selected on the contract for the invoice.
+        # Do NOT auto-hide loading / unloading columns even if all values are 0,
+        # because the user expects the column to appear with 0.00 when they have
+        # enabled that field while creating the contract.
+        active_fields = list(fields)
 
         # Always keep main_party and sub_party (if enabled in invoice_fields)
         # and reposition them so they appear directly after dc_field.
@@ -486,7 +475,11 @@ def generate_invoice_pdf(request):
                     row.append(_money(getattr(d, field, None)))
                 elif field in ("weight",):
                     row.append(_num(getattr(d, field, None), decimals=3))
-                elif field in ("km", "rate"):
+                elif field == "km":
+                    # Show km without unnecessary trailing zeros (e.g., 10.00 → 10, 10.50 → 10.5)
+                    row.append(_num_exact(getattr(d, field, None)))
+                elif field == "rate":
+                    # Keep rate with 2 fixed decimals
                     row.append(_num(getattr(d, field, None), decimals=2))
                 else:
                     # Avoid 'None' showing in PDF
@@ -745,7 +738,7 @@ def generate_invoice_pdf(request):
             if i > 0: elements.append(PageBreak())
 
             elements.append(header_table)
-            elements.append(Spacer(1, 2))  # Minimal spacing for 12 rows per page
+            elements.append(Spacer(1, 2))  # Tight spacing so table + footer stay on one page
 
             # TO Table
             to_content = [
@@ -959,22 +952,11 @@ def download_generate_invoice_pdf(request):
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=1):
 
-        # Dynamically hide loading/unloading columns when they are not used at all
-        loading_related_fields = {"unloading_charge_1", "unloading_charge_2", "loading_charge"}
-        unused_loading_fields = set()
-        for f in loading_related_fields:
-            if f in fields:
-                try:
-                    if all(
-                        (getattr(d, f, None) in (None, "", 0, 0.0, "0", "0.0"))
-                        for d in (all_dispatches or dispatches)
-                    ):
-                        unused_loading_fields.add(f)
-                except Exception:
-                    # If anything goes wrong, keep the field rather than breaking layout
-                    pass
-
-        active_fields = [f for f in fields if f not in unused_loading_fields]
+        # Use exactly the fields selected on the contract for the invoice download.
+        # Do NOT auto-hide loading / unloading columns even if all values are 0,
+        # because the user expects the column to appear with 0.00 when they have
+        # enabled that field while creating the contract.
+        active_fields = list(fields)
 
         # Always keep main_party and sub_party (if enabled in invoice_fields)
         # and reposition them so they appear directly after dc_field.
@@ -1033,20 +1015,10 @@ def download_generate_invoice_pdf(request):
                           "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
         center_fields = ["sr_no", "gc_note"]
 
-        # Improved typography - optimized for up to 12 rows per page
-        # Use slightly larger fonts for invoices with fewer rows so they visually fill the page more.
-        total_dispatch_count = len(all_dispatches or dispatches)
-        compact = True  # Always use compact mode for 12 rows per page
-        row_count = len(dispatch_subset)
-        if total_dispatch_count <= 8:
-            compact_fs = 10.5
-            compact_leading = 13
-        elif total_dispatch_count <= 10:
-            compact_fs = 10
-            compact_leading = 12
-        else:
-            compact_fs = 9
-            compact_leading = 11
+        # Fixed compact sizing so header + up to 12 rows + TOTAL + footer
+        # reliably fit on a single landscape A4 page without text breaking across lines.
+        compact_fs = 8.0
+        compact_leading = 9
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocalDl",
@@ -1184,7 +1156,11 @@ def download_generate_invoice_pdf(request):
                     row.append(_money(getattr(d, field, None)))
                 elif field in ("weight",):
                     row.append(_num(getattr(d, field, None), decimals=3))
-                elif field in ("km", "rate"):
+                elif field == "km":
+                    # Show km without unnecessary trailing zeros (e.g., 10.00 → 10, 10.50 → 10.5)
+                    row.append(_num_exact(getattr(d, field, None)))
+                elif field == "rate":
+                    # Keep rate with 2 fixed decimals
                     row.append(_num(getattr(d, field, None), decimals=2))
                 else:
                     v = getattr(d, field, "")
@@ -1391,7 +1367,7 @@ def download_generate_invoice_pdf(request):
                 
                 # Header
                 elements.append(header_table)
-                elements.append(Spacer(1, 4))  # Minimal spacing for 12 rows per page
+                elements.append(Spacer(1, 3))  # Tight spacing so table + footer stay on one page
 
                 # TO Table with Page number
                 to_content = [
@@ -1404,7 +1380,7 @@ def download_generate_invoice_pdf(request):
                 ]
                 bill_no_content = [
                     Paragraph(f"Bill No : {invoice.Bill_no}", to_style),
-                    Paragraph(f"Bill Date : {bill_date.strftime("%d-%m-%Y")}", to_style),
+                    Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
                     Paragraph(f"From : {contract.from_center}", to_style),
                     Paragraph(f"District : {district}", to_style),
                     Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
@@ -1431,7 +1407,8 @@ def download_generate_invoice_pdf(request):
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
-                elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
+                # Slightly reduced spacing so footer never overflows to next page
+                elements.append(Spacer(1, 25))
 
     else:
         page_no = 1
@@ -1493,7 +1470,8 @@ def download_generate_invoice_pdf(request):
                     start_index=(i + 1),
                 )
             )
-            elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
+            # Slightly reduced spacing so footer never overflows to next page
+            elements.append(Spacer(1, 25))
 
     # ---- Signature footer (show on EVERY page) ----
     v_by_name_dl = request.POST.get("v_by_name") or ""
