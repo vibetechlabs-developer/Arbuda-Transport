@@ -1,7 +1,7 @@
 {% extends 'masterpage.html' %}
 <!-- Content -->
 {% block title %}
-<title>ARBUDA | Client Reports </title>
+<title>ARBUDA | Outstanding Reports </title>
 {% endblock %}
 
 
@@ -17,7 +17,7 @@
 
 <div class="container-xxl">
   <div class="header d-flex justify-content-between align-items-center mt-2">
-    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Create Report For Client</h4>
+    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Outstanding Dispatch Report</h4>
   </div>
   <div class="authentication-wrapper authentication-basic container-p-y pt-0">
     <div class="authentication-inner w-100" style="max-width: 100%;">
@@ -26,7 +26,9 @@
         <div class="card-body">
           <form id="" class="mb-3" method="POST" action="download-report">
             {% csrf_token %}
-            <h5 class="text-primary fw-semibold mb-3">Report Details</h5>
+            <!-- Flag so backend knows this is OUTSTANDING mode -->
+            <input type="hidden" name="outstanding_only" value="true" />
+            <h5 class="text-primary fw-semibold mb-3">Outstanding Report Details</h5>
             <div class="row">
               <div class="mb-3 col-sm-6">
                 <label for="contract_no" class="form-label">Contract no.</label>
@@ -98,7 +100,7 @@
                 document.getElementById("p_from_date").required = (value === "product_wise");
                 document.getElementById("p_to_date").required = (value === "product_wise");
                 document.getElementsByName("product_name").required = (value === "product_wise");
-                
+
                 // Reinitialize TomSelect when product field becomes visible
                 if (value === "product_wise") {
                   setTimeout(() => {
@@ -110,20 +112,20 @@
                     }
                   }, 200);
                 }
-                
+
                 // Refresh preview when report type changes
                 setTimeout(() => {
                   fetchReportPreview();
                 }, 100);
               });
-              
+
               // Add event listeners for date fields to trigger preview
-              document.addEventListener("DOMContentLoaded", function() {
+              document.addEventListener("DOMContentLoaded", function () {
                 const dFromDate = document.getElementById("d_from_date");
                 const dToDate = document.getElementById("d_to_date");
                 const pFromDate = document.getElementById("p_from_date");
                 const pToDate = document.getElementById("p_to_date");
-                
+
                 if (dFromDate) {
                   dFromDate.addEventListener("change", fetchReportPreview);
                 }
@@ -136,12 +138,12 @@
                 if (pToDate) {
                   pToDate.addEventListener("change", fetchReportPreview);
                 }
-                
+
                 // Try to fetch preview on page load if all required fields are filled
                 setTimeout(() => {
                   const contract_id = contractTomSelect ? contractTomSelect.getValue() : document.getElementById("contract_no")?.value;
                   const reportType = document.getElementById("type_of_report")?.value;
-                  
+
                   if (contract_id && reportType) {
                     if (reportType === "date_wise") {
                       const from = dFromDate?.value;
@@ -170,7 +172,7 @@
                 <small class="text-muted">Fixed at 15 entries per page</small>
               </div>
             </div>
-            
+
             <div class="row mt-3">
               <div class="col-sm-6">
                 <label for="v_by_name" class="form-label">Verified By Name</label>
@@ -182,7 +184,7 @@
               </div>
             </div>
 
-            <h5 class="text-primary fw-semibold mb-3 mt-3">Report Preview</h5>
+            <h5 class="text-primary fw-semibold mb-3 mt-3">Outstanding Dispatch Preview</h5>
             <div class="row">
               <div class="table-responsive mb-3">
                 <table id="dispatchTable" class="table table-bordered ">
@@ -198,10 +200,10 @@
             </div>
             <div class="col-sm-6 d-flex gap-2">
               <button type="submit" name="export_type" value="pdf" class="btn btn-primary flex-fill">
-                Generate Report
+                Generate Outstanding Report
               </button>
               <button type="submit" name="export_type" value="csv" class="btn btn-outline-secondary flex-fill">
-                Export CSV
+                Export Outstanding CSV
               </button>
             </div>
           </form>
@@ -222,7 +224,7 @@
   const contractSelect = document.getElementById("contract_no");
   if (contractSelect) {
     contractTomSelect = new TomSelect(contractSelect, {
-      onChange: function(value) {
+      onChange: function (value) {
         // Call onContractChange when contract changes
         onContractChange();
       }
@@ -245,17 +247,17 @@
       console.warn('select-beast element not found');
       return;
     }
-    
+
     // Destroy existing instance if any
     if (tomSelectInstance) {
       try {
         tomSelectInstance.destroy();
-      } catch(e) {
+      } catch (e) {
         console.warn('Error destroying TomSelect:', e);
       }
       tomSelectInstance = null;
     }
-    
+
     // Create new instance
     try {
       tomSelectInstance = new TomSelect("#select-beast", {
@@ -265,7 +267,7 @@
           direction: "asc"
         },
         placeholder: "Select Product Name",
-        onChange: function(value) {
+        onChange: function (value) {
           // Refresh preview when product changes
           setTimeout(() => {
             fetchReportPreview();
@@ -273,7 +275,7 @@
         }
       });
       console.log('TomSelect initialized successfully');
-    } catch(e) {
+    } catch (e) {
       console.error('Error initializing TomSelect:', e);
       tomSelectInstance = null;
     }
@@ -298,12 +300,12 @@
         }
         return;
       }
-      
+
       // Ensure TomSelect is initialized
       if (!tomSelectInstance) {
         initializeProductSelect();
       }
-      
+
       fetch(`/api/get-dispacth-product?contract-id=${encodeURIComponent(contract_id)}`)
         .then(response => {
           if (!response.ok) {
@@ -358,22 +360,22 @@
 
   function updateDestinations(product_list) {
     console.log('updateDestinations called with:', product_list);
-    
+
     // Ensure TomSelect is initialized
     if (!tomSelectInstance) {
       console.log('Initializing TomSelect...');
       initializeProductSelect();
     }
-    
+
     if (!tomSelectInstance) {
       console.error('TomSelect instance not available after initialization');
       return;
     }
-    
+
     // Clear old options
     tomSelectInstance.clearOptions();
     tomSelectInstance.clear();
-    
+
     // Add new options
     if (product_list && product_list.length > 0) {
       console.log('Adding', product_list.length, 'products to dropdown');
@@ -386,13 +388,13 @@
           });
         }
       });
-      
+
       // Add all options at once
       tomSelectInstance.addOptions(options);
-      
+
       // Refresh the dropdown to show new options
       tomSelectInstance.refreshOptions(false);
-      
+
       console.log('Products added successfully. Options count:', tomSelectInstance.options.length);
     } else {
       console.warn('No products to add');
@@ -416,7 +418,7 @@
       return;
     }
 
-    let url = `/api/get-report-dispacth?contract-id=${encodeURIComponent(contract_id)}&type=${encodeURIComponent(reportType)}`;
+    let url = `/api/get-report-dispacth?contract-id=${encodeURIComponent(contract_id)}&type=${encodeURIComponent(reportType)}&outstanding=true`;
 
     if (reportType === "date_wise") {
       const from = document.getElementById("d_from_date").value;
@@ -435,7 +437,7 @@
       url += `&product_name=${encodeURIComponent(productName)}&p_from_date=${encodeURIComponent(from)}&p_to_date=${encodeURIComponent(to)}`;
     }
 
-    console.log('Fetching report preview from:', url);
+    console.log('Fetching outstanding report preview from:', url);
     fetch(url)
       .then(response => {
         if (!response.ok) {
@@ -446,7 +448,7 @@
         return response.json();
       })
       .then(data => {
-        console.log('Report preview data received:', data);
+        console.log('Outstanding report preview data received:', data);
         if (data.error) {
           console.error('API error:', data.error);
           // Clear table on error
@@ -459,7 +461,7 @@
           if (tableFooterRow) tableFooterRow.innerHTML = "";
           return;
         }
-        
+
         if (data.destinations && Array.isArray(data.destinations)) {
           allDispatches = data.destinations;
           allfield = data.fields || [];
@@ -483,7 +485,7 @@
         }
       })
       .catch(err => {
-        console.error('Error fetching report preview:', err);
+        console.error('Error fetching outstanding report preview:', err);
         // Clear table on error
         allDispatches = [];
         const tableHeader = document.getElementById("tableHeader");
@@ -494,6 +496,7 @@
         if (tableFooterRow) tableFooterRow.innerHTML = "";
       });
   }
+
   function updateProduct(product_list) {
     tomSelectInstance.clearOptions(); // remove old options
     product_list.forEach(product => {
@@ -502,8 +505,6 @@
         text: product,
       });
     });
-    // tomSelectInstance.refreshOptions(); // refresh the dropdown
-    // if (destinations.length > 0) tomSelectInstance.setValue(destinations[0].id);
   }
 
   let currentSearch = "";
@@ -513,6 +514,7 @@
     if (!allfield || !allfield.length) return;
     renderTable(allDispatches, allfield);
   }
+
   function isNumericValue(value) {
     if (value === null || value === undefined || value === "") return false;
     const num = parseFloat(value);
@@ -523,47 +525,52 @@
     return Number.isInteger(value) ? value : Number(value).toFixed(2);
   }
 
+  // Render table similar to Client Report preview, but without checkboxes.
   function renderTable(dispatches, fields) {
     const tableHeader = document.getElementById("tableHeader");
     const tableBody = document.getElementById("tableBody");
     const tableFooterRow = document.getElementById("tableFooterRow");
 
+    if (!tableHeader || !tableBody || !tableFooterRow) {
+      console.warn("Table elements not found");
+      return;
+    }
+
     tableHeader.innerHTML = "";
     tableBody.innerHTML = "";
-    if (tableFooterRow) tableFooterRow.innerHTML = "";
+    tableFooterRow.innerHTML = "";
 
     const totals = {};
     const numericFields = new Set();
 
     const recordTotal = (field, rawValue) => {
-      // Skip totals for date, challan no, km, and rate (but DO total weight)
-      if (field === "depature_date" || field === "dep_date" || 
-          field === "dc_field" || field === "challan_no" || 
-          field === "km" || field === "rate") {
-        return;
-      }
+      // Skip totals for non-amount text fields (party, destination, taluka, district, etc.)
+      // and for date / challan / km / rate columns. We mainly total weight + money columns.
+      const nonTotalFields = new Set([
+        "sr_no",
+        "depature_date",
+        "dep_date",
+        "dc_field",
+        "challan_no",
+        "party_name",
+        "destination",
+        "taluka",
+        "district",
+        "product_name",
+        "product",
+        "truck_no",
+        "km",
+        "rate",
+      ]);
+      if (nonTotalFields.has(field)) return;
       if (!isNumericValue(rawValue)) return;
       const num = parseFloat(rawValue);
       totals[field] = (totals[field] || 0) + num;
       numericFields.add(field);
     };
 
-    // Ensure selectAll checkbox is unchecked when rendering table
-    const selectAll = document.getElementById("selectAll");
-    if (selectAll) {
-      selectAll.checked = false;
-    }
-
     // Header
-    const th1 = document.createElement("th");
-    const selectAllCheckbox = document.createElement("input");
-    selectAllCheckbox.type = "checkbox";
-    selectAllCheckbox.id = "selectAll";
-    selectAllCheckbox.onchange = toggleAllDispatches;
-    th1.appendChild(selectAllCheckbox);
-    tableHeader.appendChild(th1);
-
-    fields.forEach(field => {
+    fields.forEach((field) => {
       const th = document.createElement("th");
       th.textContent = field.replace(/_/g, " ");
       th.style.whiteSpace = "nowrap";
@@ -574,18 +581,7 @@
     dispatches.forEach((dest, index) => {
       const tr = document.createElement("tr");
 
-      // Checkbox
-      const checkboxTd = document.createElement("td");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.name = "dispatch_ids";
-      checkbox.value = dest.id;
-      checkbox.classList.add("row-checkbox");
-      checkboxTd.appendChild(checkbox);
-      tr.appendChild(checkboxTd);
-
-      // Fields
-      fields.forEach(field => {
+      fields.forEach((field) => {
         const td = document.createElement("td");
         let rawValue = dest[field];
         if (field === "sr_no") {
@@ -595,17 +591,17 @@
           td.style.whiteSpace = "nowrap";
           rawValue = dest.dep_date || "";
           td.textContent = rawValue;
-        } else if (field === "dc_field") {
-          td.style.whiteSpace = "wrap"
+        } else if (field === "dc_field" || field === "None") {
+          td.style.whiteSpace = "wrap";
           rawValue = dest.challan_no?.toString() || "";
-          td.innerHTML = highlightText(rawValue, currentSearch);
-        } else if (field === "luggage") {
+          td.textContent = rawValue;
+        } else if (field === "luggage" || field === "totalfreight") {
           rawValue = dest.totalfreight || "";
           td.textContent = rawValue;
-        } else if (field === "product") {
+        } else if (field === "product_name" || field === "product") {
           rawValue = dest.product_name || "";
           td.textContent = rawValue;
-        } else if (field === "amount") {
+        } else if (field === "amount" || field === "grand_total") {
           rawValue = dest.grand_total;
           td.textContent = rawValue;
         } else if (field === "gc_note") {
@@ -613,7 +609,7 @@
           td.textContent = rawValue;
         } else {
           rawValue = dest[field]?.toString() || "";
-          td.innerHTML = highlightText(rawValue, currentSearch);
+          td.textContent = rawValue;
         }
         if (field !== "sr_no") {
           recordTotal(field, rawValue);
@@ -624,51 +620,25 @@
       tableBody.appendChild(tr);
     });
 
-    if (tableFooterRow) {
-      const labelTd = document.createElement("td");
-      labelTd.textContent = "Totals";
-      tableFooterRow.appendChild(labelTd);
-
-      fields.forEach(field => {
-        const td = document.createElement("td");
-        if (numericFields.has(field)) {
-          const totalValue = totals[field] || 0;
-          td.textContent = formatNumber(totalValue);
-        } else {
-          td.textContent = "";
-        }
-        tableFooterRow.appendChild(td);
-      });
-    }
-  }
-  function highlightText(text, search) {
-    if (!search) return text; // if no search, return plain text
-    const regex = new RegExp(`(${search})`, "gi"); // case-insensitive
-    return text.replace(regex, `<mark>$1</mark>`);
-  }
-
-  function toggleAllDispatches() {
-    const selectAll = document.getElementById("selectAll");
-    const checkboxes = document.querySelectorAll(".row-checkbox");
-    checkboxes.forEach(checkbox => {
-      checkbox.checked = selectAll.checked;
+    // Footer totals row (same column count as header/body)
+    // "TOTAL" label should always appear under SR NO (first column),
+    // and numeric totals under numeric columns only.
+    fields.forEach((field, index) => {
+      const td = document.createElement("td");
+      if (index === 0) {
+        td.textContent = "TOTAL";
+        td.style.fontWeight = "bold";
+      } else if (numericFields.has(field)) {
+        const totalValue = totals[field] || 0;
+        td.textContent = formatNumber(totalValue);
+        td.style.fontWeight = "bold";
+      } else {
+        td.textContent = "";
+      }
+      tableFooterRow.appendChild(td);
     });
   }
-
-  // Hook up preview refresh when date/product filters change
-  document.addEventListener("DOMContentLoaded", function () {
-    const dFrom = document.getElementById("d_from_date");
-    const dTo = document.getElementById("d_to_date");
-    const pFrom = document.getElementById("p_from_date");
-    const pTo = document.getElementById("p_to_date");
-
-    if (dFrom) dFrom.addEventListener("change", fetchReportPreview);
-    if (dTo) dTo.addEventListener("change", fetchReportPreview);
-    if (pFrom) pFrom.addEventListener("change", fetchReportPreview);
-    if (pTo) pTo.addEventListener("change", fetchReportPreview);
-  });
-
 </script>
 
-
 {% endblock %}
+

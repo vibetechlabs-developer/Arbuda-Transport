@@ -88,6 +88,7 @@ def Company_profile_view(request):
         # Validate on server (JS validation exists but must not be trusted).
         errors = {}
         values = {
+            "company_name": (request.POST.get('company_name') or '').strip(),
             "pan_number": (request.POST.get('pan_number') or '').strip().upper(),
             "address": (request.POST.get('address') or '').strip(),
             "state": (request.POST.get('state') or '').strip(),
@@ -95,6 +96,7 @@ def Company_profile_view(request):
             "pin": (request.POST.get('pin') or '').strip(),
         }
 
+        cname = values["company_name"]
         rpan_number = values["pan_number"]
         raddress = values["address"]
         rstate = values["state"]
@@ -104,6 +106,12 @@ def Company_profile_view(request):
         rp_status = request.POST.get('p_status')
 
         try:
+            # Company name validation (common for create & update)
+            if not cname:
+                errors['company_name'] = "Company name is required."
+            elif Company_user.objects.filter(company_name=cname).exclude(id=company.id).exists():
+                errors['company_name'] = "This company name already exists. Try a different one."
+
             if rp_status == 'update':
                 profile = Company_profile.objects.get(company_id=company)
                 if profile.pan_number != rpan_number:
@@ -122,6 +130,9 @@ def Company_profile_view(request):
                     alldata['errors'] = errors
                     alldata['values'] = values
                     return render(request, 'company_profile_form.html', alldata)
+                # Update company basic info
+                company.company_name = cname
+                company.save()
                 profile.address = raddress
                 profile.state = rstate
                 profile.city = rcity
@@ -155,6 +166,9 @@ def Company_profile_view(request):
                     alldata['values'] = values
                     return render(request, 'company_profile_form.html', alldata)
                 
+                # Update company basic info even when creating profile
+                company.company_name = cname
+                company.save()
                 new_profile = Company_profile(
                     company_id = company,
                     pan_number = rpan_number,

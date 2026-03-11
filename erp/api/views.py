@@ -841,6 +841,14 @@ def get_report_dispatches(request):
     contract_id = request.GET.get("contract-id")
     report_type = request.GET.get("type")
     company_id = request.session["company_info"]["company_id"]
+    # Optional flag: when true, only return dispatches that are NOT billed yet
+    # (inv_status = False). Used by the Outstanding Report screen.
+    outstanding_only = (request.GET.get("outstanding") or "").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
     if not contract_id or not report_type:
         return JsonResponse(
@@ -875,13 +883,16 @@ def get_report_dispatches(request):
                 status=400,
             )
         
-        # Match exact filter from download_report line 76-80
+        # Match filter from download_report but allow optional outstanding-only mode
         qs = Dispatch.objects.filter(
             contract_id=contract_id,
             product_name=product_name,
             dep_date__range=(f_from_date, f_to_date),
             company_id=company_id
-        ).order_by('dep_date')
+        )
+        if outstanding_only:
+            qs = qs.filter(inv_status=False)
+        qs = qs.order_by("dep_date")
 
     elif report_type == "date_wise":
         d_from_date = request.GET.get("d_from_date")
@@ -903,12 +914,15 @@ def get_report_dispatches(request):
                 status=400,
             )
         
-        # Match exact filter from download_report line 86-89
+        # Match filter from download_report but allow optional outstanding-only mode
         qs = Dispatch.objects.filter(
             contract_id=contract_id,
             dep_date__range=(f_from_date, f_to_date),
             company_id=company_id
-        ).order_by('dep_date')
+        )
+        if outstanding_only:
+            qs = qs.filter(inv_status=False)
+        qs = qs.order_by("dep_date")
     else:
         return JsonResponse({"error": "Invalid report type"}, status=400)
 

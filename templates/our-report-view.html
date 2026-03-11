@@ -17,13 +17,16 @@
 <div class="container-xxl">
   <div class="header d-flex justify-content-between align-items-center mt-2">
     <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Create Report For US</h4>
+    <button type="submit" form="internalReportForm" name="export_type" value="csv" class="btn btn-outline-secondary">
+      Export CSV
+    </button>
   </div>
   <div class="authentication-wrapper authentication-basic container-p-y pt-0">
     <div class="authentication-inner w-100" style="max-width: 100%;">
       <!-- Register Card -->
       <div class="card">
         <div class="card-body">
-          <form id="" class="mb-3" method="POST" action="download-our-report">
+          <form id="internalReportForm" class="mb-3" method="POST" action="download-our-report">
             {% csrf_token %}
             <h5 class="text-primary fw-semibold mb-3">Report Details</h5>
             <div class="row">
@@ -174,8 +177,14 @@
                 </table>
               </div>
             </div>
-            <div class="col-sm-6">
-              <button class="btn btn-primary d-grid w-100">Generate Report</button>
+            <!-- Action buttons: show both on all screen sizes -->
+            <div class="col-sm-6 d-flex gap-2">
+              <button type="submit" name="export_type" value="pdf" class="btn btn-primary flex-fill">
+                Generate Report
+              </button>
+              <button type="submit" name="export_type" value="csv" class="btn btn-outline-secondary flex-fill">
+                Export CSV
+              </button>
             </div>
           </form>
         </div>
@@ -524,10 +533,10 @@
     const numericFields = new Set();
 
     const recordTotal = (field, rawValue) => {
-      // Skip totals for date, challan no, km, rate, and weight
+      // Skip totals for date, challan no, km, and rate (but DO total weight)
       if (field === "depature_date" || field === "dep_date" || 
           field === "dc_field" || field === "challan_no" || 
-          field === "km" || field === "rate" || field === "weight") {
+          field === "km" || field === "rate") {
         return;
       }
       if (!isNumericValue(rawValue)) return;

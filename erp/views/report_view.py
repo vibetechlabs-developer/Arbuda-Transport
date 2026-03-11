@@ -46,6 +46,38 @@ def client_report_view(request):
 
 
 @session_required
+def outstanding_report_view(request):
+    """
+    Outstanding report view.
+    Same contract dropdown and filters as client report, but the actual
+    data (PDF/CSV + preview) will only include dispatches whose invoices
+    have NOT been generated yet (inv_status = False).
+    """
+    alldata = {}
+    try:
+        company_id = request.session["company_info"]["company_id"]
+        financial_year = request.session.get(
+            "financial_year", get_current_financial_year()
+        )
+        start_date, end_date = get_financial_year_start_end(financial_year)
+
+        contracts = (
+            T_Contract.objects.filter(company_id_id=company_id)
+            .filter(
+                Q(c_start_date__lte=end_date)
+                & (Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True))
+            )
+            .order_by("-id")
+        )
+        alldata["allcontracts"] = contracts
+    except T_Contract.DoesNotExist:
+        messages.error(request, "No contracts found.")
+        alldata["contracts"] = None
+
+    return render(request, "outstanding-report-view.html", alldata)
+
+
+@session_required
 def download_report(request):
     if request.method == "POST":     
         i_contract_id = request.POST.get("contract_no")
@@ -53,7 +85,15 @@ def download_report(request):
         i_bill_no = request.POST.get("bill_no")
         i_report_type = request.POST.get("type_of_report")
         export_type = request.POST.get("export_type", "pdf")
-        
+        # When called from the Outstanding Report screen, this flag will be set.
+        # In that mode we only include dispatches which are NOT yet billed
+        # (inv_status = False).
+        outstanding_only = (request.POST.get("outstanding_only") or "").lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
 
         # Fetch contract and dispatch data
         try:
@@ -73,20 +113,28 @@ def download_report(request):
             i_p_to_date = request.POST.get("p_to_date")  
             f_from_date = datetime.strptime(i_p_from_date, "%Y-%m-%d").date() if i_p_from_date else None
             f_to_date = datetime.strptime(i_p_to_date, "%Y-%m-%d").date() if i_p_to_date else None
-            dispatches = Dispatch.objects.filter(contract_id = i_contract_id,
-                                              product_name = i_product_name,
-                                              dep_date__range=(i_p_from_date, i_p_to_date),
-                                              company_id = request.session['company_info']['company_id']
-                                              ).order_by('dep_date')
+            dispatches = Dispatch.objects.filter(
+                contract_id=i_contract_id,
+                product_name=i_product_name,
+                dep_date__range=(i_p_from_date, i_p_to_date),
+                company_id=request.session["company_info"]["company_id"],
+            )
+            if outstanding_only:
+                dispatches = dispatches.filter(inv_status=False)
+            dispatches = dispatches.order_by("dep_date")
         elif i_report_type == "date_wise":
             i_d_from_date = request.POST.get("d_from_date")
             i_d_to_date = request.POST.get("d_to_date")
             f_from_date = datetime.strptime(i_d_from_date, "%Y-%m-%d").date() if i_d_from_date else None
             f_to_date = datetime.strptime(i_d_to_date, "%Y-%m-%d").date() if i_d_to_date else None
-            dispatches = Dispatch.objects.filter(contract_id = i_contract_id,
-                                              dep_date__range=(i_d_from_date, i_d_to_date),
-                                              company_id = request.session['company_info']['company_id']
-                                              ).order_by('dep_date')
+            dispatches = Dispatch.objects.filter(
+                contract_id=i_contract_id,
+                dep_date__range=(i_d_from_date, i_d_to_date),
+                company_id=request.session["company_info"]["company_id"],
+            )
+            if outstanding_only:
+                dispatches = dispatches.filter(inv_status=False)
+            dispatches = dispatches.order_by("dep_date")
         else:
             messages.error(request, "Invalid report type selected!")
             return redirect("client-report-view")
@@ -220,7 +268,15 @@ def download_report(request):
         )
 
         # --- Header Table ---
-        report_title = "<b>Date Wise Dispacth Report</b>" if i_report_type == "date_wise" else "<b>Product Wise Dispacth Report</b>"
+        base_title = (
+            "Date Wise Dispacth Report"
+            if i_report_type == "date_wise"
+            else "Product Wise Dispacth Report"
+        )
+        if outstanding_only:
+            report_title = f"<b>Outstanding {base_title}</b>"
+        else:
+            report_title = f"<b>{base_title}</b>"
         header_data = [
             [Paragraph(f"<font color='black' size='14'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
             # [Paragraph(f"{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],
@@ -341,8 +397,11 @@ def download_report(request):
                     total_km += float(d.km or 0)
 
                 for i, field in enumerate(fields):
-                    if field in ("weight", "km", "rate"):
-                        # Do not show totals for weight, km, and rate fields
+                    if field == "weight":
+                        # Show total weight (MT) with 3 decimals
+                        total_row.append(f"{total_weight:.3f}")
+                    elif field in ("km", "rate"):
+                        # Do not show totals for km and rate fields
                         total_row.append("")
                     elif field in ("depature_date", "dep_date"):
                         total_row.append("")  # No total for date
@@ -612,6 +671,7 @@ def download_our_report(request):
         i_product_name = request.POST.get("product_name")
         i_bill_no = request.POST.get("bill_no")
         i_report_type = request.POST.get("type_of_report")
+        export_type = request.POST.get("export_type", "pdf")
 
         # Fetch contract and dispatch data
         try:
@@ -653,7 +713,100 @@ def download_our_report(request):
         if not dispatches.exists():
             messages.error(request, "No dispatches found for the selected criteria!")
             return redirect("internal-report")
-   
+
+        # --- CSV Generation (internal report for us) ---
+        if export_type == "csv":
+            # Base fields come from contract.invoice_fields; append internal-only columns
+            base_fields = list(contract.invoice_fields or [])
+            additional_fields = ["truck_booking_rate", "total_paid_truck_onwer", "advance_paid", "panding_amount", "net_profit"]
+            fields = base_fields + additional_fields
+
+            # Build readable header labels similar to client CSV
+            dc_field_label = getattr(contract, "dc_field", None)
+            dc_field_label = dc_field_label if dc_field_label not in [None, "None", "null", ""] else "Challan No"
+
+            header_row = []
+            for f in fields:
+                if f == "dc_field":
+                    header_text = dc_field_label
+                elif f == "sr_no":
+                    header_text = "Sr No"
+                elif f in ("depature_date", "dep_date"):
+                    header_text = "Dep Date"
+                elif f == "truck_no":
+                    header_text = "Truck No"
+                elif f == "party_name":
+                    header_text = "Party Name"
+                elif f in ("product_name", "product"):
+                    header_text = "Product"
+                elif f == "gc_note":
+                    header_text = "GC Note"
+                elif f == "unloading_charge_1":
+                    header_text = "Unload Chg 1"
+                elif f == "unloading_charge_2":
+                    header_text = "Unload Chg 2"
+                elif f == "loading_charge":
+                    header_text = "Loading Chg"
+                elif f == "amount":
+                    header_text = "Amount"
+                elif f == "totalfreight":
+                    header_text = "Freight"
+                elif f == "truck_booking_rate":
+                    header_text = "Truck Rate"
+                elif f == "total_paid_truck_onwer":
+                    header_text = "Total Paid Owner"
+                elif f == "advance_paid":
+                    header_text = "Advance Paid"
+                elif f == "panding_amount":
+                    header_text = "Pending Amt"
+                elif f == "net_profit":
+                    header_text = "Net Profit"
+                else:
+                    header_text = f.replace("_", " ").title()
+                header_row.append(header_text)
+
+            filename = f"{contract.company_name}-Internal-Dispatch-Report.csv"
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
+
+            writer = csv.writer(response)
+            writer.writerow(header_row)
+
+            for idx, d in enumerate(dispatches, start=1):
+                total_amount = (
+                    float(d.totalfreight or 0)
+                    + float(d.unloading_charge_1 or 0)
+                    + float(d.unloading_charge_2 or 0)
+                    + float(d.loading_charge or 0)
+                )
+
+                row = []
+                for field in fields:
+                    if field == "sr_no":
+                        row.append(idx)
+                    elif field in ("depature_date", "dep_date"):
+                        if d.dep_date:
+                            date_str = d.dep_date.strftime("%d-%m-%Y")
+                            row.append(f"'{date_str}")
+                        else:
+                            row.append("")
+                    elif field == "dc_field" or field == "None":
+                        row.append(d.challan_no)
+                    elif field in ("luggage", "totalfreight"):
+                        row.append(d.totalfreight)
+                    elif field in ("product_name", "product"):
+                        row.append(d.product_name)
+                    elif field == "amount":
+                        row.append(f"{total_amount:.2f}")
+                    elif field == "gc_note":
+                        row.append(d.gc_note_no)
+                    else:
+                        row.append(getattr(d, field, ""))
+
+                writer.writerow(row)
+
+            return response
+
         # --- PDF Generation ---
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=2*mm, leftMargin=2*mm, topMargin=3*mm, bottomMargin=5*mm)
@@ -846,8 +999,11 @@ def download_our_report(request):
                     total_net_profit += float(d.net_profit or 0)
 
                 for i, field in enumerate(fields):
-                    if field in ("weight", "km", "rate"):
-                        # Do not show totals for weight, km, and rate fields
+                    if field == "weight":
+                        # Show total weight (MT) with 3 decimals
+                        total_row.append(f"{total_weight:.3f}")
+                    elif field in ("km", "rate"):
+                        # Do not show totals for km and rate fields
                         total_row.append("")
                     elif field in ("depature_date", "dep_date"):
                         total_row.append("")  # No total for date

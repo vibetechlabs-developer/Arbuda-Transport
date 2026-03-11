@@ -31,6 +31,7 @@ urlpatterns = [
 
 
     path("client-report-view", report_view.client_report_view, name="client-report-view"),
+    path("outstanding-report-view", report_view.outstanding_report_view, name="outstanding-report-view"),
     path("internal-report", report_view.internal_report, name="internal-report"),
     path("download-our-report", report_view.download_our_report, name="download-our-report"),
 

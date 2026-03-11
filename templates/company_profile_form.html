@@ -19,9 +19,18 @@
               <div class="col-sm-6">
                 <div class="mb-3">
                   <label for="company_name" class="form-label">Company Name</label>
-                  <input type="text" class="form-control" id="company_name" name="company_name"
-                    placeholder="Enter your Company Name" oninput="this.classList.remove('invalid')"
-                    value="{{company.company_name}}" readonly />
+                  <input
+                    type="text"
+                    class="form-control {% if errors.company_name %}is-invalid{% endif %}"
+                    id="company_name"
+                    name="company_name"
+                    placeholder="Enter your Company Name"
+                    oninput="this.classList.remove('invalid')"
+                    value="{% if values.company_name %}{{ values.company_name }}{% else %}{{ company.company_name }}{% endif %}"
+                  />
+                  {% if errors.company_name %}
+                  <div class="invalid-feedback d-block">{{ errors.company_name }}</div>
+                  {% endif %}
                 </div>
                 
               </div>

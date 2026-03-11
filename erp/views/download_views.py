@@ -1998,6 +1998,15 @@ def generate_summary_pdf(request):
     elements.append(bill_table)
     elements.append(Spacer(1, 10))
 
+    # Display overall total weight prominently below the summary table
+    elements.append(
+        Paragraph(
+            f"Total Weight (M.T): {total_mt:.3f}",
+            normal_bold,
+        )
+    )
+    elements.append(Spacer(1, 8))
+
     # ---- Footer note + Signature ----
     client_company_name = contract.company_name or "the Company"
     elements.append(Paragraph(f"*GST Shall be paid by {client_company_name} under", normal))
@@ -2008,7 +2017,7 @@ def generate_summary_pdf(request):
         [
             [
                 Paragraph("", normal),
-                Paragraph(f"FOR NARMADA TRANSPORT" if not company_name else f"FOR {company_name}", right_bold),
+                Paragraph(f"FOR {company_name}" if company_name else f"FOR {client_company_name}", right_bold),
             ],
             ["", Paragraph("__________________", right)],
             ["", Paragraph("Authorised Signatory", right_bold)],
