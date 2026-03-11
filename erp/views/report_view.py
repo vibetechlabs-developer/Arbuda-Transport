@@ -257,12 +257,9 @@ def download_report(request):
                     total_km += float(d.km or 0)
 
                 for i, field in enumerate(fields):
-                    if field == "weight":
-                        total_row.append(f"{total_weight:.3f}")
-                    elif field == "km":
-                        total_row.append("")  # No total for km
-                    elif field == "rate":
-                        total_row.append("")  # No total for rate
+                    if field in ("weight", "km", "rate"):
+                        # Do not show totals for weight, km, and rate fields
+                        total_row.append("")
                     elif field in ("depature_date", "dep_date"):
                         total_row.append("")  # No total for date
                     elif field in ("dc_field", "challan_no"):
@@ -765,12 +762,9 @@ def download_our_report(request):
                     total_net_profit += float(d.net_profit or 0)
 
                 for i, field in enumerate(fields):
-                    if field == "weight":
-                        total_row.append(f"{total_weight:.3f}")
-                    elif field == "km":
-                        total_row.append("")  # No total for km
-                    elif field == "rate":
-                        total_row.append("")  # No total for rate
+                    if field in ("weight", "km", "rate"):
+                        # Do not show totals for weight, km, and rate fields
+                        total_row.append("")
                     elif field in ("depature_date", "dep_date"):
                         total_row.append("")  # No total for date
                     elif field in ("dc_field", "challan_no"):

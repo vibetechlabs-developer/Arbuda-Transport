@@ -515,6 +515,9 @@ def generate_invoice_pdf(request):
                     total_row.append(f"{total_loading_sum:.3f}")
                 elif field == "amount":
                     total_row.append(f"{total_amount_sum:.2f}")
+                elif field in ("km", "rate"):
+                    # Do not show totals for km and rate fields
+                    total_row.append("")
                 else:
                     total_row.append("")
             # Total label rendered during cell formatting
@@ -1168,8 +1171,9 @@ def download_generate_invoice_pdf(request):
                 total_weight += float(d.weight or 0)
 
             for i, field in enumerate(active_fields):
-                if field == "weight":
-                    total_row.append(f"{total_weight:.3f}")
+                if field in ("weight", "km", "rate"):
+                    # Do not show totals for weight, km, and rate fields
+                    total_row.append("")
                 elif field in ("luggage", "totalfreight"):
                     total_row.append(_num_exact(total_freight_sum))
                 elif field == "unloading_charge_1":

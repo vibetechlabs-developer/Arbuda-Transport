@@ -486,12 +486,15 @@ function formatExactAmount(value) {
           rawValue = dest[field]?.toString() || "";
           td.innerHTML = highlightText(rawValue, currentSearch);
         }
-        // Avoid totalling dc_field so it does not appear in the footer summary
+        // Avoid totalling dc_field, km, rate, and weight so they do not appear in the footer summary
         if (
           field !== "sr_no" &&
           field !== "depature_date" &&
           field !== "dep_date" &&
-          field !== "dc_field"
+          field !== "dc_field" &&
+          field !== "km" &&
+          field !== "rate" &&
+          field !== "weight"
         ) {
           recordTotal(field, rawValue);
         }
@@ -511,7 +514,10 @@ function formatExactAmount(value) {
           numericFields.has(field) &&
           field !== "depature_date" &&
           field !== "dep_date" &&
-          field !== "dc_field"
+          field !== "dc_field" &&
+          field !== "km" &&
+          field !== "rate" &&
+          field !== "weight"
         ) {
           const totalValue = totals[field] || 0;
           td.textContent = (field === "luggage" || field === "totalfreight") ? formatExactAmount(totalValue) : formatNumber(totalValue);

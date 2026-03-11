@@ -524,10 +524,10 @@
     const numericFields = new Set();
 
     const recordTotal = (field, rawValue) => {
-      // Skip totals for date, challan no, km, and rate
+      // Skip totals for date, challan no, km, rate, and weight
       if (field === "depature_date" || field === "dep_date" || 
           field === "dc_field" || field === "challan_no" || 
-          field === "km" || field === "rate") {
+          field === "km" || field === "rate" || field === "weight") {
         return;
       }
       if (!isNumericValue(rawValue)) return;

@@ -598,13 +598,14 @@
           rawValue = dest[field]?.toString() || "";
           td.innerHTML = highlightText(rawValue, currentSearch);
         }
-        // Skip dc_field and km from totals to avoid showing their aggregate in footer
+        // Skip dc_field, km, and rate from totals to avoid showing their aggregate in footer
         if (
           field !== "sr_no" &&
           field !== "depature_date" &&
           field !== "dep_date" &&
           field !== "dc_field" &&
-          field !== "km"
+          field !== "km" &&
+          field !== "rate"
         ) {
           recordTotal(field, rawValue);
         }
@@ -626,6 +627,7 @@
           field !== "dep_date" &&
           field !== "dc_field" &&
           field !== "km" &&
+          field !== "rate" &&
           field !== "weight" // Do not show total for weight in invoice footer
         ) {
           const totalValue = totals[field] || 0;
