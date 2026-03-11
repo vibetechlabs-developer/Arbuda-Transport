@@ -7,6 +7,7 @@ from django.http import HttpResponse, FileResponse
 from django.contrib import messages
 from django.db.models import Q
 from io import BytesIO
+import csv
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from datetime import datetime , date
@@ -51,8 +52,7 @@ def download_report(request):
         i_product_name = request.POST.get("product_name")
         i_bill_no = request.POST.get("bill_no")
         i_report_type = request.POST.get("type_of_report")
-
-
+        export_type = request.POST.get("export_type", "pdf")
         
 
         # Fetch contract and dispatch data
@@ -95,7 +95,91 @@ def download_report(request):
         if not dispatches.exists():
             messages.error(request, "No dispatches found for the selected criteria!")
             return redirect("client-report-view")
-   
+
+        # If user requested CSV export, generate CSV instead of PDF
+        if export_type == "csv":
+            # Use same fields as invoice/report table
+            fields = contract.invoice_fields or []
+
+            # Build readable header labels similar to PDF
+            dc_field_label = getattr(contract, "dc_field", None)
+            dc_field_label = dc_field_label if dc_field_label not in [None, "None", "null", ""] else "Challan No"
+
+            header_row = []
+            for f in fields:
+                if f == "dc_field":
+                    header_text = dc_field_label
+                elif f == "sr_no":
+                    header_text = "Sr No"
+                elif f in ("depature_date", "dep_date"):
+                    header_text = "Dep Date"
+                elif f == "truck_no":
+                    header_text = "Truck No"
+                elif f == "party_name":
+                    header_text = "Party Name"
+                elif f in ("product_name", "product"):
+                    header_text = "Product"
+                elif f == "gc_note":
+                    header_text = "GC Note"
+                elif f == "unloading_charge_1":
+                    header_text = "Unload Chg 1"
+                elif f == "unloading_charge_2":
+                    header_text = "Unload Chg 2"
+                elif f == "loading_charge":
+                    header_text = "Loading Chg"
+                elif f == "amount":
+                    header_text = "Amount"
+                elif f == "totalfreight":
+                    header_text = "Freight"
+                else:
+                    header_text = f.replace("_", " ").title()
+                header_row.append(header_text)
+
+            # Prepare HTTP response
+            filename = f"{contract.company_name}-Dispatch-Report.csv"
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+            writer = csv.writer(response)
+            writer.writerow(header_row)
+
+            # Write data rows
+            for idx, d in enumerate(dispatches, start=1):
+                total_amount = (
+                    float(d.totalfreight or 0)
+                    + float(d.unloading_charge_1 or 0)
+                    + float(d.unloading_charge_2 or 0)
+                    + float(d.loading_charge or 0)
+                )
+
+                row = []
+                for field in fields:
+                    if field == "sr_no":
+                        row.append(idx)
+                    elif field in ("depature_date", "dep_date"):
+                        # Write date as plain text to avoid Excel showing ##### on narrow columns
+                        if d.dep_date:
+                            date_str = d.dep_date.strftime("%d-%m-%Y")
+                            row.append(f"'{date_str}")
+                        else:
+                            row.append("")
+                    elif field == "dc_field" or field == "None":
+                        row.append(d.challan_no)
+                    elif field in ("luggage", "totalfreight"):
+                        row.append(d.totalfreight)
+                    elif field in ("product_name", "product"):
+                        row.append(d.product_name)
+                    elif field == "amount":
+                        row.append(f"{total_amount:.2f}")
+                    elif field == "gc_note":
+                        row.append(d.gc_note_no)
+                    else:
+                        row.append(getattr(d, field, ""))
+
+                writer.writerow(row)
+
+            return response
+
         # --- PDF Generation ---
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=2*mm, leftMargin=2*mm, topMargin=3*mm, bottomMargin=5*mm)

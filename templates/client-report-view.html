@@ -196,8 +196,13 @@
                 </table>
               </div>
             </div>
-            <div class="col-sm-6">
-              <button class="btn btn-primary d-grid w-100">Generate Report</button>
+            <div class="col-sm-6 d-flex gap-2">
+              <button type="submit" name="export_type" value="pdf" class="btn btn-primary flex-fill">
+                Generate Report
+              </button>
+              <button type="submit" name="export_type" value="csv" class="btn btn-outline-secondary flex-fill">
+                Export CSV
+              </button>
             </div>
           </form>
         </div>
