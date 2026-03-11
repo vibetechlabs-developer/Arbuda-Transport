@@ -211,7 +211,8 @@ def generate_invoice_pdf(request):
         rightMargin=6 * mm,
         leftMargin=6 * mm,
         topMargin=6 * mm,
-        bottomMargin=0 * mm,
+        # Add some bottom margin so there's clear space between table and footer
+        bottomMargin=10 * mm,
     )
     styles = getSampleStyleSheet()
     elements = []
@@ -503,8 +504,9 @@ def generate_invoice_pdf(request):
                 total_weight += float(d.weight or 0)
 
             for i, field in enumerate(active_fields):
-                if field == "weight":
-                    total_row.append(f"{total_weight:.3f}")
+                if field in ("weight", "km", "rate"):
+                    # Do not show totals for weight, km, and rate fields
+                    total_row.append("")
                 elif field in ("luggage", "totalfreight"):
                     total_row.append(_num_exact(total_freight_sum))
                 elif field == "unloading_charge_1":
@@ -515,9 +517,6 @@ def generate_invoice_pdf(request):
                     total_row.append(f"{total_loading_sum:.3f}")
                 elif field == "amount":
                     total_row.append(f"{total_amount_sum:.2f}")
-                elif field in ("km", "rate"):
-                    # Do not show totals for km and rate fields
-                    total_row.append("")
                 else:
                     total_row.append("")
             # Total label rendered during cell formatting
@@ -601,13 +600,13 @@ def generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Slightly tighter padding so there is enough room for signatures on the same page
+            # Increased padding for bigger row heights
             ("LEFTPADDING", (0,0), (-1,-1), 1.5),
             ("RIGHTPADDING", (0,0), (-1,-1), 1.5),
-            ("TOPPADDING", (0,0), (-1,0), 1.5),
-            ("BOTTOMPADDING", (0,0), (-1,0), 1.5),
-            ("TOPPADDING", (0,1), (-1,-2), 0.5),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 0.5),
+            ("TOPPADDING", (0,0), (-1,0), 4),  # Header top padding - increased for taller header
+            ("BOTTOMPADDING", (0,0), (-1,0), 4),  # Header bottom padding - increased for taller header
+            ("TOPPADDING", (0,1), (-1,-2), 3),  # Data rows top padding - increased for taller data rows
+            ("BOTTOMPADDING", (0,1), (-1,-2), 3),  # Data rows bottom padding - increased for taller data rows
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -633,8 +632,8 @@ def generate_invoice_pdf(request):
             styles += [
                 ("FONTNAME", (0,-1), (-1,-1), "Helvetica-Bold"),
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
-                ("TOPPADDING", (0,-1), (-1,-1), 2),
-                ("BOTTOMPADDING", (0,-1), (-1,-1), 2),
+                ("TOPPADDING", (0,-1), (-1,-1), 5),  # Total row top padding - increased for taller total row
+                ("BOTTOMPADDING", (0,-1), (-1,-1), 5),  # Total row bottom padding - increased for taller total row
                 ("LINEABOVE", (0,-1), (-1,-1), 1.0, colors.black),
                 ("LINEBELOW", (0,-1), (-1,-1), 1.0, colors.black),
             ]
@@ -681,16 +680,21 @@ def generate_invoice_pdf(request):
                     Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                     Paragraph(f"GST NO. : {contract.gst_number}", to_style),
                 ]
-                # Include RR No. (if provided) with bill details on every page
+                # Include RR No. (only when provided) with bill details on every page
                 rr_display = request.POST.get("rr_number", "").strip()
                 bill_no_content = [
                     Paragraph(f"Bill No : {i_bill_no}", to_style),
                     Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
-                    Paragraph(f"RR No : {rr_display}" if rr_display else "RR No : -", to_style),
-                    Paragraph(f"From : {contract.from_center}", to_style),
-                    Paragraph(f"District : {district}", to_style),
-                    Paragraph(f"Page : {page_no} ", to_style),
                 ]
+                if rr_display:
+                    bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_style))
+                bill_no_content.extend(
+                    [
+                        Paragraph(f"From : {contract.from_center}", to_style),
+                        Paragraph(f"District : {district}", to_style),
+                        Paragraph(f"Page : {page_no} ", to_style),
+                    ]
+                )
                 
                 # Calculate widths based on available space
                 to_table_width = available_width
@@ -712,6 +716,7 @@ def generate_invoice_pdf(request):
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
+                elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
 
                 page_no += 1
     else:
@@ -735,15 +740,20 @@ def generate_invoice_pdf(request):
                 Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                 Paragraph(f"GST NO. : {contract.gst_number}", to_style),
             ]
-            # Include RR No. (if provided) with bill details on every page
+            # Include RR No. (only when provided) with bill details on every page
             rr_display = request.POST.get("rr_number", "").strip()
             bill_no_content = [
                 Paragraph(f"Bill No : {i_bill_no}", to_style),
                 Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
-                Paragraph(f"RR No : {rr_display}" if rr_display else "RR No : -", to_style),
-                Paragraph(f"From : {contract.from_center}", to_style),
-                Paragraph(f"Page : {page_no} of {total_pages}", to_style),
             ]
+            if rr_display:
+                bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_style))
+            bill_no_content.extend(
+                [
+                    Paragraph(f"From : {contract.from_center}", to_style),
+                    Paragraph(f"Page : {page_no} of {total_pages}", to_style),
+                ]
+            )
             # Calculate widths based on available space
             to_table_width = available_width
             to_table = Table([[to_content, bill_no_content]], colWidths=[to_table_width * 0.82, to_table_width * 0.18])
@@ -765,6 +775,7 @@ def generate_invoice_pdf(request):
             elements.append(Spacer(1, 1))
             # Dispatch Table
             elements.append(build_table_page(dispatch_chunk, add_total_row=True, is_last_page=is_last_page, all_dispatches=dispatches, start_index=(i + 1)))
+            elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
 
             page_no += 1
 
@@ -779,8 +790,8 @@ def generate_invoice_pdf(request):
         at the bottom of every invoice page.
         """
         canvas.saveState()
-        # Slightly higher so it visually matches the earlier design
-        footer_y = 25 * mm
+        # Move footer slightly closer to the bottom so there's more gap above (between table and footer)
+        footer_y = 18 * mm  # More space between TOTAL row and footer text
 
         # 3 equal sections across the printable width (same as table width)
         x_start = doc.leftMargin
@@ -878,7 +889,8 @@ def download_generate_invoice_pdf(request):
         rightMargin=6 * mm,
         leftMargin=6 * mm,
         topMargin=6 * mm,
-        bottomMargin=0 * mm,
+        # Add some bottom margin so there's clear space between table and footer
+        bottomMargin=10 * mm,
     )
     styles = getSampleStyleSheet()
     elements = []
@@ -1259,7 +1271,12 @@ def download_generate_invoice_pdf(request):
                         style = to_right_style_desc_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(str(cell), style)
 
-        table = Table(data, colWidths=col_widths, repeatRows=1)
+        # Optional: Set specific row heights (in points)
+        # Uncomment and adjust values to control row heights explicitly
+        # Example: row_heights = [15] + [12] * (len(data) - 2) + [15]  # Header=15, data rows=12, total=15
+        row_heights = None  # None = auto height based on content
+        
+        table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
 
         # Table styles - simple, elegant, standard structure (no background colors)
         styles = [
@@ -1268,13 +1285,14 @@ def download_generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Slightly tighter padding so there is enough room for signatures on the same page
+            # Adjust these padding values to change row heights:
+            # Increase values for taller rows, decrease for shorter rows
             ("LEFTPADDING", (0,0), (-1,-1), 1.5),
             ("RIGHTPADDING", (0,0), (-1,-1), 1.5),
-            ("TOPPADDING", (0,0), (-1,0), 1.5),
-            ("BOTTOMPADDING", (0,0), (-1,0), 1.5),
-            ("TOPPADDING", (0,1), (-1,-2), 0.5),
-            ("BOTTOMPADDING", (0,1), (-1,-2), 0.5),
+            ("TOPPADDING", (0,0), (-1,0), 4),  # Header top padding - increased for taller header
+            ("BOTTOMPADDING", (0,0), (-1,0), 4),  # Header bottom padding - increased for taller header
+            ("TOPPADDING", (0,1), (-1,-2), 3),  # Data rows top padding - increased for taller data rows
+            ("BOTTOMPADDING", (0,1), (-1,-2), 3),  # Data rows bottom padding - increased for taller data rows
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -1300,8 +1318,8 @@ def download_generate_invoice_pdf(request):
             styles += [
                 ("FONTNAME", (0,-1), (-1,-1), "Helvetica-Bold"),
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
-                ("TOPPADDING", (0,-1), (-1,-1), 2),
-                ("BOTTOMPADDING", (0,-1), (-1,-1), 2),
+                ("TOPPADDING", (0,-1), (-1,-1), 10),  # Total row top padding - increased for taller total row
+                ("BOTTOMPADDING", (0,-1), (-1,-1), 10),  # Total row bottom padding - increased for taller total row
                 ("LINEABOVE", (0,-1), (-1,-1), 1.0, colors.black),
                 ("LINEBELOW", (0,-1), (-1,-1), 1.0, colors.black),
             ]
@@ -1380,7 +1398,7 @@ def download_generate_invoice_pdf(request):
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
-                elements.append(Spacer(1, 4))  # Minimal spacing for 12 rows per page
+                elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
 
     else:
         page_no = 1
@@ -1442,6 +1460,7 @@ def download_generate_invoice_pdf(request):
                     start_index=(i + 1),
                 )
             )
+            elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
 
     # ---- Signature footer (show on EVERY page) ----
     v_by_name_dl = request.POST.get("v_by_name") or ""
@@ -1453,7 +1472,7 @@ def download_generate_invoice_pdf(request):
         at the bottom of every downloaded invoice page.
         """
         canvas.saveState()
-        footer_y = 25 * mm
+        footer_y = 18 * mm  # More space between TOTAL row and footer text
 
         x_start = doc.leftMargin
         usable_width = doc.width
