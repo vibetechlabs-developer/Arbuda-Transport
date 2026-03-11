@@ -105,24 +105,33 @@
                             <td>{{ forloop.counter }}</td>
                             <td style="text-align: center; ">
                                 {% if dispatch.inv_status %}
+                                <!-- When dispatch is already in an invoice: disable Edit and Delete -->
                                 <a href="dispatch-update?dispatch_id={{ dispatch.id }}" style="pointer-events: none; opacity: 0.5;">
                                     <button style="text-align: center; padding: 5px 10px;" type="button"
-                                        class="btn btn-outline-primary" disabled title="Cannot edit: Dispatch is selected in an invoice. Please unselect it first."><i class='bx  bx-edit'
-                                            style="font-size: 1rem;"></i>
+                                        class="btn btn-outline-primary" disabled
+                                        title="Cannot edit: Dispatch is selected in an invoice. Please unselect it first.">
+                                        <i class='bx  bx-edit' style="font-size: 1rem;"></i>
                                     </button>
                                 </a>
+                                <button style="text-align: center; padding: 5px 10px; opacity: 0.5;" type="button"
+                                    class="btn btn-outline-primary" disabled
+                                    title="Cannot delete: Dispatch is selected in an invoice. Please unselect it first.">
+                                    <i class='bx  bx-trash' style="font-size: 1rem;"></i>
+                                </button>
                                 {% else %}
+                                <!-- Normal Edit / Delete when not in any invoice -->
                                 <a href="dispatch-update?dispatch_id={{ dispatch.id }}">
                                     <button style="text-align: center; padding: 5px 10px;" type="button"
-                                        class="btn btn-outline-primary"><i class='bx  bx-edit'
-                                            style="font-size: 1rem;"></i>
+                                        class="btn btn-outline-primary">
+                                        <i class='bx  bx-edit' style="font-size: 1rem;"></i>
                                     </button>
                                 </a>
-                                {% endif %}
                                 <button style="text-align: center; padding: 5px 10px;" type="button"
                                     class="btn btn-outline-primary" data-bs-toggle="modal"
-                                    data-bs-target="#modalCenter{{ dispatch.id }}delete"><i class='bx  bx-trash'
-                                        style="font-size: 1rem;"></i></button>
+                                    data-bs-target="#modalCenter{{ dispatch.id }}delete">
+                                    <i class='bx  bx-trash' style="font-size: 1rem;"></i>
+                                </button>
+                                {% endif %}
                                 <div class="modal fade" id="modalCenter{{ dispatch.id }}delete" tabindex="-1"
                                     aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered" role="document">

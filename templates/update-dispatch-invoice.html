@@ -316,7 +316,7 @@ function filterTable() {
 
   renderTable(filtered, allfield);
 }
-function renderTable(dispatches, fields) {
+  function renderTable(dispatches, fields) {
     const tableHeader = document.getElementById("tableHeader");
     const tableBody = document.getElementById("tableBody");
 
@@ -347,7 +347,7 @@ function renderTable(dispatches, fields) {
 
     // Action column header
     const actionTh = document.createElement("th");
-    actionTh.textContent = "Action";
+    actionTh.textContent = "Actions";
     actionTh.style.whiteSpace = "nowrap";
     tableHeader.appendChild(actionTh);
 
@@ -361,7 +361,9 @@ function renderTable(dispatches, fields) {
       checkbox.type = "checkbox";
       checkbox.name = "dispatch_ids";
       checkbox.value = dest.id;
-      checkbox.checked = false; // Default to unchecked
+      // In "In Invoice" table, all dispatches are part of the invoice by default,
+      // so mark them as selected initially.
+      checkbox.checked = true;
       checkbox.classList.add("row-checkbox");
       checkboxTd.appendChild(checkbox);
       tr.appendChild(checkboxTd);
@@ -391,17 +393,19 @@ function renderTable(dispatches, fields) {
         tr.appendChild(td);
       });
 
-      // Action column with Edit button
+      // Action column with Edit & Delete buttons
       const actionTd = document.createElement("td");
       actionTd.style.textAlign = "center";
       actionTd.style.whiteSpace = "nowrap";
+
+      // Edit
       const editLink = document.createElement("a");
       editLink.href = `/dispatch-update?dispatch_id=${dest.id}`;
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.style.textAlign = "center";
       editBtn.style.padding = "5px 10px";
-      editBtn.className = "btn btn-outline-primary";
+      editBtn.className = "btn btn-outline-primary me-1";
       editBtn.id = `edit-btn-${dest.id}`;
       const editIcon = document.createElement("i");
       editIcon.className = "bx bx-edit";
@@ -409,28 +413,59 @@ function renderTable(dispatches, fields) {
       editBtn.appendChild(editIcon);
       editLink.appendChild(editBtn);
       actionTd.appendChild(editLink);
+
+      // Delete (same rule as Edit: only when row is unselected)
+      const deleteLink = document.createElement("a");
+      deleteLink.href = `?delete=${dest.id}`;
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.style.textAlign = "center";
+      deleteBtn.style.padding = "5px 10px";
+      deleteBtn.className = "btn btn-outline-primary";
+      deleteBtn.id = `delete-btn-${dest.id}`;
+      const deleteIcon = document.createElement("i");
+      deleteIcon.className = "bx bx-trash";
+      deleteIcon.style.fontSize = "1rem";
+      deleteBtn.appendChild(deleteIcon);
+      deleteLink.appendChild(deleteBtn);
+      actionTd.appendChild(deleteLink);
+
       tr.appendChild(actionTd);
 
-      // In "In Invoice" table:
-      // - While the checkbox is checked, the dispatch remains in this invoice → editing is blocked.
-      // - When the checkbox is unchecked, the user intends to remove it from the invoice → allow editing.
-      const setEditState = (disabled) => {
+      // Helpers to enable/disable actions based on selection
+      const setActionState = (disabled) => {
+        // Edit
         editBtn.disabled = disabled;
         editLink.style.pointerEvents = disabled ? "none" : "auto";
         editLink.style.opacity = disabled ? "0.5" : "1";
         editBtn.style.cursor = disabled ? "not-allowed" : "pointer";
+        // Delete
+        deleteBtn.disabled = disabled;
+        deleteLink.style.pointerEvents = disabled ? "none" : "auto";
+        deleteLink.style.opacity = disabled ? "0.5" : "1";
+        deleteBtn.style.cursor = disabled ? "not-allowed" : "pointer";
       };
 
-      // Initial state: all rows are part of the invoice, so their checkboxes are checked
-      // and editing should be disabled until user unchecks them.
-      setEditState(true);
+      // Initial state: row is selected in invoice → actions disabled.
+      setActionState(true);
 
-      // Toggle edit availability when user checks/unchecks the row
-      checkbox.addEventListener("change", function() {
+      // Toggle action availability when user checks/unchecks the row
+      checkbox.addEventListener("change", function () {
         if (this.checked) {
-          setEditState(true);
+          // Selected in invoice → cannot edit/delete and ensure it is not in Not In Invoice table
+          setActionState(true);
         } else {
-          setEditState(false);
+          // Unselected from invoice → move to Not In Invoice section and enable actions there
+          const id = dest.id;
+          // Remove from In Invoice array
+          allDispatches = allDispatches.filter(d => d.id !== id);
+          // Add to Not In Invoice array if not already there
+          if (!allDispatchesninv.find(d => d.id === id)) {
+            allDispatchesninv.push(dest);
+          }
+          // Re-render both tables; this row will disappear from this table
+          renderTable(allDispatches, allfield || fields);
+          renderninvTable(allDispatchesninv, allfieldninv || fields);
         }
       });
 
@@ -512,7 +547,7 @@ function renderTable(dispatches, fields) {
 
     // Action column header
     const actionTh = document.createElement("th");
-    actionTh.textContent = "Action";
+    actionTh.textContent = "Actions";
     actionTh.style.whiteSpace = "nowrap";
     tableHeader.appendChild(actionTh);
 
@@ -527,6 +562,7 @@ function renderTable(dispatches, fields) {
       checkbox.name = "dispatch_ids";
       checkbox.value = dest.id;
       checkbox.classList.add("row-checkbox");
+      checkbox.checked = false; // not part of invoice by default
       checkboxTd.appendChild(checkbox);
       tr.appendChild(checkboxTd);
 
@@ -555,17 +591,19 @@ function renderTable(dispatches, fields) {
         tr.appendChild(td);
       });
 
-      // Action column with Edit button
+      // Action column with Edit & Delete buttons
       const actionTd = document.createElement("td");
       actionTd.style.textAlign = "center";
       actionTd.style.whiteSpace = "nowrap";
+
+      // Edit
       const editLink = document.createElement("a");
       editLink.href = `/dispatch-update?dispatch_id=${dest.id}`;
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.style.textAlign = "center";
       editBtn.style.padding = "5px 10px";
-      editBtn.className = "btn btn-outline-primary";
+      editBtn.className = "btn btn-outline-primary me-1";
       editBtn.id = `edit-btn-ninv-${dest.id}`;
       const editIcon = document.createElement("i");
       editIcon.className = "bx bx-edit";
@@ -573,14 +611,51 @@ function renderTable(dispatches, fields) {
       editBtn.appendChild(editIcon);
       editLink.appendChild(editBtn);
       actionTd.appendChild(editLink);
+
+      // Delete
+      const deleteLink = document.createElement("a");
+      deleteLink.href = `?delete=${dest.id}`;
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.style.textAlign = "center";
+      deleteBtn.style.padding = "5px 10px";
+      deleteBtn.className = "btn btn-outline-primary";
+      deleteBtn.id = `delete-btn-ninv-${dest.id}`;
+      const deleteIcon = document.createElement("i");
+      deleteIcon.className = "bx bx-trash";
+      deleteIcon.style.fontSize = "1rem";
+      deleteBtn.appendChild(deleteIcon);
+      deleteLink.appendChild(deleteBtn);
+      actionTd.appendChild(deleteLink);
+
       tr.appendChild(actionTd);
 
-      // In "Not In Invoice" table, dispatches are already free from invoices,
-      // so editing should always be allowed regardless of checkbox state.
+      // In "Not In Invoice" table, dispatches are free from invoices,
+      // so editing and delete should always be allowed.
       editBtn.disabled = false;
       editLink.style.pointerEvents = "auto";
       editLink.style.opacity = "1";
       editBtn.style.cursor = "pointer";
+      deleteBtn.disabled = false;
+      deleteLink.style.pointerEvents = "auto";
+      deleteLink.style.opacity = "1";
+      deleteBtn.style.cursor = "pointer";
+
+      // If user checks a row here, move it into "In Invoice" section live
+      checkbox.addEventListener("change", function () {
+        if (this.checked) {
+          const id = dest.id;
+          // Remove from Not In Invoice array
+          allDispatchesninv = allDispatchesninv.filter(d => d.id !== id);
+          // Add to In Invoice array if not already there
+          if (!allDispatches.find(d => d.id === id)) {
+            allDispatches.push(dest);
+          }
+          // Re-render both tables
+          renderTable(allDispatches, allfield || fields);
+          renderninvTable(allDispatchesninv, allfieldninv || fields);
+        }
+      });
 
       tableBody.appendChild(tr);
     });

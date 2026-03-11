@@ -425,7 +425,7 @@ def generate_invoice_pdf(request):
                 return f"{0:.{decimals}f}"
 
         def _num_exact(val):
-            """Format freight/amount with exact precision, no rounding."""
+            """Format numeric values without forcing a fixed number of decimals."""
             try:
                 if val in (None, "", "None", "null", "NULL", "-"):
                     return "0"
@@ -433,6 +433,17 @@ def generate_invoice_pdf(request):
                 return s if s else "0"
             except Exception:
                 return "0"
+
+        def _money(val):
+            """
+            Format currency (Rs.) values with exactly 2 decimal places.
+            """
+            try:
+                if val in (None, "", "None", "null", "NULL", "-"):
+                    return "0.00"
+                return f"{float(val):.2f}"
+            except Exception:
+                return "0.00"
 
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=start_index):
@@ -457,12 +468,13 @@ def generate_invoice_pdf(request):
                 elif field == "dc_field" or field == "None":
                     row.append(d.challan_no)
                 elif field in ("luggage", "totalfreight"):
-                    # keep invoice structure consistent even when freight is missing; use exact amount
-                    row.append(_num_exact(d.totalfreight))
+                    # keep invoice structure consistent even when freight is missing; show Rs with 2 decimals
+                    row.append(_money(d.totalfreight))
                 elif field in ("product_name", "product"):
                     row.append(d.product_name)
                 elif field == "amount":
-                    row.append(f"{total_amount:.2f}")
+                    # Total amount (Rs.) per row – always 2 decimals
+                    row.append(_money(total_amount))
                 elif field == "gc_note":
                     row.append(d.gc_note_no)
                 elif field == "main_party":
@@ -470,8 +482,8 @@ def generate_invoice_pdf(request):
                 elif field == "sub_party":
                     row.append(d.sub_party or "")
                 elif field in ("unloading_charge_1", "unloading_charge_2", "loading_charge"):
-                    # critical: when these are not present, PDF was looking like "error structure"
-                    row.append(_num(getattr(d, field, None), decimals=3))
+                    # Loading / unloading (Rs.) – always 2 decimals
+                    row.append(_money(getattr(d, field, None)))
                 elif field in ("weight",):
                     row.append(_num(getattr(d, field, None), decimals=3))
                 elif field in ("km", "rate"):
@@ -504,19 +516,23 @@ def generate_invoice_pdf(request):
                 total_weight += float(d.weight or 0)
 
             for i, field in enumerate(active_fields):
-                if field in ("weight", "km", "rate"):
-                    # Do not show totals for weight, km, and rate fields
+                if field == "weight":
+                    # Show total weight (MT) with 3 decimals
+                    total_row.append(f"{total_weight:.3f}")
+                elif field in ("km", "rate"):
+                    # No totals for km and rate
                     total_row.append("")
                 elif field in ("luggage", "totalfreight"):
-                    total_row.append(_num_exact(total_freight_sum))
+                    # Freight total (Rs.) – 2 decimals
+                    total_row.append(_money(total_freight_sum))
                 elif field == "unloading_charge_1":
-                    total_row.append(f"{total_unloading_sum_1:.3f}")
+                    total_row.append(_money(total_unloading_sum_1))
                 elif field == "unloading_charge_2":
-                    total_row.append(f"{total_unloading_sum_2:.3f}")
+                    total_row.append(_money(total_unloading_sum_2))
                 elif field == "loading_charge":
-                    total_row.append(f"{total_loading_sum:.3f}")
+                    total_row.append(_money(total_loading_sum))
                 elif field == "amount":
-                    total_row.append(f"{total_amount_sum:.2f}")
+                    total_row.append(_money(total_amount_sum))
                 else:
                     total_row.append("")
             # Total label rendered during cell formatting
@@ -1107,7 +1123,7 @@ def download_generate_invoice_pdf(request):
                 return f"{0:.{decimals}f}"
 
         def _num_exact(val):
-            """Format freight/amount with exact precision, no rounding."""
+            """Format numeric values without forcing a fixed number of decimals."""
             try:
                 if val in (None, "", "None", "null", "NULL", "-"):
                     return "0"
@@ -1115,6 +1131,17 @@ def download_generate_invoice_pdf(request):
                 return s if s else "0"
             except Exception:
                 return "0"
+
+        def _money(val):
+            """
+            Format currency (Rs.) values with exactly 2 decimal places.
+            """
+            try:
+                if val in (None, "", "None", "null", "NULL", "-"):
+                    return "0.00"
+                return f"{float(val):.2f}"
+            except Exception:
+                return "0.00"
 
         # Build rows
         for idx, d in enumerate(dispatch_subset, start=start_index):
@@ -1139,11 +1166,13 @@ def download_generate_invoice_pdf(request):
                 elif field == "dc_field" or field == "None":
                     row.append(d.challan_no)
                 elif field in ("luggage", "totalfreight"):
-                    row.append(_num_exact(d.totalfreight))
+                    # Freight per row (Rs.) – 2 decimals
+                    row.append(_money(d.totalfreight))
                 elif field in ("product_name", "product"):
                     row.append(d.product_name)
                 elif field == "amount":
-                    row.append(f"{total_amount:.2f}")
+                    # Total amount (Rs.) per row – 2 decimals
+                    row.append(_money(total_amount))
                 elif field == "gc_note":
                     row.append(d.gc_note_no)
                 elif field == "main_party":
@@ -1151,7 +1180,8 @@ def download_generate_invoice_pdf(request):
                 elif field == "sub_party":
                     row.append(d.sub_party or "")
                 elif field in ("unloading_charge_1", "unloading_charge_2", "loading_charge"):
-                    row.append(_num(getattr(d, field, None), decimals=3))
+                    # Loading / unloading (Rs.) – 2 decimals
+                    row.append(_money(getattr(d, field, None)))
                 elif field in ("weight",):
                     row.append(_num(getattr(d, field, None), decimals=3))
                 elif field in ("km", "rate"):
@@ -1183,19 +1213,22 @@ def download_generate_invoice_pdf(request):
                 total_weight += float(d.weight or 0)
 
             for i, field in enumerate(active_fields):
-                if field in ("weight", "km", "rate"):
-                    # Do not show totals for weight, km, and rate fields
+                if field == "weight":
+                    # Show total weight (MT) with 3 decimals
+                    total_row.append(f"{total_weight:.3f}")
+                elif field in ("km", "rate"):
+                    # No totals for km and rate
                     total_row.append("")
                 elif field in ("luggage", "totalfreight"):
-                    total_row.append(_num_exact(total_freight_sum))
+                    total_row.append(_money(total_freight_sum))
                 elif field == "unloading_charge_1":
-                    total_row.append(f"{total_unloading_sum_1:.3f}")
+                    total_row.append(_money(total_unloading_sum_1))
                 elif field == "unloading_charge_2":
-                    total_row.append(f"{total_unloading_sum_2:.3f}")
+                    total_row.append(_money(total_unloading_sum_2))
                 elif field == "loading_charge":
-                    total_row.append(f"{total_loading_sum:.3f}")
+                    total_row.append(_money(total_loading_sum))
                 elif field == "amount":
-                    total_row.append(f"{total_amount_sum:.2f}")
+                    total_row.append(_money(total_amount_sum))
                 else:
                     total_row.append("")
             # Total label rendered during cell formatting

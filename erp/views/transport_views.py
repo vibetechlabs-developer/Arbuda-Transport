@@ -602,6 +602,24 @@ def dispatch_form(request):
         dep_date_value = request.POST.get("dep_date")
         if not dep_date_value:
             dep_date_value = date.today()
+
+        # Respect loading / unloading radio flags:
+        # Only persist charges when the corresponding "Yes" radio is selected,
+        # otherwise force them to 0 so they are not counted in invoices.
+        if request.POST.get("unloading_rate_1") == "yes":
+            i_unloading_charge_1 = request.POST.get("unloading_charge_1") or 0
+        else:
+            i_unloading_charge_1 = 0
+
+        if request.POST.get("unloading_rate_2") == "yes":
+            i_unloading_charge_2 = request.POST.get("unloading_charge_2") or 0
+        else:
+            i_unloading_charge_2 = 0
+
+        if request.POST.get("loading_rate") == "yes":
+            i_loading_charge = request.POST.get("loading_charge") or 0
+        else:
+            i_loading_charge = 0
         
         dispatch = Dispatch.objects.create(
             company_id = Company_user.objects.get(id=request.session['company_info']['company_id']),
@@ -618,9 +636,9 @@ def dispatch_form(request):
             weight=request.POST.get("weight") or 0,
             rate=request.POST.get("rate") or 0,
             totalfreight=request.POST.get("totalfreight") or 0,
-            unloading_charge_1=request.POST.get("unloading_charge_1") or 0,
-            unloading_charge_2=request.POST.get("unloading_charge_2") or 0,
-            loading_charge=request.POST.get("loading_charge") or 0,
+            unloading_charge_1=i_unloading_charge_1,
+            unloading_charge_2=i_unloading_charge_2,
+            loading_charge=i_loading_charge,
             grand_total=request.POST.get("grand_total") or 0,
             truck_booking_rate=request.POST.get("truck_booking_rate") or 0,
             total_paid_truck_onwer=request.POST.get("total_paid_truck_onwer") or 0,
@@ -815,9 +833,21 @@ def dispatch_update(request):
             dispatch.weight = request.POST.get("weight") or 0
             dispatch.rate = request.POST.get("rate") or 0
             dispatch.totalfreight = request.POST.get("totalfreight") or 0
-            dispatch.unloading_charge_1 = request.POST.get("unloading_charge_1") or 0
-            dispatch.unloading_charge_2 = request.POST.get("unloading_charge_2") or 0
-            dispatch.loading_charge = request.POST.get("loading_charge") or 0
+            # Respect loading / unloading radio flags on update as well
+            if request.POST.get("unloading_rate_1") == "yes":
+                dispatch.unloading_charge_1 = request.POST.get("unloading_charge_1") or 0
+            else:
+                dispatch.unloading_charge_1 = 0
+
+            if request.POST.get("unloading_rate_2") == "yes":
+                dispatch.unloading_charge_2 = request.POST.get("unloading_charge_2") or 0
+            else:
+                dispatch.unloading_charge_2 = 0
+
+            if request.POST.get("loading_rate") == "yes":
+                dispatch.loading_charge = request.POST.get("loading_charge") or 0
+            else:
+                dispatch.loading_charge = 0
             dispatch.grand_total = request.POST.get("grand_total") or 0
             dispatch.truck_booking_rate = request.POST.get("truck_booking_rate") or 0
             dispatch.total_paid_truck_onwer = request.POST.get("total_paid_truck_onwer") or 0
