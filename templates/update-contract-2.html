@@ -948,6 +948,46 @@
               </div>
             </div>
 
+            <h5 class="text-primary fw-semibold mb-3 mt-4">Invoice Footer</h5>
+            <div class="row">
+              <div class="col-sm-4">
+                <div class="form-check mt-3 ">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="show_verified_by"
+                    name="show_verified_by"
+                    {% if contract.show_verified_by %}checked{% endif %}
+                  >
+                  <label class="form-check-label" for="show_verified_by">Verified By</label>
+                </div>
+                <div class="form-check mt-3 ">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="show_recommended_by"
+                    name="show_recommended_by"
+                    {% if contract.show_recommended_by %}checked{% endif %}
+                  >
+                  <label class="form-check-label" for="show_recommended_by">Recommended By</label>
+                </div>
+              </div>
+              <div class="col-sm-8">
+                <div class="mb-3 mt-3">
+                  <label for="footer_company_name" class="form-label">Footer "For," Company Name</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="footer_company_name"
+                    name="footer_company_name"
+                    placeholder="e.g. Vibe Tech Labs"
+                    value="{{ contract.footer_company_name|default:contract.company_name }}"
+                  >
+                  <small class="text-muted">This name will appear as <strong>For, &lt;Company&gt;</strong> at the bottom of every invoice for this contract.</small>
+                </div>
+              </div>
+            </div>
+
             <script>
               let fields = "{{ contract.invoice_fields }}"
               let f_fields = document.querySelectorAll('[name="field"]')

@@ -60,6 +60,11 @@ class T_Contract(models.Model):
     # Fields to include in invoice
     invoice_fields = models.JSONField(default=list, blank=True, null=True)
 
+    # Invoice footer configuration
+    show_verified_by = models.BooleanField(default=False)
+    show_recommended_by = models.BooleanField(default=False)
+    footer_company_name = models.CharField(max_length=255, blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):   

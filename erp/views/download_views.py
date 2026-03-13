@@ -254,6 +254,52 @@ def generate_invoice_pdf(request):
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
 
+    # --- Invoice footer helper ---
+    def build_footer_block():
+        footer_elements = []
+        footer_labels = []
+
+        # Decide footer "For" company name – prefer explicit footer name,
+        # else fall back to contract company_name, else logged-in company.
+        footer_name = (
+            getattr(contract, "footer_company_name", None)
+            or getattr(contract, "company_name", None)
+            or request.session['company_info']['company_name']
+        )
+
+        if getattr(contract, "show_verified_by", False):
+            footer_labels.append(Paragraph("Verified By", to_style))
+        if getattr(contract, "show_recommended_by", False):
+            footer_labels.append(Paragraph("Recommended By", to_style))
+        # "For" company label – always shown
+        footer_labels.append(Paragraph(f"For, {footer_name}", to_style))
+
+        if not footer_labels:
+            return footer_elements
+
+        col_count = len(footer_labels)
+        col_widths = [available_width / col_count] * col_count
+
+        # Second row: blank signature lines
+        signature_row = [Paragraph("__________________", to_style) for _ in range(col_count)]
+
+        footer_table = Table([footer_labels, signature_row], colWidths=col_widths)
+        footer_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, 0), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
+                    ("TOPPADDING", (0, 1), (-1, 1), 2),
+                    ("BOTTOMPADDING", (0, 1), (-1, 1), 4),
+                    ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
+                ]
+            )
+        )
+        footer_elements.append(footer_table)
+        return footer_elements
+
     fields = contract.invoice_fields
     # Target 12 rows per page so header + 12 rows + TOTAL + signatures fit on one page
     # (UI is locked to 12 so this stays consistent)
@@ -736,7 +782,8 @@ def generate_invoice_pdf(request):
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
-                elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
+                elements.append(Spacer(1, 20))
+                elements.extend(build_footer_block())
 
                 page_no += 1
     else:
@@ -795,7 +842,8 @@ def generate_invoice_pdf(request):
             elements.append(Spacer(1, 1))
             # Dispatch Table
             elements.append(build_table_page(dispatch_chunk, add_total_row=True, is_last_page=is_last_page, all_dispatches=dispatches, start_index=(i + 1)))
-            elements.append(Spacer(1, 35))  # Increased spacing between table and footer section
+            elements.append(Spacer(1, 20))
+            elements.extend(build_footer_block())
 
             page_no += 1
 
@@ -913,6 +961,48 @@ def download_generate_invoice_pdf(request):
         ('BOTTOMPADDING', (0,0), (-1,-1), 2),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
+
+    # --- Invoice footer helper ---
+    def build_footer_block():
+        footer_elements = []
+        footer_labels = []
+
+        footer_name = (
+            getattr(contract, "footer_company_name", None)
+            or getattr(contract, "company_name", None)
+            or request.session['company_info']['company_name']
+        )
+
+        if getattr(contract, "show_verified_by", False):
+            footer_labels.append(Paragraph("Verified By", to_style))
+        if getattr(contract, "show_recommended_by", False):
+            footer_labels.append(Paragraph("Recommended By", to_style))
+        footer_labels.append(Paragraph(f"For, {footer_name}", to_style))
+
+        if not footer_labels:
+            return footer_elements
+
+        col_count = len(footer_labels)
+        col_widths = [available_width / col_count] * col_count
+
+        signature_row = [Paragraph("__________________", to_style) for _ in range(col_count)]
+
+        footer_table = Table([footer_labels, signature_row], colWidths=col_widths)
+        footer_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, 0), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
+                    ("TOPPADDING", (0, 1), (-1, 1), 2),
+                    ("BOTTOMPADDING", (0, 1), (-1, 1), 4),
+                    ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
+                ]
+            )
+        )
+        footer_elements.append(footer_table)
+        return footer_elements
 
     fields = contract.invoice_fields
     # Target 12 rows per page so header + 12 rows + TOTAL + signatures fit on one page
@@ -1391,8 +1481,8 @@ def download_generate_invoice_pdf(request):
 
                 # Dispatch Table for this page
                 elements.append(build_table_page(dispatch_chunk, add_total_row=True))
-                # Slightly reduced spacing so footer never overflows to next page
-                elements.append(Spacer(1, 25))
+                elements.append(Spacer(1, 18))
+                elements.extend(build_footer_block())
 
     else:
         page_no = 1
@@ -1454,8 +1544,8 @@ def download_generate_invoice_pdf(request):
                     start_index=(i + 1),
                 )
             )
-            # Slightly reduced spacing so footer never overflows to next page
-            elements.append(Spacer(1, 25))
+            elements.append(Spacer(1, 18))
+            elements.extend(build_footer_block())
 
     # --- Build PDF (no Verified / Recommended / For footer, as per latest requirement) ---
     doc.build(elements)
