@@ -981,7 +981,7 @@
                     id="footer_company_name"
                     name="footer_company_name"
                     placeholder="e.g. Vibe Tech Labs"
-                    value="{{ contract.footer_company_name|default:contract.company_name }}"
+                    value="{{ contract.footer_company_name|default:request.session.company_info.company_name }}"
                   >
                   <small class="text-muted">This name will appear as <strong>For, &lt;Company&gt;</strong> at the bottom of every invoice for this contract.</small>
                 </div>

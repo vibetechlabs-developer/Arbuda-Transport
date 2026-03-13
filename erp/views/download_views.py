@@ -260,10 +260,9 @@ def generate_invoice_pdf(request):
         footer_labels = []
 
         # Decide footer "For" company name – prefer explicit footer name,
-        # else fall back to contract company_name, else logged-in company.
+        # else fall back to logged-in main company profile name.
         footer_name = (
             getattr(contract, "footer_company_name", None)
-            or getattr(contract, "company_name", None)
             or request.session['company_info']['company_name']
         )
 
@@ -967,11 +966,7 @@ def download_generate_invoice_pdf(request):
         footer_elements = []
         footer_labels = []
 
-        footer_name = (
-            getattr(contract, "footer_company_name", None)
-            or getattr(contract, "company_name", None)
-            or request.session['company_info']['company_name']
-        )
+        footer_name = getattr(contract, "footer_company_name", None) or request.session['company_info']['company_name']
 
         if getattr(contract, "show_verified_by", False):
             footer_labels.append(Paragraph("Verified By", to_style))

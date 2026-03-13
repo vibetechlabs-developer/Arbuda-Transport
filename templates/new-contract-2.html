@@ -560,7 +560,7 @@
                       id="footer_company_name"
                       name="footer_company_name"
                       placeholder="e.g. Vibe Tech Labs"
-                      value="{% if form_data.footer_company_name %}{{ form_data.footer_company_name }}{% elif form_data.company_name %}{{ form_data.company_name }}{% endif %}"
+                      value="{% if form_data.footer_company_name %}{{ form_data.footer_company_name }}{% else %}{{ request.session.company_info.company_name }}{% endif %}"
                     >
                     <small class="text-muted">This name will appear as <strong>For, &lt;Company&gt;</strong> at the bottom of every invoice for this contract.</small>
                   </div>

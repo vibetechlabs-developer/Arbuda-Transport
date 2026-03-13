@@ -75,10 +75,10 @@ def add_contract(request):
                 invoice_fields=request.POST.getlist("field"),
                 show_verified_by=bool(request.POST.get("show_verified_by")),
                 show_recommended_by=bool(request.POST.get("show_recommended_by")),
-                # If footer company name is not explicitly provided, fall back to contract company_name
+                # If footer company name is not explicitly provided, fall back to logged-in company profile name
                 footer_company_name=(
                     request.POST.get("footer_company_name")
-                    or request.POST.get("company_name")
+                    or request.session['company_info']['company_name']
                     or None
                 ),
             )
@@ -303,8 +303,10 @@ def update_contract(request, ):
             contract.show_verified_by = bool(request.POST.get("show_verified_by"))
             contract.show_recommended_by = bool(request.POST.get("show_recommended_by"))
             footer_name = request.POST.get("footer_company_name")
-            # When footer name is left blank, default to current contract company_name
-            contract.footer_company_name = footer_name or contract.company_name
+            # When footer name is left blank, default to logged-in main company name
+            contract.footer_company_name = (
+                footer_name or request.session['company_info']['company_name']
+            )
 
             # Save the contract first
             contract.save()
