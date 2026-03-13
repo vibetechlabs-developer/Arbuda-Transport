@@ -23,14 +23,38 @@
       <!-- Register Card -->
       <div class="card">
         <div class="card-body">
+            <!-- Contract filter (GET) -->
+            <form method="get" class="mb-3">
+              <div class="row">
+                <div class="mb-3 col-sm-4">
+                  <label for="filter_contract_id" class="form-label">Filter by Contract</label>
+                  <select
+                    class="form-select"
+                    name="contract_id"
+                    id="filter_contract_id"
+                    onchange="this.form.submit()"
+                  >
+                    <option value="">All Contracts</option>
+                    {% for contract in allcontract %}
+                      <option
+                        value="{{ contract.id }}"
+                        {% if selected_contract_id and contract.id == selected_contract_id %}selected{% endif %}
+                      >
+                        {{ contract.contract_no }} - {{ contract.company_name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </form>
             <form id="formAuthentication" class="mb-3" method="POST">
               {% csrf_token %}
               <h5 class="text-primary fw-semibold mb-3">Invoice Details</h5>
               <div class="row">
-                <div class="mb-3 col-sm-6">
-                  <label for="bill_no" class="form-label">Bill no.</label>
+                <div class="mb-3 col-sm-4">
+                  <label for="bill_no" class="form-label">Select Bill</label>
                   <select class="form-select ts-select" name="bill_no" id="bill_no"
-                    placeholder="Select contract no" autocomplete="off" onchange="fetchInvoice()">
+                    placeholder="Select bill no" autocomplete="off" onchange="fetchInvoice()">
                     <option value="" disabled selected>Select Bill No</option>
                     {% for invoice in allinvoice %}
                     <option value="{{ invoice.id }}">
@@ -38,7 +62,12 @@
                     {% endfor %}
                   </select>
                 </div>
-                <div class="mb-3 col-sm-6">
+                <div class="mb-3 col-sm-4">
+                  <label for="new_bill_no" class="form-label">Bill No.</label>
+                  <input type="text" class="form-control" id="new_bill_no" name="new_bill_no" autofocus
+                    oninput="this.classList.remove('invalid')" placeholder="Enter / update bill no" />
+                </div>
+                <div class="mb-3 col-sm-4">
                   <label for="bill_date" class="form-label">Bill Date</label>
                   <input type="date" class="form-control" id="bill_date" name="bill_date" autofocus
                     oninput="this.classList.remove('invalid')" required />
@@ -254,11 +283,13 @@
           return;
         }
         if (data.destinations !== undefined) {
+          // Populate editable invoice fields
+          document.getElementById("new_bill_no").value = data.bill_no || '';
           document.getElementById("bill_date").value = data.bill_date || '';
           document.getElementById("contract_no").value = data.contract_no || '';
           document.getElementById("contract_id").value = data.contract_id || '';
           document.getElementById("rr_number").value = data.rr_number || '';
-          document.getElementById("bill_date").setAttribute("readonly", true);
+          // Contract no. is informational; keep it read-only, but allow bill date/bill no to be edited
           document.getElementById("contract_no").setAttribute("readonly", true);
           allDispatches = data.destinations || [];
           allfield = data.fields || [];

@@ -104,12 +104,22 @@ def get_destination_details(request):
         # Let the frontend know nothing was found so user can enter manually
         return JsonResponse({"found": False})
 
+    # IMPORTANT:
+    # - District and taluka can be re-used across contracts (helpful auto-fill).
+    # - KM should NOT be auto-copied from another contract.
+    #   Only when the destination belongs to the SAME contract should KM be auto-filled.
+    #   Otherwise, KM must be entered manually on the dispatch form.
+    km_value = destination.km
+    if contract_id and str(destination.contract_id_id) != str(contract_id):
+        # Different contract → do not auto-fill KM
+        km_value = None
+
     return JsonResponse(
         {
             "found": True,
             "district": destination.district,
             "taluka": destination.taluka or "",
-            "km": destination.km,
+            "km": km_value,
             "rate_type": destination.contract_id.rate_type,
         }
     )
@@ -241,21 +251,19 @@ def get_dispacth(request):
     try:
         contract = T_Contract.objects.get(id=dcontract_id)
         try:
-            # Only fetch dispatches which are **not** already linked to any invoice
-            # so that already-billed entries do not appear again on invoice creation.
             dispatch = Dispatch.objects.filter(
                 contract_id=dcontract_id,
                 company_id=request.session['company_info']['company_id'],
                 inv_status=False,
             )
-            
+
             # Filter by financial year
             dispatch = filter_by_financial_year(dispatch, financial_year, 'dep_date')
-            
+
             # Filter by district if provided
             if district_filter:
                 dispatch = dispatch.filter(district=district_filter)
-            
+
             # Latest date first, challan_no ascending within date for invoice creation list
             dispatch = (
                 dispatch.annotate(
@@ -306,7 +314,6 @@ def get_ninv_dispacth(request):                  # ninv means not in invoice dis
     try:
         invoice = Invoice.objects.get(id=dbill_id , company_id = request.session['company_info']['company_id'])
         contract = T_Contract.objects.get(id=invoice.contract_id.id)
-        # Include inv_status explicitly to ensure it's in the response
         dispatch = Dispatch.objects.filter(
             contract_id=invoice.contract_id.id,
             company_id=request.session['company_info']['company_id'],
@@ -439,7 +446,6 @@ def get_invoice(request):
     bill_id = request.GET.get('bill-id')
     try:
         invoice = Invoice.objects.get(id=bill_id , company_id = request.session['company_info']['company_id'])
-
     except Invoice.DoesNotExist:
         return JsonResponse({
            'error': 'dispatch not found' 
@@ -535,7 +541,8 @@ def get_invoice(request):
                 safe_bill = str(invoice.Bill_no or "invoice").replace("/", "-")
                 return csv_response(filename=f"invoice_{safe_bill}_backup", header=header, rows=rows)
             return JsonResponse({
-           'bill_date': invoice.Bill_date,  
+            'bill_no': invoice.Bill_no,
+            'bill_date': invoice.Bill_date,  
             'contract_no' : contract.contract_no, 
             'contract_id' : contract.id,
             'rr_number' : invoice.rr_number or '',     

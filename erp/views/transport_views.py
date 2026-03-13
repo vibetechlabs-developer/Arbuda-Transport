@@ -1068,15 +1068,37 @@ def view_dispatch_Invoice(request):
     alldata = {}
     company_id = request.session['company_info']['company_id']
     financial_year = request.session.get('financial_year', get_current_financial_year())
-    
+
     try:
         start_date, end_date = get_financial_year_start_end(financial_year)
-        allcontract = Invoice.objects.filter(
+        # Base queryset: all invoices for the company in the selected financial year
+        invoices_qs = Invoice.objects.filter(
             company_id=company_id,
             Bill_date__gte=start_date,
             Bill_date__lte=end_date
-        )
-        alldata['allinvoice'] = allcontract
+        ).select_related("contract_id")
+
+        # All contracts that have at least one invoice in this financial year
+        allcontract = T_Contract.objects.filter(
+            company_id=company_id,
+            invoice__company_id=company_id,
+            invoice__Bill_date__gte=start_date,
+            invoice__Bill_date__lte=end_date,
+        ).distinct().order_by('-id')
+
+        # Optional filter: limit invoices to a selected contract
+        selected_contract_id = request.GET.get("contract_id")
+        if selected_contract_id:
+            try:
+                selected_contract_id_int = int(selected_contract_id)
+                invoices_qs = invoices_qs.filter(contract_id_id=selected_contract_id_int)
+                alldata["selected_contract_id"] = selected_contract_id_int
+            except (TypeError, ValueError):
+                # Ignore invalid IDs and show all invoices
+                pass
+
+        alldata['allinvoice'] = invoices_qs
+        alldata['allcontract'] = allcontract
         alldata['financial_year'] = financial_year
     except Invoice.DoesNotExist:
         messages.error(request , 'Invoice not fonded')
@@ -1087,24 +1109,48 @@ def update_dispatch_Invoice(request):
     alldata = {}
     company_id = request.session['company_info']['company_id']
     financial_year = request.session.get('financial_year', get_current_financial_year())
-    
+
     try:
         start_date, end_date = get_financial_year_start_end(financial_year)
-        allcontract = Invoice.objects.filter(
+        # Base queryset: all invoices for the company in the selected financial year
+        invoices_qs = Invoice.objects.filter(
             company_id=company_id,
             Bill_date__gte=start_date,
             Bill_date__lte=end_date
-        )
-        alldata['allinvoice'] = allcontract
+        ).select_related("contract_id")
+
+        # All contracts that have at least one invoice in this financial year
+        allcontract = T_Contract.objects.filter(
+            company_id=company_id,
+            invoice__company_id=company_id,
+            invoice__Bill_date__gte=start_date,
+            invoice__Bill_date__lte=end_date,
+        ).distinct().order_by('-id')
+
+        # Optional filter: limit invoices to a selected contract
+        selected_contract_id = request.GET.get("contract_id")
+        if selected_contract_id:
+            try:
+                selected_contract_id_int = int(selected_contract_id)
+                invoices_qs = invoices_qs.filter(contract_id_id=selected_contract_id_int)
+                alldata["selected_contract_id"] = selected_contract_id_int
+            except (TypeError, ValueError):
+                # Ignore invalid IDs and show all invoices
+                pass
+
+        alldata['allinvoice'] = invoices_qs
+        alldata['allcontract'] = allcontract
         alldata['financial_year'] = financial_year
     except Invoice.DoesNotExist:
         messages.error(request, 'Invoice not found.')
     
     if request.method == "POST":
-        dbill_id = request.POST.get("bill_no")  # existing invoice id
+        # `bill_no` select holds the existing invoice ID (primary key)
+        dbill_id = request.POST.get("bill_no")
         dcontract_no = request.POST.get("contract_no")
         dispatch_ids = [int(i) for i in request.POST.getlist("dispatch_ids")]
-        i_bill_no = request.POST.get("bill_no")
+        # Optional new bill number text field (for updating Invoice.Bill_no)
+        new_bill_no = (request.POST.get("new_bill_no") or "").strip()
         bill_date_str = request.POST.get("bill_date")
         rr_number = request.POST.get("rr_number", "").strip()
         # Validation    
@@ -1130,19 +1176,21 @@ def update_dispatch_Invoice(request):
                 messages.error(request, "Invalid bill date format.")
                 return redirect("update-dispatch-invoice")
 
-        # Check for duplicate Bill_no (excluding current invoice)
-        if Invoice.objects.filter(
-            Bill_no=invoice.Bill_no,   
-            company_id=company,
-            contract_id=contract
-        ).exclude(id=invoice.id).exists():
-            messages.error(request, "Another invoice with this bill number already exists.")
-            return redirect("update-dispatch-invoice")
+        # If user entered a new bill number, check for duplicates (excluding current invoice)
+        if new_bill_no:
+            if Invoice.objects.filter(
+                Bill_no=new_bill_no,
+                company_id=company,
+                contract_id=contract
+            ).exclude(id=invoice.id).exists():
+                messages.error(request, "Another invoice with this bill number already exists.")
+                return redirect("update-dispatch-invoice")
 
         # Wrap everything in a transaction
         with transaction.atomic():
             # --- Update invoice fields ---
-            invoice.Bill_no = invoice.Bill_no
+            if new_bill_no:
+                invoice.Bill_no = new_bill_no
             invoice.Bill_date = bill_date
             invoice.rr_number = rr_number if rr_number else None
             invoice.contract_id = contract
@@ -1207,7 +1255,10 @@ def update_dispatch_Invoice(request):
                     d.save()
 
         # If everything succeeded, commit and show success
-        messages.success(request, f"Invoice {i_bill_no} updated successfully.")
+        messages.success(
+            request,
+            f"Invoice {invoice.Bill_no} updated successfully."
+        )
         return redirect("update-dispatch-invoice")
 
     return render(request, 'update-dispatch-invoice.html', alldata)
