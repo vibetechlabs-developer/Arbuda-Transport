@@ -158,8 +158,9 @@
 
             <div class="row mt-3">
               <div class="col-sm-6">
-                <label class="form-label">Enter Dispacthes Per Page</label>
-                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="10" required>
+                <label class="form-label">Entries Per Page</label>
+                <input type="number" name="chunk" id="chunk" class="form-control" min="1" value="12" readonly>
+                <small class="text-muted">Fixed at 12 entries per page in PDF</small>
               </div>
             </div>
 
@@ -178,11 +179,30 @@
               </div>
             </div>
             <!-- Action buttons: show both on all screen sizes -->
-            <div class="col-sm-6 d-flex gap-2">
-              <button type="submit" name="export_type" value="pdf" class="btn btn-primary flex-fill">
-                Generate Report
+            <div class="col-sm-8 d-flex gap-2 mt-1">
+              <!-- Preview button: opens PDF in new tab (inline viewer with browser download button) -->
+              <button type="submit"
+                      name="export_type"
+                      value="pdf"
+                      class="btn btn-outline-primary flex-fill"
+                      formtarget="_blank">
+                Preview PDF
               </button>
-              <button type="submit" name="export_type" value="csv" class="btn btn-outline-secondary flex-fill">
+
+              <!-- Explicit download button: same PDF but forces attachment -->
+              <button type="submit"
+                      name="export_type"
+                      value="pdf"
+                      class="btn btn-primary flex-fill"
+                      onclick="this.form.insertAdjacentHTML('beforeend','<input type=&quot;hidden&quot; name=&quot;download&quot; value=&quot;1&quot; />')">
+                Download PDF
+              </button>
+
+              <!-- CSV export unchanged -->
+              <button type="submit"
+                      name="export_type"
+                      value="csv"
+                      class="btn btn-outline-secondary flex-fill">
                 Export CSV
               </button>
             </div>
@@ -533,10 +553,18 @@
     const numericFields = new Set();
 
     const recordTotal = (field, rawValue) => {
-      // Skip totals for date, challan no, km, and rate (but DO total weight)
-      if (field === "depature_date" || field === "dep_date" || 
-          field === "dc_field" || field === "challan_no" || 
-          field === "km" || field === "rate") {
+      // Skip totals for fields where totals are not required:
+      // dates, challan no, km, rate, party_name and truck_booking_rate (Truck Rate)
+      if (
+        field === "depature_date" ||
+        field === "dep_date" ||
+        field === "dc_field" ||
+        field === "challan_no" ||
+        field === "km" ||
+        field === "rate" ||
+        field === "party_name" ||
+        field === "truck_booking_rate"
+      ) {
         return;
       }
       if (!isNumericValue(rawValue)) return;

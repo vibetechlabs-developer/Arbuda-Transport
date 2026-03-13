@@ -920,12 +920,12 @@ def dispatch_view(request):
         company_id=company['company_id'],
     ).order_by('-Bill_date', '-id').values('Bill_no')[:1]
 
-    # ✅ Final ordering: Latest date first (descending), then challan number descending (23, 22, 21, 20)
+    # ✅ Final ordering: Latest date first (descending), then challan number ascending (1, 2, 3...)
     # Cast challan_no to a number for correct ordering if it contains numeric values
     dispatch_qs = dispatch_qs.annotate(
         challan_int=Func('challan_no', function='CAST', template='CAST(%(expressions)s AS UNSIGNED)'),
         ebill_no=Subquery(invoice_subquery),
-    ).order_by('-dep_date', '-challan_int')
+    ).order_by('-dep_date', 'challan_int')
 
     # CSV export (backup) - respects current filters
     if (request.GET.get("export") or "").lower() == "csv":

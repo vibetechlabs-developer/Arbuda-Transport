@@ -799,58 +799,20 @@ def generate_invoice_pdf(request):
 
             page_no += 1
 
-    # ---- Signature footer (show on EVERY page) ----
-    # Capture names once so they can be reused in the page footer callback
-    v_by_name = request.POST.get("v_by_name") or ""
-    r_by_name = request.POST.get("r_by_name") or ""
-
-    def invoice_footer(canvas, doc):
-        """
-        Draw "Verified By / Recommended By / For, <Company>" footer
-        at the bottom of every invoice page.
-        """
-        canvas.saveState()
-        # Move footer slightly closer to the bottom so there's more gap above (between table and footer)
-        footer_y = 18 * mm  # More space between TOTAL row and footer text
-
-        # 3 equal sections across the printable width (same as table width)
-        x_start = doc.leftMargin
-        usable_width = doc.width
-        col_width = usable_width / 3.0
-
-        labels = ["Verified By", "Recommended By", f"For, {request.session['company_info']['company_name']}"]
-        names = [v_by_name, r_by_name, ""]
-
-        canvas.setFont("Helvetica-Bold", 11)
-        for idx in range(3):
-            col_x_center = x_start + col_width * (idx + 0.5)
-
-            # Label (above the line)
-            canvas.drawCentredString(col_x_center, footer_y + 8, labels[idx])
-
-            # Signature line (fixed, similar to original design width)
-            line_half = 25 * mm
-            canvas.setLineWidth(0.7)
-            canvas.line(
-                col_x_center - line_half,
-                footer_y + 2,
-                col_x_center + line_half,
-                footer_y + 2,
-            )
-
-            # Name text (under the line) – skip for company column
-            if names[idx]:
-                canvas.setFont("Helvetica", 9)
-                canvas.drawCentredString(col_x_center, footer_y - 6, names[idx])
-                canvas.setFont("Helvetica-Bold", 11)
-
-        canvas.restoreState()
-
-    # --- Build PDF ---
-    doc.build(elements, onFirstPage=invoice_footer, onLaterPages=invoice_footer)
+    # --- Build PDF (no Verified / Recommended / For footer, as per latest requirement) ---
+    doc.build(elements)
     buffer.seek(0)
     filename = f"{contract.company_name}_{i_bill_no.replace('/','-')}.pdf"
-    return FileResponse(buffer, as_attachment=True, filename=filename)
+
+    # For the "preview" flow this view is used for, we always want an inline preview,
+    # not a forced download. The explicit download button should call the dedicated
+    # download view instead of relying on this one.
+    from django.http import HttpResponse
+
+    response = HttpResponse(buffer, content_type="application/pdf")
+    # Use inline disposition so browsers open the PDF viewer instead of saving the file.
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
 
 ################################
 ## END OF GENRATE INOVICE PDF ##
@@ -1495,51 +1457,13 @@ def download_generate_invoice_pdf(request):
             # Slightly reduced spacing so footer never overflows to next page
             elements.append(Spacer(1, 25))
 
-    # ---- Signature footer (show on EVERY page) ----
-    v_by_name_dl = request.POST.get("v_by_name") or ""
-    r_by_name_dl = request.POST.get("r_by_name") or ""
-
-    def invoice_footer_dl(canvas, doc):
-        """
-        Draw "Verified By / Recommended By / For, <Company>" footer
-        at the bottom of every downloaded invoice page.
-        """
-        canvas.saveState()
-        footer_y = 18 * mm  # More space between TOTAL row and footer text
-
-        x_start = doc.leftMargin
-        usable_width = doc.width
-        col_width = usable_width / 3.0
-
-        labels = ["Verified By", "Recommended By", f"For, {request.session['company_info']['company_name']}"]
-        names = [v_by_name_dl, r_by_name_dl, ""]
-
-        canvas.setFont("Helvetica-Bold", 11)
-        for idx in range(3):
-            col_x_center = x_start + col_width * (idx + 0.5)
-
-            canvas.drawCentredString(col_x_center, footer_y + 8, labels[idx])
-
-            line_half = 25 * mm
-            canvas.setLineWidth(0.7)
-            canvas.line(
-                col_x_center - line_half,
-                footer_y + 2,
-                col_x_center + line_half,
-                footer_y + 2,
-            )
-
-            if names[idx]:
-                canvas.setFont("Helvetica", 9)
-                canvas.drawCentredString(col_x_center, footer_y - 6, names[idx])
-                canvas.setFont("Helvetica-Bold", 11)
-
-        canvas.restoreState()
-
-    # --- Build PDF ---
-    doc.build(elements, onFirstPage=invoice_footer_dl, onLaterPages=invoice_footer_dl)
+    # --- Build PDF (no Verified / Recommended / For footer, as per latest requirement) ---
+    doc.build(elements)
     buffer.seek(0)
     filename = f"{contract.company_name}_{invoice.Bill_no.replace('/','-')}.pdf"
+
+    # This view is specifically for downloading an already generated invoice,
+    # so always send it as a file attachment.
     return FileResponse(buffer, as_attachment=True, filename=filename)
 
 

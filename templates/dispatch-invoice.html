@@ -90,17 +90,7 @@
             </div>
             {% endif %}
 
-            <h5 class="text-primary fw-semibold mb-3">Sign Details</h5>
-            <div class="row">
-              <div class="mb-3 col-sm-6">
-                <label for="v_by_name" class="form-label">Verified By Name</label>
-                <input type="text" class="form-control" id="v_by_name" name="v_by_name" autofocus value="{% if form_data.v_by_name %}{{ form_data.v_by_name }}{% endif %}" />
-              </div>
-              <div class="mb-3 col-sm-6">
-                <label for="r_by_name" class="form-label">Recommended By Name</label>
-                <input type="text" class="form-control" id="r_by_name" name="r_by_name" autofocus value="{% if form_data.r_by_name %}{{ form_data.r_by_name }}{% endif %}" />
-              </div>
-            </div>
+            <!-- Sign details are no longer used in the generated invoice PDF -->
             <div class="row mb-3">
               <div class="col-sm-6">
                 <label class="form-label">Enter Dispacthes Per Page</label>
@@ -156,8 +146,24 @@
                 </table>
               </div>
             </div>
-            <div class="col-sm-6">
-              <button class="btn btn-primary d-grid w-100">Generate Bill</button>
+            <div class="col-sm-8 d-flex gap-2 mt-1">
+              <!-- Preview button: opens PDF in new tab (inline viewer with browser download button) -->
+              <button type="submit"
+                      name="export_type"
+                      value="pdf"
+                      class="btn btn-outline-primary flex-fill"
+                      formtarget="_blank">
+                Preview Invoice
+              </button>
+
+              <!-- Explicit download button: same PDF but forces attachment -->
+              <button type="submit"
+                      name="export_type"
+                      value="pdf"
+                      class="btn btn-primary flex-fill"
+                      onclick="this.form.insertAdjacentHTML('beforeend','<input type=&quot;hidden&quot; name=&quot;download&quot; value=&quot;1&quot; />')">
+                Download Invoice
+              </button>
             </div>
           </form>
         </div>

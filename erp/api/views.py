@@ -18,6 +18,7 @@ from transport.models import (
 import re
 from decimal import Decimal
 from datetime import datetime
+from django.db.models import Func, F, IntegerField
 
 ## CONTRACT DETAILS FETCHING ##
 
@@ -255,7 +256,19 @@ def get_dispacth(request):
             if district_filter:
                 dispatch = dispatch.filter(district=district_filter)
             
-            dispatch = dispatch.values().order_by('dep_date')
+            # Latest date first, challan_no ascending within date for invoice creation list
+            dispatch = (
+                dispatch.annotate(
+                    challan_int=Func(
+                        F("challan_no"),
+                        function="CAST",
+                        template="CAST(%(expressions)s AS UNSIGNED)",
+                        output_field=IntegerField(),
+                    )
+                )
+                .values()
+                .order_by("-dep_date", "challan_int")
+            )
 
             inv = Invoice.objects.filter(company_id = request.session['company_info']['company_id'], contract_id = dcontract_id).order_by('-id').first()
 
@@ -294,16 +307,49 @@ def get_ninv_dispacth(request):                  # ninv means not in invoice dis
         invoice = Invoice.objects.get(id=dbill_id , company_id = request.session['company_info']['company_id'])
         contract = T_Contract.objects.get(id=invoice.contract_id.id)
         # Include inv_status explicitly to ensure it's in the response
-        dispatch = Dispatch.objects.filter(contract_id=invoice.contract_id.id , company_id = request.session['company_info']['company_id'], inv_status = False)
+        dispatch = Dispatch.objects.filter(
+            contract_id=invoice.contract_id.id,
+            company_id=request.session['company_info']['company_id'],
+            inv_status=False,
+        )
         
         # Filter by financial year
         dispatch = filter_by_financial_year(dispatch, financial_year, 'dep_date')
-        
-        dispatch = dispatch.values('id', 'challan_no', 'dep_date', 'truck_no', 'product_name', 
-                                                      'party_name', 'from_center', 'destination', 'taluka', 'district',
-                                                      'km', 'weight', 'rate', 'totalfreight', 'unloading_charge_1',
-                                                      'unloading_charge_2', 'loading_charge', 'grand_total', 
-                                                      'gc_note_no', 'inv_status').order_by('dep_date')
+
+        # Latest date first, challan_no ascending within date when showing non-invoiced dispatch list
+        dispatch = (
+            dispatch.annotate(
+                challan_int=Func(
+                    F("challan_no"),
+                    function="CAST",
+                    template="CAST(%(expressions)s AS UNSIGNED)",
+                    output_field=IntegerField(),
+                )
+            )
+            .values(
+                'id',
+                'challan_no',
+                'dep_date',
+                'truck_no',
+                'product_name',
+                'party_name',
+                'from_center',
+                'destination',
+                'taluka',
+                'district',
+                'km',
+                'weight',
+                'rate',
+                'totalfreight',
+                'unloading_charge_1',
+                'unloading_charge_2',
+                'loading_charge',
+                'grand_total',
+                'gc_note_no',
+                'inv_status',
+            )
+            .order_by('-dep_date', 'challan_int')
+        )
 
         return JsonResponse({
             'fields' : contract.invoice_fields,
@@ -403,11 +449,41 @@ def get_invoice(request):
         try:
             contract = T_Contract.objects.get(id=contract_id)
             # Include inv_status explicitly to ensure it's in the response
-            dispatch = invoice.dispatch_list.values('id', 'challan_no', 'dep_date', 'truck_no', 'product_name', 
-                                                      'party_name', 'from_center', 'destination', 'taluka', 'district',
-                                                      'km', 'weight', 'rate', 'totalfreight', 'unloading_charge_1',
-                                                      'unloading_charge_2', 'loading_charge', 'grand_total', 
-                                                      'gc_note_no', 'inv_status', 'main_party', 'sub_party').order_by('dep_date')
+            dispatch = (
+                invoice.dispatch_list.annotate(
+                    challan_int=Func(
+                        F("challan_no"),
+                        function="CAST",
+                        template="CAST(%(expressions)s AS UNSIGNED)",
+                        output_field=IntegerField(),
+                    )
+                )
+                .values(
+                    'id',
+                    'challan_no',
+                    'dep_date',
+                    'truck_no',
+                    'product_name',
+                    'party_name',
+                    'from_center',
+                    'destination',
+                    'taluka',
+                    'district',
+                    'km',
+                    'weight',
+                    'rate',
+                    'totalfreight',
+                    'unloading_charge_1',
+                    'unloading_charge_2',
+                    'loading_charge',
+                    'grand_total',
+                    'gc_note_no',
+                    'inv_status',
+                    'main_party',
+                    'sub_party',
+                )
+                .order_by('-dep_date', 'challan_int')
+            )
             if (request.GET.get("format") or "").lower() == "csv":
                 header = [
                     "Challan No",
@@ -884,15 +960,27 @@ def get_report_dispatches(request):
             )
         
         # Match filter from download_report but allow optional outstanding-only mode
-        qs = Dispatch.objects.filter(
+        base_qs = Dispatch.objects.filter(
             contract_id=contract_id,
             product_name=product_name,
             dep_date__range=(f_from_date, f_to_date),
-            company_id=company_id
+            company_id=company_id,
         )
         if outstanding_only:
-            qs = qs.filter(inv_status=False)
-        qs = qs.order_by("dep_date")
+            base_qs = base_qs.filter(inv_status=False)
+
+        # Order: latest date first, then challan_no ascending (numeric)
+        qs = (
+            base_qs.annotate(
+                challan_int=Func(
+                    F("challan_no"),
+                    function="CAST",
+                    template="CAST(%(expressions)s AS UNSIGNED)",
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-dep_date", "challan_int")
+        )
 
     elif report_type == "date_wise":
         d_from_date = request.GET.get("d_from_date")
@@ -915,14 +1003,26 @@ def get_report_dispatches(request):
             )
         
         # Match filter from download_report but allow optional outstanding-only mode
-        qs = Dispatch.objects.filter(
+        base_qs = Dispatch.objects.filter(
             contract_id=contract_id,
             dep_date__range=(f_from_date, f_to_date),
-            company_id=company_id
+            company_id=company_id,
         )
         if outstanding_only:
-            qs = qs.filter(inv_status=False)
-        qs = qs.order_by("dep_date")
+            base_qs = base_qs.filter(inv_status=False)
+
+        # Order: latest date first, then challan_no ascending (numeric)
+        qs = (
+            base_qs.annotate(
+                challan_int=Func(
+                    F("challan_no"),
+                    function="CAST",
+                    template="CAST(%(expressions)s AS UNSIGNED)",
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-dep_date", "challan_int")
+        )
     else:
         return JsonResponse({"error": "Invalid report type"}, status=400)
 

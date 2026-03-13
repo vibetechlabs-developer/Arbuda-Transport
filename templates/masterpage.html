@@ -396,6 +396,28 @@
     document.onscroll = resetTimer;
   </script>
 
+  <script>
+    // Prevent selecting future dates in all date inputs across the app
+    document.addEventListener("DOMContentLoaded", function () {
+      try {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const dd = String(today.getDate()).padStart(2, "0");
+        const maxDate = `${yyyy}-${mm}-${dd}`;
+
+        document.querySelectorAll('input[type="date"]').forEach(function (input) {
+          // Only tighten max; never relax an existing earlier max
+          if (!input.max || input.max > maxDate) {
+            input.max = maxDate;
+          }
+        });
+      } catch (e) {
+        console.error("Error setting max date on date inputs:", e);
+      }
+    });
+  </script>
+
 
 </body>
 

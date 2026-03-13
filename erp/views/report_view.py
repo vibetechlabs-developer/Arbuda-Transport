@@ -5,7 +5,7 @@ from company.models import Company_user , Company_profile
 from django.shortcuts import render ,redirect ,get_object_or_404
 from django.http import HttpResponse, FileResponse
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, Func, F, IntegerField
 from io import BytesIO
 import csv
 from reportlab.lib.pagesizes import A4, landscape
@@ -113,28 +113,52 @@ def download_report(request):
             i_p_to_date = request.POST.get("p_to_date")  
             f_from_date = datetime.strptime(i_p_from_date, "%Y-%m-%d").date() if i_p_from_date else None
             f_to_date = datetime.strptime(i_p_to_date, "%Y-%m-%d").date() if i_p_to_date else None
-            dispatches = Dispatch.objects.filter(
+            base_qs = Dispatch.objects.filter(
                 contract_id=i_contract_id,
                 product_name=i_product_name,
                 dep_date__range=(i_p_from_date, i_p_to_date),
                 company_id=request.session["company_info"]["company_id"],
             )
             if outstanding_only:
-                dispatches = dispatches.filter(inv_status=False)
-            dispatches = dispatches.order_by("dep_date")
+                base_qs = base_qs.filter(inv_status=False)
+
+            # Order: latest dispatch date first, and within each date challan_no ascending (numeric)
+            dispatches = (
+                base_qs.annotate(
+                    challan_int=Func(
+                        F("challan_no"),
+                        function="CAST",
+                        template="CAST(%(expressions)s AS UNSIGNED)",
+                        output_field=IntegerField(),
+                    )
+                )
+                .order_by("-dep_date", "challan_int")
+            )
         elif i_report_type == "date_wise":
             i_d_from_date = request.POST.get("d_from_date")
             i_d_to_date = request.POST.get("d_to_date")
             f_from_date = datetime.strptime(i_d_from_date, "%Y-%m-%d").date() if i_d_from_date else None
             f_to_date = datetime.strptime(i_d_to_date, "%Y-%m-%d").date() if i_d_to_date else None
-            dispatches = Dispatch.objects.filter(
+            base_qs = Dispatch.objects.filter(
                 contract_id=i_contract_id,
                 dep_date__range=(i_d_from_date, i_d_to_date),
                 company_id=request.session["company_info"]["company_id"],
             )
             if outstanding_only:
-                dispatches = dispatches.filter(inv_status=False)
-            dispatches = dispatches.order_by("dep_date")
+                base_qs = base_qs.filter(inv_status=False)
+
+            # Order: latest dispatch date first, and within each date challan_no ascending (numeric)
+            dispatches = (
+                base_qs.annotate(
+                    challan_int=Func(
+                        F("challan_no"),
+                        function="CAST",
+                        template="CAST(%(expressions)s AS UNSIGNED)",
+                        output_field=IntegerField(),
+                    )
+                )
+                .order_by("-dep_date", "challan_int")
+            )
         else:
             messages.error(request, "Invalid report type selected!")
             return redirect("client-report-view")
@@ -158,7 +182,8 @@ def download_report(request):
                 if f == "dc_field":
                     header_text = dc_field_label
                 elif f == "sr_no":
-                    header_text = "Sr No"
+                    # Very short label so it never overwrites adjacent column
+                    header_text = "Sr"
                 elif f in ("depature_date", "dep_date"):
                     header_text = "Dep Date"
                 elif f == "truck_no":
@@ -168,7 +193,7 @@ def download_report(request):
                 elif f in ("product_name", "product"):
                     header_text = "Product"
                 elif f == "gc_note":
-                    header_text = "GC Note"
+                    header_text = "GC No"
                 elif f == "unloading_charge_1":
                     header_text = "Unload Chg 1"
                 elif f == "unloading_charge_2":
@@ -248,23 +273,45 @@ def download_report(request):
         to_right_style_desc = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=9, alignment=2 ,leading=11)
 
         # Header (column name) styles - slightly smaller font
+        # Header styles: slightly smaller font and **no wrapping** so column
+        # names never break like "Luggag" / "e" or "Unload Ch" / "g 1".
         header_center_style_desc = ParagraphStyle(
             name="HeaderCenterDesc",
             parent=center_style_desc,
             fontSize=center_style_desc.fontSize - 1,
             leading=center_style_desc.leading - 1,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
         )
         header_to_style_desc = ParagraphStyle(
             name="HeaderToDesc",
             parent=to_style_desc,
             fontSize=to_style_desc.fontSize - 1,
             leading=to_style_desc.leading - 1,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
         )
         header_to_right_style_desc_heading = ParagraphStyle(
             name="HeaderToRightDescHeading",
             parent=to_right_style_desc_heading,
             fontSize=to_right_style_desc_heading.fontSize - 1,
             leading=to_right_style_desc_heading.leading - 1,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
+        )
+
+        # Styles where content must NOT break across lines (for clean standard layout)
+        no_break_date_style = ParagraphStyle(
+            name="NoBreakDateClient",
+            parent=center_style_desc,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
+        )
+        no_break_text_style = ParagraphStyle(
+            name="NoBreakTextClient",
+            parent=to_style_desc,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
         )
 
         # --- Header Table ---
@@ -287,10 +334,8 @@ def download_report(request):
         header_table.setStyle(TableStyle([('LINEBELOW', (0,2), (-1,2), 0.5, colors.black), ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black)]))
 
         fields = contract.invoice_fields
-        # print("Fields for report:", fields)
-        # Show fewer rows per page so rows can be taller and clearer
-        chunk_size = 10  # Fixed to 10 entries per page
-
+        # Use 12 rows per page so layout matches invoice and other reports
+        chunk_size = 12
 
         # --- Build table for a page ---
         def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=0):
@@ -314,12 +359,15 @@ def download_report(request):
                     header_text = "Product"
                 elif f == "gc_note":
                     header_text = "GC Note"
+                # Use very short labels for money columns so they never overwrite neighbours
+                elif f == "luggage":
+                    header_text = "Lugg"
                 elif f == "unloading_charge_1":
-                    header_text = "Unload Chg 1"
+                    header_text = "Unld1"
                 elif f == "unloading_charge_2":
-                    header_text = "Unload Chg 2"
+                    header_text = "Unld2"
                 elif f == "loading_charge":
-                    header_text = "Loading Chg"
+                    header_text = "Load"
                 else:
                     header_text = f.replace("_", " ").title()
                 header_row.append(header_text)
@@ -328,10 +376,40 @@ def download_report(request):
 
             numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
                             "amount", "loading_charge", "totalfreight", "unloading_charge_2"]
-            center_fields = ["sr_no", "gc_note"]
+            # Center some key text columns to create natural space from cell borders
+            # (visually increasing space between Dep Date & Truck No, Destination & Product, District & Product).
+            center_fields = [
+                "sr_no",
+                "gc_note",
+                "depature_date",
+                "dep_date",
+                "destination",
+                "district",
+                "product_name",
+                "product",
+            ]
 
             # Initialize page totals
             total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = total_rate = total_km = 0
+
+            # --- Numeric format helpers (for consistent decimals in the report) ---
+            def _money(val):
+                """Format currency/amount values with exactly 2 decimal places."""
+                try:
+                    if val in (None, "", "None", "null", "NULL", "-"):
+                        return "0.00"
+                    return f"{float(val):.2f}"
+                except Exception:
+                    return "0.00"
+
+            def _num2(val):
+                """Generic 2‑decimal formatter (for Rate etc.)."""
+                try:
+                    if val in (None, "", "None", "null", "NULL", "-"):
+                        return "0.00"
+                    return f"{float(val):.2f}"
+                except Exception:
+                    return "0.00"
 
             # Build rows
             for idx, d in enumerate(dispatch_subset, start=start_index + 1):
@@ -352,33 +430,36 @@ def download_report(request):
                     if field == "sr_no":
                         row.append(idx)
                     elif field in ("depature_date", "dep_date"):
-                        row.append(d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "")
+                        # Use non‑breaking hyphens so the date never splits across lines
+                        row.append(d.dep_date.strftime("%d\u2011%m\u2011%Y") if d.dep_date else "")
                     elif field == "dc_field" or field == "None":
                         row.append(d.challan_no)
                     elif field in ("luggage", "totalfreight"):
-                        row.append(d.totalfreight)
+                        # Show per‑row freight with 2 decimals
+                        row.append(_money(d.totalfreight))
                     elif field in ("product_name", "product"):
                         row.append(d.product_name)
                     elif field == "amount":
-                        row.append(f"{total_amount:.2f}")
+                        # Per‑row total amount with 2 decimals
+                        row.append(_money(total_amount))
+                    elif field == "weight":
+                        # Weight with exactly 2 decimals for this report
+                        row.append(_num2(d.weight))
                     elif field == "gc_note":
                         row.append(d.gc_note_no)
+                    elif field == "rate":
+                        # Rate with exactly 2 decimals
+                        row.append(_num2(d.rate))
                     else:
                         row.append(getattr(d, field, ""))
                 data.append(row)                
 
             # Determine total row logic
-            add_total = False
+            # For this client report, show a TOTAL row **on every page**.
+            # Each page's TOTAL reflects only the dispatches shown on that page.
+            add_total = True
             total_row = []
-
-            if contract.rate_type == "Distric-Wise" and add_total_row:
-                # District-wise: show totals per page
-                add_total = True
-                dispatches_to_sum = dispatch_subset
-            elif contract.rate_type != "Distric-Wise" and is_last_page:
-                # Other rate types: show grand total on last page
-                add_total = True
-                dispatches_to_sum = all_dispatches
+            dispatches_to_sum = dispatch_subset
 
             if add_total:
                 total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
@@ -398,8 +479,8 @@ def download_report(request):
 
                 for i, field in enumerate(fields):
                     if field == "weight":
-                        # Show total weight (MT) with 3 decimals
-                        total_row.append(f"{total_weight:.3f}")
+                        # Show total weight (MT) with 2 decimals
+                        total_row.append(_num2(total_weight))
                     elif field in ("km", "rate"):
                         # Do not show totals for km and rate fields
                         total_row.append("")
@@ -408,16 +489,17 @@ def download_report(request):
                     elif field in ("dc_field", "challan_no"):
                         total_row.append("")  # No total for challan no
                     elif field in ("luggage", "totalfreight"):
-                        s = f"{total_freight_sum:.6f}".rstrip('0').rstrip('.')
-                        total_row.append(s if s else "0")
+                        # Freight total with 2 decimals
+                        total_row.append(_money(total_freight_sum))
                     elif field == "unloading_charge_1":
-                        total_row.append(f"{total_unloading_sum_1:.3f}")
+                        total_row.append(_money(total_unloading_sum_1))
                     elif field == "unloading_charge_2":
-                        total_row.append(f"{total_unloading_sum_2:.3f}")
+                        total_row.append(_money(total_unloading_sum_2))
                     elif field == "loading_charge":
-                        total_row.append(f"{total_loading_sum:.3f}")
+                        total_row.append(_money(total_loading_sum))
                     elif field == "amount":
-                        total_row.append(f"{total_amount_sum:.2f}")
+                        # Grand total amount with 2 decimals
+                        total_row.append(_money(total_amount_sum))
                     else:
                         total_row.append("")
                 total_row[0] = "TOTAL"
@@ -425,18 +507,34 @@ def download_report(request):
 
             # Special column widths
             special_widths = {
-                "Sr No": width_for_chars(5) * mm,
-                f"{contract.dc_field}": width_for_chars(16) * mm,
-                "truck_no": width_for_chars(10) * mm,
-                "Party Name": width_for_chars(25) * mm,
-                "Product Name": width_for_chars(14) * mm,
-                "Gc Note": width_for_chars(8) * mm,
-                "Weight": width_for_chars(10) * mm,
-                "Km": width_for_chars(5) * mm,
-                "Rate": width_for_chars(12) * mm,
-                "Luggage": width_for_chars(14) * mm,
-                "Unloading Charge 1": width_for_chars(14) * mm,
-                "Loading Charge": width_for_chars(14) * mm,
+                # Sr column slightly wider so number + header fit cleanly
+                "Sr": 10 * mm,
+                "Sr No": 10 * mm,
+                # Widened so full date (e.g. 13‑03‑2026) fits on one line and
+                # leaves a bit of blank space before the Truck No column.
+                "Dep Date": 18 * mm,
+                f"{contract.dc_field}": 18 * mm,
+                "truck_no": 14 * mm,
+                # Key text columns widened so destination / district / product names don't break
+                # and to create more visual separation between these adjacent columns.
+                "Party Name": 24 * mm,
+                "Product Name": 20 * mm,
+                "Destination": 24 * mm,
+                "District": 20 * mm,
+                "Taluka": 16 * mm,
+                "Gc Note": 10 * mm,
+                "Weight": 12 * mm,
+                "Km": 9 * mm,
+                "Rate": 11 * mm,
+                # Money columns: short labels and enough width so they don't overwrite neighbours
+                "Lugg": 13 * mm,
+                "Luggage": 13 * mm,
+                "Unld1": 15 * mm,
+                "Unld2": 15 * mm,
+                "Unload Chg 1": 15 * mm,
+                "Unload Chg 2": 15 * mm,
+                "Unloading Charge 1": 15 * mm,
+                "Loading Charge": 13 * mm,
             }
 
             table_width = 288 * mm
@@ -460,6 +558,9 @@ def download_report(request):
                 for j, cell in enumerate(row):
                     field_name = fields[j]
                     if i == 0:  # header
+                        # Prevent header labels like "Dep Date" or "Party Name"
+                        # from breaking into two lines by using non‑breaking spaces
+                        cell_text = str(cell).replace(" ", "\u00A0")
                         style = (
                             header_to_right_style_desc_heading
                             if field_name in numeric_fields
@@ -467,28 +568,44 @@ def download_report(request):
                             if field_name in center_fields
                             else header_to_style_desc
                         )
-                        row[j] = Paragraph(f"<b>{cell}</b>", style)
+                        row[j] = Paragraph(f"<b>{cell_text}</b>", style)
                     elif add_total and i == len(data) - 1:  # total/grand total row
                         row[j] = Paragraph(str(cell), total_style)
                     else:
-                        style = to_right_style_desc if field_name in numeric_fields else center_style_desc if field_name in center_fields else to_style_desc
+                        # Force no‑wrap for dates and key text fields so data never splits
+                        if field_name in ("depature_date", "dep_date"):
+                            style = no_break_date_style
+                        elif field_name in ("destination", "district", "taluka", "party_name", "product_name", "product"):
+                            style = no_break_text_style
+                        else:
+                            style = (
+                                to_right_style_desc
+                                if field_name in numeric_fields
+                                else center_style_desc
+                                if field_name in center_fields
+                                else to_style_desc
+                            )
                         row[j] = Paragraph(str(cell), style)
 
             table = Table(data, colWidths=col_widths, repeatRows=1)
 
-            # Table styles
+            # Table styles (tuned for clean, standard spacing)
             styles = [
                 ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-                ("VALIGN", (0,0), (-1,-1), "TOP"),
+                # Keep text visually centered in each cell to avoid cramped / glitchy look
+                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
                 ("ALIGN", (0,0), (-1,0), "CENTER"),
                 ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-                ("LEFTPADDING", (0,0), (-1,-1), 2),
-                ("RIGHTPADDING", (0,0), (-1,-1), 2),
-                ("TOPPADDING", (0,0), (-1,0), 3),
+                # Slightly more horizontal and vertical padding for breathing room
+                ("LEFTPADDING", (0,0), (-1,-1), 3),
+                ("RIGHTPADDING", (0,0), (-1,-1), 3),
+                # Header row padding
+                ("TOPPADDING", (0,0), (-1,0), 4),
+                ("BOTTOMPADDING", (0,0), (-1,0), 4),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ("BOTTOMPADDING", (0,0), (-1,0), 3),
-                ("TOPPADDING", (0,1), (-1,-2), 1),  
-                ("BOTTOMPADDING", (0,1), (-1,-2), 1),
+                # Data rows padding
+                ("TOPPADDING", (0,1), (-1,-2), 3),  
+                ("BOTTOMPADDING", (0,1), (-1,-2), 3),
                 ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
                 ("LINEBELOW", (0,0), (-1,0), 0.2, colors.black),
             ]
@@ -551,11 +668,12 @@ def download_report(request):
             ]))
             elements.append(to_table)  
             elements.append(Spacer(1,2))
-            elements.append(Paragraph("<center><b>PERTICULARS</b></center>", center_style))
+            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
             elements.append(Spacer(1,2))
             elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.black))
             elements.append(Spacer(1,2))
-            add_total_row = contract.rate_type == "Distric-Wise"
+            # Always show a TOTAL row per page for this client report
+            add_total_row = True
             
             # Build table and signature together to keep on same page
             table = build_table_page(
@@ -565,43 +683,23 @@ def download_report(request):
                 all_dispatches=dispatches,
                 start_index=i,
             )
-            
-            # Signature section on each page - more compact
-            v_by_name = request.POST.get('v_by_name', '')
-            r_by_name = request.POST.get('r_by_name', '')
-            signature_style = ParagraphStyle(name="Signature", fontName="Helvetica", fontSize=8, alignment=0, leading=9)
-            signature_right_style = ParagraphStyle(name="SignatureRight", fontName="Helvetica", fontSize=8, alignment=2, leading=9)
-            signature_data = [
-                [
-                    Paragraph(f"<b>Verified By</b><br/>_________________<br/>{v_by_name}", signature_style),
-                    Paragraph(f"<b>Recommended By</b><br/>_________________<br/>{r_by_name}", signature_style),
-                    Paragraph(f"<b>For, {request.session['company_info']['company_name']}</b><br/>_________________", signature_right_style),
-                ]
-            ]
-            signature_table = Table(signature_data, colWidths=[70*mm,70*mm,70*mm])
-            signature_table.setStyle(TableStyle([
-                ("ALIGN",(0,0),(0,0),"LEFT"),
-                ("ALIGN",(1,0),(1,0),"CENTER"),
-                ("ALIGN",(2,0),(2,0),"RIGHT"),
-                ("TOPPADDING",(0,0),(-1,-1),2),
-                ("BOTTOMPADDING",(0,0),(-1,-1),2),
-                ("VALIGN",(0,0),(-1,-1),"TOP")
-            ]))
-            
-            # Keep table and signature together on same page
-            page_content = [
-                table,
-                Spacer(1,2),
-                signature_table
-            ]
-            elements.append(KeepTogether(page_content))
+
+            # Only the table (no Verified / Recommended / For footer)
+            elements.append(table)
 
         # --- Build PDF ---
         try:
             doc.build(elements)
             buffer.seek(0)
             filename = f"{contract.company_name}-Dispacth-Report.pdf"
-            response = FileResponse(buffer, as_attachment=True, filename=filename, content_type='application/pdf')
+            # Inline preview by default; only download when ?download=1 or hidden input is sent
+            download_flag = request.POST.get("download") or request.GET.get("download")
+            response = FileResponse(
+                buffer,
+                as_attachment=bool(download_flag),
+                filename=filename,
+                content_type='application/pdf',
+            )
             return response
         except Exception as e:
             messages.error(request, f"Error generating PDF: {str(e)}")
@@ -754,7 +852,8 @@ def download_our_report(request):
                 elif f == "truck_booking_rate":
                     header_text = "Truck Rate"
                 elif f == "total_paid_truck_onwer":
-                    header_text = "Total Paid Owner"
+                    # Stack into two lines so it doesn't collide with neighbours
+                    header_text = "Total Paid<br/>Owner"
                 elif f == "advance_paid":
                     header_text = "Advance Paid"
                 elif f == "panding_amount":
@@ -813,37 +912,73 @@ def download_our_report(request):
         styles = getSampleStyleSheet()
         elements = []
 
-        # --- Styles --- (optimized for better fit with more columns)
-        # Slightly larger fonts and spacing for a clearer internal report,
-        # but keep column names a bit smaller than data rows.
-        center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=10, alignment=1 ,leading=12)
-        center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=8, alignment=1 ,leading=10)
-        title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=11, alignment=1 ,leading=13) 
-        to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=0 ,leading=11)
-        to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=2 ,leading=11)
-        total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=8, alignment=2, leading=10)
-        to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=8, alignment=0 ,leading=10)
-        to_right_style_desc_heading = ParagraphStyle(name="ToRightDescHeading", fontName="Helvetica-Bold", fontSize=8, alignment=2 ,leading=10)
-        to_right_style_desc = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=8, alignment=2 ,leading=10)
+        # --- Styles ---
+        # Keep internal report visually consistent with client report, just with
+        # a slightly more compact data font so additional columns fit cleanly.
+        center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=10, alignment=1, leading=12)
+        center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
+        title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=11, alignment=1, leading=13)
+        to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=0, leading=11)
+        to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
+        total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)
+        to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=8, alignment=0, leading=10)
+        to_right_style_desc_heading = ParagraphStyle(
+            name="ToRightDescHeading",
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            alignment=2,
+            leading=10,
+        )
+        to_right_style_desc = ParagraphStyle(
+            name="ToRightDesc",
+            fontName="Helvetica",
+            fontSize=8,
+            alignment=2,
+            leading=10,
+        )
 
-        # Header (column name) styles - slightly smaller
+        # Header styles: use non‑breaking spaces and no wrapping so column names
+        # never split across lines (same idea as client report).
+        # For internal report (more columns), use slightly smaller header fonts and
+        # allow wrapping on long labels so they don't visually overwrite neighbours.
         header_center_style_desc_internal = ParagraphStyle(
             name="HeaderCenterDescInternal",
             parent=center_style_desc,
-            fontSize=center_style_desc.fontSize - 1,
+            fontSize=center_style_desc.fontSize - 1.5,
             leading=center_style_desc.leading - 1,
+            # allow natural wrapping for long labels
+            wordWrap="CJK",
+            splitLongWords=0,
         )
         header_to_style_desc_internal = ParagraphStyle(
             name="HeaderToDescInternal",
             parent=to_style_desc,
-            fontSize=to_style_desc.fontSize - 1,
+            fontSize=to_style_desc.fontSize - 1.5,
             leading=to_style_desc.leading - 1,
+            wordWrap="CJK",
+            splitLongWords=0,
         )
         header_to_right_style_desc_heading_internal = ParagraphStyle(
             name="HeaderToRightDescHeadingInternal",
             parent=to_right_style_desc_heading,
-            fontSize=to_right_style_desc_heading.fontSize - 1,
-            leading=to_right_style_desc_heading.leading - 1,
+            fontSize=to_right_style_desc_heading.fontSize - 0.5,
+            leading=to_right_style_desc_heading.leading - 0.5,
+            # numeric headers are short; keep them on one line
+            wordWrap="NOBREAK",
+            splitLongWords=0,
+        )
+        # Cells where data must NEVER break across lines (dates, key text columns)
+        no_break_date_style = ParagraphStyle(
+            name="NoBreakDateInternal",
+            parent=center_style_desc,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
+        )
+        no_break_text_style = ParagraphStyle(
+            name="NoBreakTextInternal",
+            parent=to_style_desc,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
         )
 
         # --- Header Table ---
@@ -858,56 +993,110 @@ def download_our_report(request):
         header_table.setStyle(TableStyle([('LINEBELOW', (0,2), (-1,2), 0.5, colors.black), ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black)]))
 
         fields = contract.invoice_fields
-        # print("Fields for report:", fields)
-        # Add the 5 additional columns for internal report
-        additional_fields = ["truck_booking_rate", "total_paid_truck_onwer", "advance_paid", "panding_amount", "net_profit"]
+        # Add internal-only columns for internal report (exclude truck_booking_rate)
+        additional_fields = [
+            "total_paid_truck_onwer",
+            "advance_paid",
+            "panding_amount",
+            "net_profit",
+        ]
         fields = fields + additional_fields if fields else additional_fields
-        # Fewer rows per page for better readability with many columns
-        chunk_size = 10  # Fixed to 10 entries per page
+        # Use 12 rows per page for internal report as well, to keep all reports consistent
+        chunk_size = 12
 
         # --- Build table for a page ---
         def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=0):
-            # Header row with better formatting and shorter labels
+            """
+            Build one page of the internal report table.
+            Layout philosophy:
+            - Reuse client report styling so headers and data never look broken.
+            - Treat all money/amount columns as right‑aligned with fixed decimals.
+            - Keep key text columns on a single line using non‑breaking spaces.
+            """
+            # Header row with readable, compact labels
             header_row = []
-            dc_field_label = contract.dc_field if contract.dc_field and contract.dc_field not in [None, "None", "null", ""] else "Challan No"
-            
+            dc_field_label = (
+                contract.dc_field
+                if contract.dc_field and contract.dc_field not in [None, "None", "null", ""]
+                else "Challan No"
+            )
+
             for f in fields:
                 if f == "dc_field":
                     header_text = dc_field_label
-                elif f == "truck_no":
-                    header_text = "Truck No"
-                elif f == "total_paid_truck_onwer":
-                    header_text = "Total Paid Owner"  # Shorter label
-                elif f == "panding_amount":
-                    header_text = "Pending Amt"  # Shorter label
-                elif f == "unloading_charge_1":
-                    header_text = "Unload Chg 1"  # Shorter label
-                elif f == "unloading_charge_2":
-                    header_text = "Unload Chg 2"  # Shorter label
-                elif f == "loading_charge":
-                    header_text = "Loading Chg"  # Shorter label
-                elif f == "truck_booking_rate":
-                    header_text = "Truck Rate"  # Shorter label
-                elif f == "gc_note":
-                    header_text = "GC Note"
                 elif f == "sr_no":
                     header_text = "Sr No"
-                elif f == "product_name" or f == "product":
+                elif f in ("depature_date", "dep_date"):
+                    header_text = "Dep Date"
+                elif f == "truck_no":
+                    header_text = "Truck No"
+                elif f == "party_name":
+                    header_text = "Party Name"
+                elif f in ("product_name", "product"):
                     header_text = "Product"
+                elif f == "gc_note":
+                    header_text = "GC No"
+                elif f == "luggage":
+                    header_text = "Lugg"
+                elif f == "unloading_charge_1":
+                    header_text = "Unld1"
+                elif f == "unloading_charge_2":
+                    header_text = "Unld2"
+                elif f == "loading_charge":
+                    header_text = "Load"
+                elif f == "total_paid_truck_onwer":
+                    header_text = "Total Paid Owner"
+                elif f == "advance_paid":
+                    header_text = "Adv<br/>Paid"
+                elif f == "panding_amount":
+                    header_text = "Pending<br/>Amt"
+                elif f == "net_profit":
+                    header_text = "Net<br/>Profit"
                 else:
                     header_text = f.replace("_", " ").title()
                 header_row.append(header_text)
             data = [header_row]
 
-            numeric_fields = ["weight", "km", "rate", "luggage", "unloading_charge_1",
-                            "amount", "loading_charge", "totalfreight", "unloading_charge_2",
-                            "truck_booking_rate", "total_paid_truck_onwer", "advance_paid", 
-                            "panding_amount", "net_profit"]
+            numeric_fields = [
+                "weight",
+                "km",
+                "rate",
+                "luggage",
+                "unloading_charge_1",
+                "amount",
+                "loading_charge",
+                "totalfreight",
+                "unloading_charge_2",
+                "total_paid_truck_onwer",
+                "advance_paid",
+                "panding_amount",
+                "net_profit",
+            ]
+            # Center some small identifier columns
             center_fields = ["sr_no", "gc_note"]
 
+            # Numeric helpers (match client behaviour: money/qty → 2 decimals)
+            def _money(val):
+                try:
+                    if val in (None, "", "None", "null", "NULL", "-"):
+                        return "0.00"
+                    return f"{float(val):.2f}"
+                except Exception:
+                    return "0.00"
+
+            def _num2(val):
+                try:
+                    if val in (None, "", "None", "null", "NULL", "-"):
+                        return "0.00"
+                    return f"{float(val):.2f}"
+                except Exception:
+                    return "0.00"
+
             # Initialize page totals
-            total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = total_rate = total_km = 0
-            total_truck_booking_rate = total_paid_truck_owner = total_advance_paid = total_panding_amount = total_net_profit = 0
+            total_freight_sum = (
+                total_unloading_sum_1
+            ) = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = total_rate = total_km = 0
+            total_paid_truck_owner = total_advance_paid = total_panding_amount = total_net_profit = 0
 
             # Build rows
             for idx, d in enumerate(dispatch_subset, start=start_index + 1):
@@ -924,7 +1113,6 @@ def download_our_report(request):
                 total_weight += float(d.weight or 0)
                 
                 # Additional fields totals
-                total_truck_booking_rate += float(d.truck_booking_rate or 0)
                 total_paid_truck_owner += float(d.total_paid_truck_onwer or 0)
                 total_advance_paid += float(d.advance_paid or 0)
                 total_panding_amount += float(d.panding_amount or 0)
@@ -935,27 +1123,34 @@ def download_our_report(request):
                     if field == "sr_no":
                         row.append(idx)
                     elif field in ("depature_date", "dep_date"):
-                        row.append(d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "")
+                        # Use non‑breaking hyphens so the date never splits across lines
+                        row.append(d.dep_date.strftime("%d\u2011%m\u2011%Y") if d.dep_date else "")
                     elif field == "dc_field" or field == "None":
                         row.append(d.challan_no)
                     elif field in ("luggage", "totalfreight"):
-                        row.append(d.totalfreight)
+                        # per‑row freight/luggage – 2 decimals
+                        row.append(_money(d.totalfreight))
                     elif field in ("product_name", "product"):
                         row.append(d.product_name)
                     elif field == "amount":
-                        row.append(f"{total_amount:.2f}")
+                        # per‑row total amount – 2 decimals
+                        row.append(_money(total_amount))
                     elif field == "gc_note":
                         row.append(d.gc_note_no)
-                    elif field == "truck_booking_rate":
-                        row.append(f"{float(d.truck_booking_rate or 0):.2f}")
+                    elif field == "weight":
+                        row.append(_num2(d.weight))
+                    elif field == "rate":
+                        row.append(_num2(d.rate))
+                    elif field == "km":
+                        row.append(_num2(d.km))
                     elif field == "total_paid_truck_onwer":
-                        row.append(f"{float(d.total_paid_truck_onwer or 0):.2f}")
+                        row.append(_money(d.total_paid_truck_onwer))
                     elif field == "advance_paid":
-                        row.append(f"{float(d.advance_paid or 0):.2f}")
+                        row.append(_money(d.advance_paid))
                     elif field == "panding_amount":
-                        row.append(f"{float(d.panding_amount or 0):.2f}")
+                        row.append(_money(d.panding_amount))
                     elif field == "net_profit":
-                        row.append(f"{float(d.net_profit or 0):.2f}")
+                        row.append(_money(d.net_profit))
                     else:
                         row.append(getattr(d, field, ""))
                 data.append(row)                
@@ -974,14 +1169,18 @@ def download_our_report(request):
                 dispatches_to_sum = all_dispatches
 
             if add_total:
-                total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
-                total_truck_booking_rate = total_paid_truck_owner = total_advance_paid = total_panding_amount = total_net_profit = 0
-                
+                total_weight = (
+                    total_freight_sum
+                ) = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
+                total_paid_truck_owner = total_advance_paid = total_panding_amount = total_net_profit = 0
+
                 for d in dispatches_to_sum:
-                    total_amount = (float(d.totalfreight or 0) +
-                                    float(d.unloading_charge_1 or 0) +
-                                    float(d.unloading_charge_2 or 0) +
-                                    float(d.loading_charge or 0))
+                    total_amount = (
+                        float(d.totalfreight or 0)
+                        + float(d.unloading_charge_1 or 0)
+                        + float(d.unloading_charge_2 or 0)
+                        + float(d.loading_charge or 0)
+                    )
                     total_freight_sum += float(d.totalfreight or 0)
                     total_unloading_sum_1 += float(d.unloading_charge_1 or 0)
                     total_unloading_sum_2 += float(d.unloading_charge_2 or 0)
@@ -990,9 +1189,8 @@ def download_our_report(request):
                     total_weight += float(d.weight or 0)
                     total_rate += float(d.rate or 0)
                     total_km += float(d.km or 0)
-                    
+
                     # Additional fields totals
-                    total_truck_booking_rate += float(d.truck_booking_rate or 0)
                     total_paid_truck_owner += float(d.total_paid_truck_onwer or 0)
                     total_advance_paid += float(d.advance_paid or 0)
                     total_panding_amount += float(d.panding_amount or 0)
@@ -1000,47 +1198,47 @@ def download_our_report(request):
 
                 for i, field in enumerate(fields):
                     if field == "weight":
-                        # Show total weight (MT) with 3 decimals
-                        total_row.append(f"{total_weight:.3f}")
+                        # Show total weight (MT) with 2 decimals
+                        total_row.append(_num2(total_weight))
                     elif field in ("km", "rate"):
-                        # Do not show totals for km and rate fields
+                        # No totals for km and rate
                         total_row.append("")
                     elif field in ("depature_date", "dep_date"):
                         total_row.append("")  # No total for date
                     elif field in ("dc_field", "challan_no"):
                         total_row.append("")  # No total for challan no
                     elif field in ("luggage", "totalfreight"):
-                        s = f"{total_freight_sum:.6f}".rstrip('0').rstrip('.')
-                        total_row.append(s if s else "0")
+                        total_row.append(_money(total_freight_sum))
                     elif field == "unloading_charge_1":
-                        total_row.append(f"{total_unloading_sum_1:.3f}")
+                        total_row.append(_money(total_unloading_sum_1))
                     elif field == "unloading_charge_2":
-                        total_row.append(f"{total_unloading_sum_2:.3f}")
+                        total_row.append(_money(total_unloading_sum_2))
                     elif field == "loading_charge":
-                        total_row.append(f"{total_loading_sum:.3f}")
+                        total_row.append(_money(total_loading_sum))
                     elif field == "amount":
-                        total_row.append(f"{total_amount_sum:.2f}")
-                    elif field == "truck_booking_rate":
-                        total_row.append(f"{total_truck_booking_rate:.2f}")
+                        total_row.append(_money(total_amount_sum))
                     elif field == "total_paid_truck_onwer":
-                        total_row.append(f"{total_paid_truck_owner:.2f}")
+                        total_row.append(_money(total_paid_truck_owner))
                     elif field == "advance_paid":
-                        total_row.append(f"{total_advance_paid:.2f}")
+                        total_row.append(_money(total_advance_paid))
                     elif field == "panding_amount":
-                        total_row.append(f"{total_panding_amount:.2f}")
+                        total_row.append(_money(total_panding_amount))
                     elif field == "net_profit":
-                        total_row.append(f"{total_net_profit:.2f}")
+                        total_row.append(_money(total_net_profit))
                     else:
                         total_row.append("")
                 total_row[0] = "TOTAL"
                 data.append(total_row)
 
-            # Special column widths - optimized for better fit with all columns
+            # Column widths – mirror client report philosophy, with extra room for
+            # internal numeric columns so headers & data stay on one line.
             special_widths = {
-                "Sr No": 7 * mm,
-                dc_field_label: 18 * mm,
-                "Truck No": 14 * mm,
-                "Party Name": 22 * mm,
+                # extra space between Sr / Date / Truck so they don't feel glued together
+                "Sr No": 12 * mm,
+                "Dep Date": 22 * mm,
+                dc_field_label: 20 * mm,
+                "Truck No": 20 * mm,
+                "Party Name": 24 * mm,
                 "Product": 18 * mm,
                 "Product Name": 18 * mm,
                 "GC Note": 11 * mm,
@@ -1048,69 +1246,49 @@ def download_our_report(request):
                 "Weight": 11 * mm,
                 "Km": 9 * mm,
                 "Rate": 11 * mm,
-                "Luggage": 13 * mm,
-                "Unload Chg 1": 14 * mm,
-                "Unloading Charge 1": 14 * mm,
-                "Unload Chg 2": 14 * mm,
-                "Unloading Charge 2": 14 * mm,
-                "Loading Chg": 13 * mm,
-                "Loading Charge": 13 * mm,
-                "Truck Rate": 14 * mm,
-                "Truck Booking Rate": 14 * mm,
-                "Total Paid Owner": 16 * mm,
-                "Total Paid Truck Onwer": 16 * mm,
-                "Advance Paid": 13 * mm,
-                "Pending Amt": 14 * mm,
-                "Panding Amount": 14 * mm,
+                "Lugg": 12 * mm,
+                "Luggage": 12 * mm,
+                "Unld1": 13 * mm,
+                "Unld2": 13 * mm,
+                "Unload Chg 1": 13 * mm,
+                "Unload Chg 2": 13 * mm,
+                "Load": 12 * mm,
+                "Loading Chg": 12 * mm,
+                "Total Paid Owner": 17 * mm,
+                "Adv Paid": 13 * mm,
+                "Pending Amt": 15 * mm,
                 "Net Profit": 13 * mm,
+                "District": 18 * mm,
+                "Destination": 22 * mm,
+                "Taluka": 14 * mm,
             }
 
             table_width = 288 * mm
             headers = data[0]
 
-            # Calculate column widths - improved algorithm
             col_widths = []
             for col_name in headers:
-                # Try exact match first
-                width = special_widths.get(col_name, None)
+                width = special_widths.get(col_name)
                 if width is None:
-                    # Try case-insensitive match
-                    width = next((special_widths[k] for k in special_widths.keys() if k.lower() == col_name.lower()), None)
-                if width is None:
-                    # Try partial match for common fields
-                    col_lower = col_name.lower()
-                    if "challan" in col_lower or "dc" in col_lower:
-                        width = special_widths.get(dc_field_label, 18 * mm)
-                    elif "truck" in col_lower and "no" in col_lower:
-                        width = special_widths.get("Truck No", 14 * mm)
-                    elif "unloading" in col_lower:
-                        width = special_widths.get("Unload Chg 1", 14 * mm)
-                    elif "loading" in col_lower:
-                        width = special_widths.get("Loading Chg", 13 * mm)
-                    elif "product" in col_lower:
-                        width = special_widths.get("Product", 18 * mm)
-                    else:
-                        # Default width for unknown columns
-                        width = 14 * mm
+                    # Default width for unknown columns
+                    width = 14 * mm
                 col_widths.append(width)
 
-            # Adjust column widths proportionally if total exceeds table width
+            # Scale widths if sum doesn't match table width
             fixed_total = sum(col_widths)
-            if fixed_total > table_width:
-                # Scale down proportionally
+            if fixed_total > 0:
                 scale_factor = table_width / fixed_total
                 col_widths = [w * scale_factor for w in col_widths]
-            elif fixed_total < table_width:
-                # Distribute remaining space proportionally
-                remaining = table_width - fixed_total
-                per_col = remaining / len(col_widths)
-                col_widths = [w + per_col for w in col_widths]
 
             # Format cells
             for i, row in enumerate(data):
                 for j, cell in enumerate(row):
                     field_name = fields[j]
                     if i == 0:  # header
+                        # For internal header row, allow normal spaces / <br/> so
+                        # long labels can wrap inside their own cells instead of
+                        # visually overwriting neighbouring columns.
+                        cell_text = str(cell)
                         style = (
                             header_to_right_style_desc_heading_internal
                             if field_name in numeric_fields
@@ -1118,11 +1296,30 @@ def download_our_report(request):
                             if field_name in center_fields
                             else header_to_style_desc_internal
                         )
-                        row[j] = Paragraph(f"<b>{cell}</b>", style)
+                        row[j] = Paragraph(f"<b>{cell_text}</b>", style)
                     elif add_total and i == len(data) - 1:  # total/grand total row
                         row[j] = Paragraph(str(cell), total_style)
                     else:
-                        style = to_right_style_desc if field_name in numeric_fields else center_style_desc if field_name in center_fields else to_style_desc
+                        # Force no‑wrap for dates and key text fields so data never splits
+                        if field_name in ("depature_date", "dep_date"):
+                            style = no_break_date_style
+                        elif field_name in (
+                            "district",
+                            "destination",
+                            "taluka",
+                            "party_name",
+                            "product_name",
+                            "product",
+                        ):
+                            style = no_break_text_style
+                        else:
+                            style = (
+                                to_right_style_desc
+                                if field_name in numeric_fields
+                                else center_style_desc
+                                if field_name in center_fields
+                                else to_style_desc
+                            )
                         row[j] = Paragraph(str(cell), style)
 
             table = Table(data, colWidths=col_widths, repeatRows=1)
@@ -1201,13 +1398,13 @@ def download_our_report(request):
             ]))
             elements.append(to_table)  
             elements.append(Spacer(1,2))
-            elements.append(Paragraph("<center><b>PERTICULARS</b></center>", center_style))
+            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
             elements.append(Spacer(1,2))
             elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.black))
             elements.append(Spacer(1,2))
             add_total_row = contract.rate_type == "Distric-Wise"
             
-            # Build table and signature together to keep on same page
+            # Build table only (no Verified / Recommended / For footer as per latest requirement)
             table = build_table_page(
                 dispatch_chunk,
                 add_total_row=add_total_row,
@@ -1215,43 +1412,23 @@ def download_our_report(request):
                 all_dispatches=dispatches,
                 start_index=i,
             )
-            
-            # Signature section on each page - more compact
-            v_by_name = request.POST.get('v_by_name', '')
-            r_by_name = request.POST.get('r_by_name', '')
-            signature_style = ParagraphStyle(name="Signature", fontName="Helvetica", fontSize=8, alignment=0, leading=9)
-            signature_right_style = ParagraphStyle(name="SignatureRight", fontName="Helvetica", fontSize=8, alignment=2, leading=9)
-            signature_data = [
-                [
-                    Paragraph(f"<b>Verified By</b><br/>_________________<br/>{v_by_name}", signature_style),
-                    Paragraph(f"<b>Recommended By</b><br/>_________________<br/>{r_by_name}", signature_style),
-                    Paragraph(f"<b>For, {request.session['company_info']['company_name']}</b><br/>_________________", signature_right_style),
-                ]
-            ]
-            signature_table = Table(signature_data, colWidths=[70*mm,70*mm,70*mm])
-            signature_table.setStyle(TableStyle([
-                ("ALIGN",(0,0),(0,0),"LEFT"),
-                ("ALIGN",(1,0),(1,0),"CENTER"),
-                ("ALIGN",(2,0),(2,0),"RIGHT"),
-                ("TOPPADDING",(0,0),(-1,-1),2),
-                ("BOTTOMPADDING",(0,0),(-1,-1),2),
-                ("VALIGN",(0,0),(-1,-1),"TOP")
-            ]))
-            
-            # Keep table and signature together on same page
-            page_content = [
-                table,
-                Spacer(1,2),
-                signature_table
-            ]
-            elements.append(KeepTogether(page_content))
+            elements.append(table)
 
         # --- Build PDF ---
         try:
             doc.build(elements)
             buffer.seek(0)
             filename = f"{contract.company_name}-Dispacth-Report.pdf"
-            response = FileResponse(buffer, as_attachment=True, filename=filename, content_type='application/pdf')
+
+            # Match client report behaviour:
+            # preview inline by default, download only when ?download=1 or hidden input is sent
+            download_flag = request.POST.get("download") or request.GET.get("download")
+            response = FileResponse(
+                buffer,
+                as_attachment=bool(download_flag),
+                filename=filename,
+                content_type="application/pdf",
+            )
             return response
         except Exception as e:
             messages.error(request, f"Error generating PDF: {str(e)}")
