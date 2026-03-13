@@ -430,8 +430,8 @@ def download_report(request):
                     if field == "sr_no":
                         row.append(idx)
                     elif field in ("depature_date", "dep_date"):
-                        # Use non‑breaking hyphens so the date never splits across lines
-                        row.append(d.dep_date.strftime("%d\u2011%m\u2011%Y") if d.dep_date else "")
+                        # Standard date format matching sample (e.g. 25-11-2025)
+                        row.append(d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "")
                     elif field == "dc_field" or field == "None":
                         row.append(d.challan_no)
                     elif field in ("luggage", "totalfreight"):
@@ -572,11 +572,10 @@ def download_report(request):
                     elif add_total and i == len(data) - 1:  # total/grand total row
                         row[j] = Paragraph(str(cell), total_style)
                     else:
-                        # Force no‑wrap for dates and key text fields so data never splits
+                        # Keep dates on a single line; allow text columns to wrap
+                        # instead of visually overwriting neighbouring cells.
                         if field_name in ("depature_date", "dep_date"):
                             style = no_break_date_style
-                        elif field_name in ("destination", "district", "taluka", "party_name", "product_name", "product"):
-                            style = no_break_text_style
                         else:
                             style = (
                                 to_right_style_desc
@@ -993,8 +992,9 @@ def download_our_report(request):
         header_table.setStyle(TableStyle([('LINEBELOW', (0,2), (-1,2), 0.5, colors.black), ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black)]))
 
         fields = contract.invoice_fields
-        # Add internal-only columns for internal report (exclude truck_booking_rate)
+        # Add internal-only columns for internal report (including truck_booking_rate)
         additional_fields = [
+            "truck_booking_rate",
             "total_paid_truck_onwer",
             "advance_paid",
             "panding_amount",
@@ -1044,6 +1044,8 @@ def download_our_report(request):
                     header_text = "Unld2"
                 elif f == "loading_charge":
                     header_text = "Load"
+                elif f == "truck_booking_rate":
+                    header_text = "Truck Rate"
                 elif f == "total_paid_truck_onwer":
                     header_text = "Total Paid Owner"
                 elif f == "advance_paid":
@@ -1123,8 +1125,8 @@ def download_our_report(request):
                     if field == "sr_no":
                         row.append(idx)
                     elif field in ("depature_date", "dep_date"):
-                        # Use non‑breaking hyphens so the date never splits across lines
-                        row.append(d.dep_date.strftime("%d\u2011%m\u2011%Y") if d.dep_date else "")
+                        # Standard date format matching sample (e.g. 25-11-2025)
+                        row.append(d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "")
                     elif field == "dc_field" or field == "None":
                         row.append(d.challan_no)
                     elif field in ("luggage", "totalfreight"):
@@ -1143,6 +1145,8 @@ def download_our_report(request):
                         row.append(_num2(d.rate))
                     elif field == "km":
                         row.append(_num2(d.km))
+                    elif field == "truck_booking_rate":
+                        row.append(_num2(d.truck_booking_rate))
                     elif field == "total_paid_truck_onwer":
                         row.append(_money(d.total_paid_truck_onwer))
                     elif field == "advance_paid":
@@ -1200,8 +1204,8 @@ def download_our_report(request):
                     if field == "weight":
                         # Show total weight (MT) with 2 decimals
                         total_row.append(_num2(total_weight))
-                    elif field in ("km", "rate"):
-                        # No totals for km and rate
+                    elif field in ("km", "rate", "truck_booking_rate"):
+                        # No totals for km, rate, or truck booking rate
                         total_row.append("")
                     elif field in ("depature_date", "dep_date"):
                         total_row.append("")  # No total for date
@@ -1246,6 +1250,7 @@ def download_our_report(request):
                 "Weight": 11 * mm,
                 "Km": 9 * mm,
                 "Rate": 11 * mm,
+                "Truck Rate": 11 * mm,
                 "Lugg": 12 * mm,
                 "Luggage": 12 * mm,
                 "Unld1": 13 * mm,
@@ -1300,18 +1305,10 @@ def download_our_report(request):
                     elif add_total and i == len(data) - 1:  # total/grand total row
                         row[j] = Paragraph(str(cell), total_style)
                     else:
-                        # Force no‑wrap for dates and key text fields so data never splits
+                        # Keep dates on a single line; allow long text columns to wrap
+                        # so they don't overwrite neighbouring cells.
                         if field_name in ("depature_date", "dep_date"):
                             style = no_break_date_style
-                        elif field_name in (
-                            "district",
-                            "destination",
-                            "taluka",
-                            "party_name",
-                            "product_name",
-                            "product",
-                        ):
-                            style = no_break_text_style
                         else:
                             style = (
                                 to_right_style_desc
