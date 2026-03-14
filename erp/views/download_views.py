@@ -1602,14 +1602,23 @@ def download_generate_invoice_pdf(request):
             elements.append(Spacer(1, 18))
             elements.extend(build_footer_block())
 
-    # --- Build PDF (no Verified / Recommended / For footer, as per latest requirement) ---
+    # --- Build PDF ---
     doc.build(elements)
     buffer.seek(0)
     filename = f"{contract.company_name}_{invoice.Bill_no.replace('/','-')}.pdf"
 
-    # This view is specifically for downloading an already generated invoice,
-    # so always send it as a file attachment.
-    return FileResponse(buffer, as_attachment=True, filename=filename)
+    # Decide whether to preview inline or force download based on the "download" flag
+    download_flag = (request.POST.get("download") or "").strip()
+    if download_flag:
+        # Explicit download button → send as file attachment
+        return FileResponse(buffer, as_attachment=True, filename=filename)
+
+    # Preview button (no download flag) → open inline in browser
+    from django.http import HttpResponse
+
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
 
 
 ##########################################
