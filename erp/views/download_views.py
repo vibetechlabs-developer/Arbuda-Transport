@@ -752,7 +752,6 @@ def generate_invoice_pdf(request):
                 ("TOPPADDING", (0,-1), (-1,-1), 5),  # Total row top padding - increased for taller total row
                 ("BOTTOMPADDING", (0,-1), (-1,-1), 5),  # Total row bottom padding - increased for taller total row
                 ("LINEABOVE", (0,-1), (-1,-1), 1.0, colors.black),
-                ("LINEBELOW", (0,-1), (-1,-1), 1.0, colors.black),
             ]
         table.setStyle(TableStyle(styles))
 
@@ -1526,7 +1525,6 @@ def download_generate_invoice_pdf(request):
                 ("TOPPADDING", (0,-1), (-1,-1), 10),  # Total row top padding - increased for taller total row
                 ("BOTTOMPADDING", (0,-1), (-1,-1), 10),  # Total row bottom padding - increased for taller total row
                 ("LINEABOVE", (0,-1), (-1,-1), 1.0, colors.black),
-                ("LINEBELOW", (0,-1), (-1,-1), 1.0, colors.black),
             ]
         table.setStyle(TableStyle(styles))
 
