@@ -74,6 +74,7 @@ def generate_invoice_pdf(request):
     dispatch_ids_raw = request.POST.getlist("dispatch_ids")
     i_bill_no = request.POST.get("bill_no", "").strip()
     bill_date_str = request.POST.get("bill_date")
+    total_option = request.POST.get("total_option", "every_page")  # Default to every_page
     
     # Store form data for repopulation
     alldata['form_data'] = request.POST
@@ -257,7 +258,8 @@ def generate_invoice_pdf(request):
     # --- Invoice footer helper ---
     def build_footer_block():
         footer_elements = []
-        footer_labels = []
+        left_labels = []
+        right_labels = []
 
         # Decide footer "For" company name – prefer explicit footer name,
         # else fall back to logged-in main company profile name.
@@ -266,32 +268,52 @@ def generate_invoice_pdf(request):
             or request.session['company_info']['company_name']
         )
 
+        # Left side: Verified By and Recommended By (if enabled)
         if getattr(contract, "show_verified_by", False):
-            footer_labels.append(Paragraph("Verified By", to_style))
+            left_labels.append(Paragraph("Verified By", to_style))
         if getattr(contract, "show_recommended_by", False):
-            footer_labels.append(Paragraph("Recommended By", to_style))
-        # "For" company label – always shown
-        footer_labels.append(Paragraph(f"For, {footer_name}", to_style))
+            left_labels.append(Paragraph("Recommended By", to_style))
+        
+        # Right side: Company name always on the right
+        right_labels.append(Paragraph(f"For, {footer_name}", to_right_style))
 
-        if not footer_labels:
-            return footer_elements
+        # Create signature rows
+        left_signatures = [Paragraph("__________________", to_style) for _ in range(len(left_labels))] if left_labels else []
+        right_signatures = [Paragraph("__________________", to_right_style) for _ in range(len(right_labels))]
 
-        col_count = len(footer_labels)
-        col_widths = [available_width / col_count] * col_count
+        # Combine left and right columns
+        # Left column content
+        left_content = left_labels + left_signatures
+        # Right column content  
+        right_content = right_labels + right_signatures
 
-        # Second row: blank signature lines
-        signature_row = [Paragraph("__________________", to_style) for _ in range(col_count)]
+        # Calculate column widths - if no left labels, right takes full width
+        if left_labels:
+            left_width = available_width * 0.5
+            right_width = available_width * 0.5
+        else:
+            left_width = 0
+            right_width = available_width
 
-        footer_table = Table([footer_labels, signature_row], colWidths=col_widths)
+        # Create table with left and right columns
+        footer_data = []
+        max_rows = max(len(left_content), len(right_content))
+        for i in range(max_rows):
+            left_item = left_content[i] if i < len(left_content) else Paragraph("", to_style)
+            right_item = right_content[i] if i < len(right_content) else Paragraph("", to_right_style)
+            footer_data.append([left_item, right_item])
+
+        footer_table = Table(footer_data, colWidths=[left_width, right_width])
         footer_table.setStyle(
             TableStyle(
                 [
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("TOPPADDING", (0, 0), (-1, 0), 4),
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
-                    ("TOPPADDING", (0, 1), (-1, 1), 2),
-                    ("BOTTOMPADDING", (0, 1), (-1, 1), 4),
+                    ("TOPPADDING", (0, 1), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
                     ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
                 ]
             )
@@ -740,7 +762,7 @@ def generate_invoice_pdf(request):
                 to_content = [
                     Paragraph("<b>TO</b>", to_style),
                     Paragraph(f"{contract.c_designation}, ", to_style),
-                    Paragraph(f"{contract.company_name},", to_style),
+                    Paragraph(f"{contract.company_name},", to_right_style),  # Company name on left side, right-aligned
                     Paragraph(f"{contract.billing_address}, {contract.billing_city}", to_style),
                     Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                     Paragraph(f"GST NO. : {contract.gst_number}", to_style),
@@ -748,16 +770,16 @@ def generate_invoice_pdf(request):
                 # Include RR No. (only when provided) with bill details on every page
                 rr_display = request.POST.get("rr_number", "").strip()
                 bill_no_content = [
-                    Paragraph(f"Bill No : {i_bill_no}", to_style),
-                    Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
+                    Paragraph(f"Bill No : {i_bill_no}", to_right_style),
+                    Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
                 ]
                 if rr_display:
-                    bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_style))
+                    bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
                 bill_no_content.extend(
                     [
-                        Paragraph(f"From : {contract.from_center}", to_style),
-                        Paragraph(f"District : {district}", to_style),
-                        Paragraph(f"Page : {page_no} ", to_style),
+                        Paragraph(f"From : {contract.from_center}", to_right_style),
+                        Paragraph(f"District : {district}", to_right_style),
+                        Paragraph(f"Page : {page_no} ", to_right_style),
                     ]
                 )
                 
@@ -780,7 +802,9 @@ def generate_invoice_pdf(request):
                 elements.append(Spacer(1, 3))  # Minimal spacing for 12 rows per page
 
                 # Dispatch Table for this page
-                elements.append(build_table_page(dispatch_chunk, add_total_row=True))
+                # Determine if we should show total based on total_option
+                show_total = (total_option == "every_page")
+                elements.append(build_table_page(dispatch_chunk, add_total_row=show_total))
                 elements.append(Spacer(1, 20))
                 elements.extend(build_footer_block())
 
@@ -801,7 +825,7 @@ def generate_invoice_pdf(request):
             to_content = [
                 Paragraph("<b>TO</b>", to_style),
                 Paragraph(f"{contract.c_designation}, ", to_style),
-                Paragraph(f"{contract.company_name},", to_style),
+                Paragraph(f"{contract.company_name},", to_right_style),  # Company name on left side, right-aligned
                 Paragraph(f"{contract.billing_address}, {contract.billing_city}", to_style),
                 Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                 Paragraph(f"GST NO. : {contract.gst_number}", to_style),
@@ -809,15 +833,15 @@ def generate_invoice_pdf(request):
             # Include RR No. (only when provided) with bill details on every page
             rr_display = request.POST.get("rr_number", "").strip()
             bill_no_content = [
-                Paragraph(f"Bill No : {i_bill_no}", to_style),
-                Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
+                Paragraph(f"Bill No : {i_bill_no}", to_right_style),
+                Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
             ]
             if rr_display:
-                bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_style))
+                bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
             bill_no_content.extend(
                 [
-                    Paragraph(f"From : {contract.from_center}", to_style),
-                    Paragraph(f"Page : {page_no} of {total_pages}", to_style),
+                    Paragraph(f"From : {contract.from_center}", to_right_style),
+                    Paragraph(f"Page : {page_no} of {total_pages}", to_right_style),
                 ]
             )
             # Calculate widths based on available space
@@ -840,7 +864,12 @@ def generate_invoice_pdf(request):
             elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
             elements.append(Spacer(1, 1))
             # Dispatch Table
-            elements.append(build_table_page(dispatch_chunk, add_total_row=True, is_last_page=is_last_page, all_dispatches=dispatches, start_index=(i + 1)))
+            # Determine if we should show total based on total_option
+            if total_option == "every_page":
+                show_total = True
+            else:
+                show_total = is_last_page  # Only show on last page
+            elements.append(build_table_page(dispatch_chunk, add_total_row=show_total, is_last_page=is_last_page, all_dispatches=dispatches, start_index=(i + 1)))
             elements.append(Spacer(1, 20))
             elements.extend(build_footer_block())
 
@@ -907,6 +936,7 @@ def download_generate_invoice_pdf(request):
    
         bill_date_str = request.POST.get("bill_date")
         bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else None
+        total_option = request.POST.get("total_option", "every_page")  # Default to every_page
         
     # --- PDF Generation ---
     buffer = BytesIO()
@@ -964,34 +994,57 @@ def download_generate_invoice_pdf(request):
     # --- Invoice footer helper ---
     def build_footer_block():
         footer_elements = []
-        footer_labels = []
+        left_labels = []
+        right_labels = []
 
         footer_name = getattr(contract, "footer_company_name", None) or request.session['company_info']['company_name']
 
+        # Left side: Verified By and Recommended By (if enabled)
         if getattr(contract, "show_verified_by", False):
-            footer_labels.append(Paragraph("Verified By", to_style))
+            left_labels.append(Paragraph("Verified By", to_style))
         if getattr(contract, "show_recommended_by", False):
-            footer_labels.append(Paragraph("Recommended By", to_style))
-        footer_labels.append(Paragraph(f"For, {footer_name}", to_style))
+            left_labels.append(Paragraph("Recommended By", to_style))
+        
+        # Right side: Company name always on the right
+        right_labels.append(Paragraph(f"For, {footer_name}", to_right_style))
 
-        if not footer_labels:
-            return footer_elements
+        # Create signature rows
+        left_signatures = [Paragraph("__________________", to_style) for _ in range(len(left_labels))] if left_labels else []
+        right_signatures = [Paragraph("__________________", to_right_style) for _ in range(len(right_labels))]
 
-        col_count = len(footer_labels)
-        col_widths = [available_width / col_count] * col_count
+        # Combine left and right columns
+        # Left column content
+        left_content = left_labels + left_signatures
+        # Right column content  
+        right_content = right_labels + right_signatures
 
-        signature_row = [Paragraph("__________________", to_style) for _ in range(col_count)]
+        # Calculate column widths - if no left labels, right takes full width
+        if left_labels:
+            left_width = available_width * 0.5
+            right_width = available_width * 0.5
+        else:
+            left_width = 0
+            right_width = available_width
 
-        footer_table = Table([footer_labels, signature_row], colWidths=col_widths)
+        # Create table with left and right columns
+        footer_data = []
+        max_rows = max(len(left_content), len(right_content))
+        for i in range(max_rows):
+            left_item = left_content[i] if i < len(left_content) else Paragraph("", to_style)
+            right_item = right_content[i] if i < len(right_content) else Paragraph("", to_right_style)
+            footer_data.append([left_item, right_item])
+
+        footer_table = Table(footer_data, colWidths=[left_width, right_width])
         footer_table.setStyle(
             TableStyle(
                 [
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("TOPPADDING", (0, 0), (-1, 0), 4),
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
-                    ("TOPPADDING", (0, 1), (-1, 1), 2),
-                    ("BOTTOMPADDING", (0, 1), (-1, 1), 4),
+                    ("TOPPADDING", (0, 1), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
                     ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
                 ]
             )
@@ -1442,17 +1495,17 @@ def download_generate_invoice_pdf(request):
                 to_content = [
                     Paragraph("<b>TO</b>", to_style),
                     Paragraph(f"{contract.c_designation}, ", to_style),
-                    Paragraph(f"{contract.company_name},", to_style),
+                    Paragraph(f"{contract.company_name},", to_right_style),  # Company name on left side, right-aligned
                     Paragraph(f"{contract.billing_address}, {contract.billing_city}", to_style),
                     Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                     Paragraph(f"GST NO. : {contract.gst_number}", to_style)
                 ]
                 bill_no_content = [
-                    Paragraph(f"Bill No : {invoice.Bill_no}", to_style),
-                    Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
-                    Paragraph(f"From : {contract.from_center}", to_style),
-                    Paragraph(f"District : {district}", to_style),
-                    Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
+                    Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
+                    Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
+                    Paragraph(f"From : {contract.from_center}", to_right_style),
+                    Paragraph(f"District : {district}", to_right_style),
+                    Paragraph(f"Page : {page_no} of {total_pages} ", to_right_style)
                 ]
                 page_no += 1
                 
@@ -1475,7 +1528,9 @@ def download_generate_invoice_pdf(request):
                 elements.append(Spacer(1, 3))  # Minimal spacing for 12 rows per page
 
                 # Dispatch Table for this page
-                elements.append(build_table_page(dispatch_chunk, add_total_row=True))
+                # Determine if we should show total based on total_option
+                show_total = (total_option == "every_page")
+                elements.append(build_table_page(dispatch_chunk, add_total_row=show_total))
                 elements.append(Spacer(1, 18))
                 elements.extend(build_footer_block())
 
@@ -1497,16 +1552,16 @@ def download_generate_invoice_pdf(request):
             to_content = [
                 Paragraph("<b>TO</b>", to_style),
                 Paragraph(f"{contract.c_designation}, ", to_style),
-                Paragraph(f"{contract.company_name},", to_style),
+                Paragraph(f"{contract.company_name},", to_right_style),  # Company name on left side, right-aligned
                 Paragraph(f"{contract.billing_address}, {contract.billing_city}", to_style),
                 Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                 Paragraph(f"GST NO. : {contract.gst_number}", to_style)
             ]
             bill_no_content = [
-                Paragraph(f"Bill No : {invoice.Bill_no}", to_style),
-                Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_style),
-                Paragraph(f"From : {contract.from_center}", to_style),
-                Paragraph(f"Page : {page_no} of {total_pages}", to_style)
+                Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
+                Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
+                Paragraph(f"From : {contract.from_center}", to_right_style),
+                Paragraph(f"Page : {page_no} of {total_pages}", to_right_style)
             ]
             page_no += 1
 
@@ -1530,10 +1585,15 @@ def download_generate_invoice_pdf(request):
 
             # **Build table only ONCE per page**
             # Use start_index so Sr No continues across pages (13 after 12, etc.)
+            # Determine if we should show total based on total_option
+            if total_option == "every_page":
+                show_total = True
+            else:
+                show_total = is_last_page  # Only show on last page
             elements.append(
                 build_table_page(
                     dispatch_chunk,
-                    add_total_row=True,
+                    add_total_row=show_total,
                     is_last_page=is_last_page,
                     all_dispatches=dispatches,
                     start_index=(i + 1),

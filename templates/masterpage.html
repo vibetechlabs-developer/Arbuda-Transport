@@ -398,6 +398,7 @@
 
   <script>
     // Prevent selecting future dates in all date inputs across the app
+    // Exception: contract end date (c_end_date) can be in the future
     document.addEventListener("DOMContentLoaded", function () {
       try {
         const today = new Date();
@@ -407,6 +408,10 @@
         const maxDate = `${yyyy}-${mm}-${dd}`;
 
         document.querySelectorAll('input[type="date"]').forEach(function (input) {
+          // Skip contract end date - allow future dates
+          if (input.id === 'c_end_date' || input.name === 'c_end_date') {
+            return; // Don't restrict contract end date
+          }
           // Only tighten max; never relax an existing earlier max
           if (!input.max || input.max > maxDate) {
             input.max = maxDate;

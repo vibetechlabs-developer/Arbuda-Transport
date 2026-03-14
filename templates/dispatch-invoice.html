@@ -106,6 +106,13 @@
                   readonly
                 >
               </div>
+              <div class="col-sm-6">
+                <label class="form-label">Total Display Option</label>
+                <select name="total_option" id="total_option" class="form-select" required>
+                  <option value="every_page" {% if form_data.total_option == 'every_page' %}selected{% endif %}>Total Every Page</option>
+                  <option value="last_page" {% if form_data.total_option == 'last_page' %}selected{% endif %}>All Total in Last Page</option>
+                </select>
+              </div>
             </div>
             <h5 class="text-primary fw-semibold mb-3">Search</h5>
             <div class="row">
