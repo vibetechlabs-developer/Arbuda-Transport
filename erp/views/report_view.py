@@ -411,6 +411,15 @@ def download_report(request):
                 except Exception:
                     return "0.00"
 
+            def _int(val):
+                """Format numeric values as integer (no decimal point)."""
+                try:
+                    if val in (None, "", "None", "null", "NULL", "-"):
+                        return "0"
+                    return str(int(float(val)))
+                except Exception:
+                    return "0"
+
             # Build rows
             for idx, d in enumerate(dispatch_subset, start=start_index + 1):
                 total_amount = (float(d.totalfreight or 0) +
@@ -1144,7 +1153,8 @@ def download_our_report(request):
                     elif field == "rate":
                         row.append(_num2(d.rate))
                     elif field == "km":
-                        row.append(_num2(d.km))
+                        # Show km as integer (no decimal point)
+                        row.append(_int(d.km))
                     elif field == "truck_booking_rate":
                         row.append(_num2(d.truck_booking_rate))
                     elif field == "total_paid_truck_onwer":

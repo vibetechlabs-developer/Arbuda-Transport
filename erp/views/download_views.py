@@ -332,7 +332,6 @@ def generate_invoice_pdf(request):
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
                     ("TOPPADDING", (0, 1), (-1, -1), 2),
                     ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
-                    ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
                 ]
             )
         )
@@ -519,6 +518,15 @@ def generate_invoice_pdf(request):
             except Exception:
                 return "0"
 
+        def _int(val):
+            """Format numeric values as integer (no decimal point)."""
+            try:
+                if val in (None, "", "None", "null", "NULL", "-"):
+                    return "0"
+                return str(int(float(val)))
+            except Exception:
+                return "0"
+
         def _money(val):
             """
             Format currency (Rs.) values with exactly 2 decimal places.
@@ -572,8 +580,8 @@ def generate_invoice_pdf(request):
                 elif field in ("weight",):
                     row.append(_num(getattr(d, field, None), decimals=3))
                 elif field == "km":
-                    # Show km without unnecessary trailing zeros (e.g., 10.00 → 10, 10.50 → 10.5)
-                    row.append(_num_exact(getattr(d, field, None)))
+                    # Show km as integer (no decimal point)
+                    row.append(_int(getattr(d, field, None)))
                 elif field == "rate":
                     # Keep rate with 2 fixed decimals
                     row.append(_num(getattr(d, field, None), decimals=2))
@@ -1099,7 +1107,6 @@ def download_generate_invoice_pdf(request):
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
                     ("TOPPADDING", (0, 1), (-1, -1), 2),
                     ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
-                    ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
                 ]
             )
         )
@@ -1280,6 +1287,15 @@ def download_generate_invoice_pdf(request):
             except Exception:
                 return "0"
 
+        def _int(val):
+            """Format numeric values as integer (no decimal point)."""
+            try:
+                if val in (None, "", "None", "null", "NULL", "-"):
+                    return "0"
+                return str(int(float(val)))
+            except Exception:
+                return "0"
+
         def _money(val):
             """
             Format currency (Rs.) values with exactly 2 decimal places.
@@ -1333,8 +1349,8 @@ def download_generate_invoice_pdf(request):
                 elif field in ("weight",):
                     row.append(_num(getattr(d, field, None), decimals=3))
                 elif field == "km":
-                    # Show km without unnecessary trailing zeros (e.g., 10.00 → 10, 10.50 → 10.5)
-                    row.append(_num_exact(getattr(d, field, None)))
+                    # Show km as integer (no decimal point)
+                    row.append(_int(getattr(d, field, None)))
                 elif field == "rate":
                     # Keep rate with 2 fixed decimals
                     row.append(_num(getattr(d, field, None), decimals=2))
@@ -2155,7 +2171,6 @@ def generate_summary_pdf(request):
                 Paragraph("", normal),
                 Paragraph(f"FOR {company_name}" if company_name else f"FOR {client_company_name}", right_bold),
             ],
-            ["", Paragraph("__________________", right)],
             ["", Paragraph("Authorised Signatory", right_bold)],
         ],
         colWidths=[available_w * 0.55, available_w * 0.45],
