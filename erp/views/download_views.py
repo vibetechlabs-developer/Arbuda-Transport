@@ -258,8 +258,7 @@ def generate_invoice_pdf(request):
     # --- Invoice footer helper ---
     def build_footer_block():
         footer_elements = []
-        footer_labels = []
-
+        
         # Decide footer "For" company name – prefer explicit footer name,
         # else fall back to logged-in main company profile name.
         footer_name = (
@@ -267,33 +266,72 @@ def generate_invoice_pdf(request):
             or request.session['company_info']['company_name']
         )
 
-        # Add all footer items in order: Verified By, Recommended By, For company name
+        # Build left side content: Verified By and Recommended By on same line
+        left_items = []
         if getattr(contract, "show_verified_by", False):
-            footer_labels.append(Paragraph("Verified By", to_style))
+            left_items.append(Paragraph("Verified By", to_style))
         if getattr(contract, "show_recommended_by", False):
-            footer_labels.append(Paragraph("Recommended By", to_style))
-        # "For" company label – always shown
-        footer_labels.append(Paragraph(f"For, {footer_name}", to_style))
+            left_items.append(Paragraph("Recommended By", to_style))
+        
+        # Create nested table for left side to place items side by side
+        if left_items:
+            left_table_data = [left_items]
+            left_table = Table(left_table_data, colWidths=[available_width * 0.2] * len(left_items))
+            left_table.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            left_label = left_table
+        else:
+            left_label = Paragraph("", to_style)
+        
+        # Right side: Company name always on the right
+        right_label = Paragraph(f"For, {footer_name}", to_right_style)
 
-        if not footer_labels:
-            return footer_elements
+        # Create signature rows - need to match the nested table structure
+        if left_items:
+            left_sig_items = [Paragraph("__________________", to_style) for _ in left_items]
+            left_sig_table = Table([left_sig_items], colWidths=[available_width * 0.2] * len(left_items))
+            left_sig_table.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            left_signature = left_sig_table
+        else:
+            left_signature = Paragraph("", to_style)
+        right_signature = Paragraph("__________________", to_right_style)
 
-        col_count = len(footer_labels)
-        col_widths = [available_width / col_count] * col_count
+        # Always use 50/50 split to keep layout consistent
+        # Left side always reserved for Verified By/Recommended By (even if empty)
+        # Right side always for company name
+        left_width = available_width * 0.5
+        right_width = available_width * 0.5
 
-        # Second row: blank signature lines
-        signature_row = [Paragraph("__________________", to_style) for _ in range(col_count)]
+        # Create table with left and right columns
+        footer_data = [
+            [left_label, right_label],  # Labels row
+            [left_signature, right_signature],  # Signatures row
+        ]
 
-        footer_table = Table([footer_labels, signature_row], colWidths=col_widths)
+        footer_table = Table(footer_data, colWidths=[left_width, right_width])
         footer_table.setStyle(
             TableStyle(
                 [
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("TOPPADDING", (0, 0), (-1, 0), 4),
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
-                    ("TOPPADDING", (0, 1), (-1, 1), 2),
-                    ("BOTTOMPADDING", (0, 1), (-1, 1), 4),
+                    ("TOPPADDING", (0, 1), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
                     ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
                 ]
             )
@@ -992,37 +1030,75 @@ def download_generate_invoice_pdf(request):
     # --- Invoice footer helper ---
     def build_footer_block():
         footer_elements = []
-        footer_labels = []
-
+        
         footer_name = getattr(contract, "footer_company_name", None) or request.session['company_info']['company_name']
 
-        # Add all footer items in order: Verified By, Recommended By, For company name
+        # Build left side content: Verified By and Recommended By on same line
+        left_items = []
         if getattr(contract, "show_verified_by", False):
-            footer_labels.append(Paragraph("Verified By", to_style))
+            left_items.append(Paragraph("Verified By", to_style))
         if getattr(contract, "show_recommended_by", False):
-            footer_labels.append(Paragraph("Recommended By", to_style))
-        # "For" company label – always shown
-        footer_labels.append(Paragraph(f"For, {footer_name}", to_style))
+            left_items.append(Paragraph("Recommended By", to_style))
+        
+        # Create nested table for left side to place items side by side
+        if left_items:
+            left_table_data = [left_items]
+            left_table = Table(left_table_data, colWidths=[available_width * 0.2] * len(left_items))
+            left_table.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            left_label = left_table
+        else:
+            left_label = Paragraph("", to_style)
+        
+        # Right side: Company name always on the right
+        right_label = Paragraph(f"For, {footer_name}", to_right_style)
 
-        if not footer_labels:
-            return footer_elements
+        # Create signature rows - need to match the nested table structure
+        if left_items:
+            left_sig_items = [Paragraph("__________________", to_style) for _ in left_items]
+            left_sig_table = Table([left_sig_items], colWidths=[available_width * 0.2] * len(left_items))
+            left_sig_table.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            left_signature = left_sig_table
+        else:
+            left_signature = Paragraph("", to_style)
+        right_signature = Paragraph("__________________", to_right_style)
 
-        col_count = len(footer_labels)
-        col_widths = [available_width / col_count] * col_count
+        # Always use 50/50 split to keep layout consistent
+        # Left side always reserved for Verified By/Recommended By (even if empty)
+        # Right side always for company name
+        left_width = available_width * 0.5
+        right_width = available_width * 0.5
 
-        # Second row: blank signature lines
-        signature_row = [Paragraph("__________________", to_style) for _ in range(col_count)]
+        # Create table with left and right columns
+        footer_data = [
+            [left_label, right_label],  # Labels row
+            [left_signature, right_signature],  # Signatures row
+        ]
 
-        footer_table = Table([footer_labels, signature_row], colWidths=col_widths)
+        footer_table = Table(footer_data, colWidths=[left_width, right_width])
         footer_table.setStyle(
             TableStyle(
                 [
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("TOPPADDING", (0, 0), (-1, 0), 4),
                     ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
-                    ("TOPPADDING", (0, 1), (-1, 1), 2),
-                    ("BOTTOMPADDING", (0, 1), (-1, 1), 4),
+                    ("TOPPADDING", (0, 1), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
                     ("LINEABOVE", (0, 0), (-1, 0), 0.8, colors.black),
                 ]
             )
