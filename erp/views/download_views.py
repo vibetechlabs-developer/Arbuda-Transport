@@ -19,6 +19,8 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from erp.utils.financial_year import get_current_financial_year, get_financial_year_start_end
 from django.db.models import Q
+from reportlab.platypus import KeepTogether
+
 
 
 def sort_dispatches_by_challan_asc(dispatches):
@@ -321,21 +323,24 @@ def generate_invoice_pdf(request):
             [left_signature, right_signature],  # Signatures row
         ]
 
-        footer_table = Table(footer_data, colWidths=[left_width, right_width])
+        # Do not allow the footer table to split between rows across pages
+        footer_table = Table(footer_data, colWidths=[left_width, right_width], splitByRow=0)
         footer_table.setStyle(
             TableStyle(
                 [
                     ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
                     ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("TOPPADDING", (0, 0), (-1, 0), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
-                    ("TOPPADDING", (0, 1), (-1, -1), 2),
-                    ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+                    # Very tight vertical padding so labels and lines stay close
+                    ("TOPPADDING", (0, 0), (-1, 0), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
+                    ("TOPPADDING", (0, 1), (-1, -1), 1),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 1),
                 ]
             )
         )
-        footer_elements.append(footer_table)
+        # Keep the entire footer block (labels + signatures) together
+        footer_elements.append(KeepTogether(footer_table))
         return footer_elements
 
     fields = contract.invoice_fields
@@ -839,6 +844,23 @@ def generate_invoice_pdf(request):
                     # only show total on the last page of this invoice.
                     is_last_page = (i + chunk_size) >= len(dispatches)
                     show_total = is_last_page
+
+                # Keep the dispatch table and footer together on the same page
+                # page_block = [
+                #     build_table_page(
+                #         dispatch_chunk,
+                #         add_total_row=show_total,
+                #         is_last_page=is_last_page,
+                #         all_dispatches=dispatches,
+                #         start_index=(i + 1),
+                #     ),
+                #     Spacer(1, 4),  # Very small gap between table and footer
+                # ]
+                
+                # page_block.extend(build_footer_block())
+                # elements.append(KeepTogether(page_block))
+
+                # page_no += 1
                 elements.append(
                     build_table_page(
                         dispatch_chunk,
@@ -847,11 +869,12 @@ def generate_invoice_pdf(request):
                         all_dispatches=dispatches,
                         start_index=(i + 1),
                     )
-                )
-                elements.append(Spacer(1, 20))
-                elements.extend(build_footer_block())
+)
 
-                page_no += 1
+                elements.append(Spacer(1, 6))  # space before footer
+
+                for item in build_footer_block():
+                    elements.append(item)
     else:
         page_no=1
         total_pages = math.ceil(len(dispatches) / chunk_size)
@@ -912,9 +935,29 @@ def generate_invoice_pdf(request):
                 show_total = True
             else:
                 show_total = is_last_page  # Only show on last page
-            elements.append(build_table_page(dispatch_chunk, add_total_row=show_total, is_last_page=is_last_page, all_dispatches=dispatches, start_index=(i + 1)))
-            elements.append(Spacer(1, 20))
-            elements.extend(build_footer_block())
+            # elements.append(build_table_page(dispatch_chunk, add_total_row=show_total, is_last_page=is_last_page, all_dispatches=dispatches, start_index=(i + 1)))
+            # elements.append(Spacer(1, 20))
+            # elements.extend(build_footer_block())
+
+
+            page_block = []
+
+            page_block.append(
+                build_table_page(
+                    dispatch_chunk,
+                    add_total_row=show_total,
+                    is_last_page=is_last_page,
+                    all_dispatches=dispatches,
+                    start_index=(i + 1),
+                )
+            )
+
+            page_block.append(Spacer(1, 6))
+
+            for item in build_footer_block():
+                page_block.append(item)
+
+            elements.append(KeepTogether(page_block))
 
             page_no += 1
 
@@ -987,12 +1030,12 @@ def download_generate_invoice_pdf(request):
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        # Slightly tighter margins so 12 rows + TOTAL + signatures reliably fit on one page
+        # Tighter margins so header + 12 rows + TOTAL + signatures fit on one page
         rightMargin=6 * mm,
         leftMargin=6 * mm,
         topMargin=6 * mm,
-        # Add some bottom margin so there's clear space between table and footer
-        bottomMargin=10 * mm,
+        # Reduce bottom margin to free up a bit more vertical space
+        bottomMargin=6 * mm,
     )
     styles = getSampleStyleSheet()
     elements = []
@@ -1095,17 +1138,19 @@ def download_generate_invoice_pdf(request):
             [left_signature, right_signature],  # Signatures row
         ]
 
-        footer_table = Table(footer_data, colWidths=[left_width, right_width])
+        # Do not allow the footer table to split between rows across pages
+        footer_table = Table(footer_data, colWidths=[left_width, right_width], splitByRow=0)
         footer_table.setStyle(
             TableStyle(
                 [
                     ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
                     ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("TOPPADDING", (0, 0), (-1, 0), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
-                    ("TOPPADDING", (0, 1), (-1, -1), 2),
-                    ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+                    # Very tight vertical padding so labels and lines stay close
+                    ("TOPPADDING", (0, 0), (-1, 0), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
+                    ("TOPPADDING", (0, 1), (-1, -1), 1),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 1),
                 ]
             )
         )
@@ -1489,14 +1534,13 @@ def download_generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Adjust these padding values to change row heights:
-            # Increase values for taller rows, decrease for shorter rows
-            ("LEFTPADDING", (0,0), (-1,-1), 1.5),
-            ("RIGHTPADDING", (0,0), (-1,-1), 1.5),
-            ("TOPPADDING", (0,0), (-1,0), 4),  # Header top padding - increased for taller header
-            ("BOTTOMPADDING", (0,0), (-1,0), 4),  # Header bottom padding - increased for taller header
-            ("TOPPADDING", (0,1), (-1,-2), 3),  # Data rows top padding - increased for taller data rows
-            ("BOTTOMPADDING", (0,1), (-1,-2), 3),  # Data rows bottom padding - increased for taller data rows
+            # Tighter paddings so the full table + footer fit on a single page
+            ("LEFTPADDING", (0,0), (-1,-1), 1.0),
+            ("RIGHTPADDING", (0,0), (-1,-1), 1.0),
+            ("TOPPADDING", (0,0), (-1,0), 2),   # Header padding
+            ("BOTTOMPADDING", (0,0), (-1,0), 2),
+            ("TOPPADDING", (0,1), (-1,-2), 2),  # Data rows padding
+            ("BOTTOMPADDING", (0,1), (-1,-2), 2),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -1522,8 +1566,9 @@ def download_generate_invoice_pdf(request):
             styles += [
                 ("FONTNAME", (0,-1), (-1,-1), "Helvetica-Bold"),
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
-                ("TOPPADDING", (0,-1), (-1,-1), 10),  # Total row top padding - increased for taller total row
-                ("BOTTOMPADDING", (0,-1), (-1,-1), 10),  # Total row bottom padding - increased for taller total row
+                # Much tighter total-row padding; previously this was very tall
+                ("TOPPADDING", (0,-1), (-1,-1), 4),
+                ("BOTTOMPADDING", (0,-1), (-1,-1), 4),
                 ("LINEABOVE", (0,-1), (-1,-1), 1.0, colors.black),
             ]
         table.setStyle(TableStyle(styles))
@@ -1602,9 +1647,14 @@ def download_generate_invoice_pdf(request):
                 # Dispatch Table for this page
                 # Determine if we should show total based on total_option
                 show_total = (total_option == "every_page")
-                elements.append(build_table_page(dispatch_chunk, add_total_row=show_total))
-                elements.append(Spacer(1, 18))
-                elements.extend(build_footer_block())
+
+                # Keep the dispatch table and footer together on the same page
+                page_block = [
+                    build_table_page(dispatch_chunk, add_total_row=show_total),
+                    Spacer(1, 4),  # Very small gap between table and footer
+                ]
+                page_block.extend(build_footer_block())
+                elements.append(KeepTogether(page_block))
 
     else:
         page_no = 1
@@ -1671,7 +1721,8 @@ def download_generate_invoice_pdf(request):
                     start_index=(i + 1),
                 )
             )
-            elements.append(Spacer(1, 18))
+            # Reduce gap before footer so everything fits on one page
+            elements.append(Spacer(1, 4))
             elements.extend(build_footer_block())
 
     # --- Build PDF ---
