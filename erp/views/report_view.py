@@ -255,13 +255,15 @@ def download_report(request):
 
         # --- PDF Generation ---
         buffer = BytesIO()
+        # Use ultra‑tight margins for this external dispatch report so the
+        # header and table span virtually the entire physical page width.
         doc = SimpleDocTemplate(
             buffer,
             pagesize=landscape(A4),
-            rightMargin=2 * mm,
-            leftMargin=2 * mm,
-            topMargin=3 * mm,
-            bottomMargin=5 * mm,
+            rightMargin=0,
+            leftMargin=0,
+            topMargin=0,
+            bottomMargin=0,
         )
         styles = getSampleStyleSheet()
         elements = []
