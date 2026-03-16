@@ -459,20 +459,21 @@ def generate_invoice_pdf(request):
             wordWrap="NOBREAK",  # keep long district names on a single line
         )
         # Uniform header style for all column names.
-        # Slightly larger for better readability while still fitting in one line.
+        # Make header text larger so the table looks bigger.
         header_style_uniform = ParagraphStyle(
             name="HeaderUniform",
             parent=to_right_style_desc_heading,
-            fontSize=9,
-            leading=11,
+            fontSize=12,
+            leading=14,
             alignment=1,  # Center all headers
             splitLongWords=0,
         )
+        # Larger body font so the whole table appears bigger.
         to_right_style_desc_local = ParagraphStyle(
             name="ToRightDescLocal",
             parent=to_right_style_desc,
-            fontSize=compact_fs or to_right_style_desc.fontSize,
-            leading=compact_leading or to_right_style_desc.leading,
+            fontSize=(compact_fs or to_right_style_desc.fontSize) + 2,
+            leading=(compact_leading or to_right_style_desc.leading) + 2,
             splitLongWords=0,  # don't split long numbers
         )
         # Uniform header style - same size for all column names
@@ -486,8 +487,8 @@ def generate_invoice_pdf(request):
         total_style_local = ParagraphStyle(
             name="TotalStyleLocal",
             parent=total_style,
-            fontSize=compact_fs or total_style.fontSize,
-            leading=compact_leading or total_style.leading,
+            fontSize=(compact_fs or total_style.fontSize) + 2,
+            leading=(compact_leading or total_style.leading) + 2,
             splitLongWords=0,
         )
         total_label_style_local = ParagraphStyle(
@@ -1520,11 +1521,26 @@ def download_generate_invoice_pdf(request):
                         style = to_right_style_desc_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(str(cell), style)
 
-        # Optional: Set specific row heights (in points)
-        # Uncomment and adjust values to control row heights explicitly
-        # Example: row_heights = [15] + [12] * (len(data) - 2) + [15]  # Header=15, data rows=12, total=15
-        row_heights = None  # None = auto height based on content
-        
+        # Set explicit row heights (in points) so the table appears visually larger on the page
+        # and the table + footer block covers more of the page height.
+        if add_total:
+            # Header row taller, data rows medium, total row taller
+            if len(data) >= 2:
+                row_heights = [26]  # header
+                if len(data) > 2:
+                    row_heights += [24] * (len(data) - 2)  # data rows
+                row_heights += [26]  # total row
+            else:
+                row_heights = [26] * len(data)
+        else:
+            # Header row taller, data rows medium
+            if len(data) >= 1:
+                row_heights = [26]  # header
+                if len(data) > 1:
+                    row_heights += [24] * (len(data) - 1)
+            else:
+                row_heights = None
+
         table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
 
         # Table styles - simple, elegant, standard structure (no background colors)
@@ -1535,7 +1551,7 @@ def download_generate_invoice_pdf(request):
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
             # Tighter paddings so the full table + footer fit on a single page
-            ("LEFTPADDING", (0,0), (-1,-1), 1.0),
+            ("LEFTPADDING", (0,0), (-1,-1), 1.0 ),
             ("RIGHTPADDING", (0,0), (-1,-1), 1.0),
             ("TOPPADDING", (0,0), (-1,0), 2),   # Header padding
             ("BOTTOMPADDING", (0,0), (-1,0), 2),
