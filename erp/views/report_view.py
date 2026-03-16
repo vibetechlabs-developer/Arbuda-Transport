@@ -968,9 +968,20 @@ def download_our_report(request):
 
         # --- PDF Generation ---
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=2*mm, leftMargin=2*mm, topMargin=3*mm, bottomMargin=5*mm)
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=2 * mm,
+            leftMargin=2 * mm,
+            topMargin=3 * mm,
+            bottomMargin=5 * mm,
+        )
         styles = getSampleStyleSheet()
         elements = []
+
+        # Use full content width (page width minus margins) so the internal
+        # dispatch report spans the page similarly to the client report.
+        available_width = doc.width
 
         # --- Styles ---
         # Keep internal report visually consistent with client report, just with
@@ -1049,7 +1060,8 @@ def download_our_report(request):
             [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
             [Paragraph(report_title, title_style)]
         ]
-        header_table = Table(header_data, colWidths=[288*mm])
+        # Stretch header across the full printable width.
+        header_table = Table(header_data, colWidths=[available_width])
         header_table.setStyle(TableStyle([('LINEBELOW', (0,2), (-1,2), 0.5, colors.black), ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black)]))
 
         fields = contract.invoice_fields
@@ -1339,7 +1351,9 @@ def download_our_report(request):
                 "Taluka": 14 * mm,
             }
 
-            table_width = 288 * mm
+            # Use the full printable width instead of a fixed magic number so
+            # the table visually fills the page.
+            table_width = available_width
             headers = data[0]
 
             col_widths = []
@@ -1457,7 +1471,11 @@ def download_our_report(request):
                 ]
             page_no += 1
 
-            to_table = Table([[to_content, bill_no_content]], colWidths=[238*mm, 50*mm])
+            # Match client report proportions but using full available width.
+            to_table = Table(
+                [[to_content, bill_no_content]],
+                colWidths=[available_width * 0.82, available_width * 0.18],
+            )
             to_table.setStyle(TableStyle([
                 ('LINEBELOW',(0,0),(-1,0),0.5,colors.black),
                 ("VALIGN",(0,0),(-1,-1),"TOP"),
