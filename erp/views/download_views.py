@@ -240,8 +240,9 @@ def generate_invoice_pdf(request):
     )
     center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=10, alignment=1, leading=12)
     title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=16, alignment=1, leading=18)
+    # Slightly larger font for bill details on the right so they are easier to read.
     to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=10, alignment=0, leading=12)
-    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=10, alignment=2, leading=12)
+    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=11, alignment=2, leading=13)
     total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=10, alignment=2, leading=12)
     to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=9, alignment=0, leading=10)
     # Uniform header style for all column names - slightly smaller so long labels fit in one line
@@ -1175,7 +1176,8 @@ def download_generate_invoice_pdf(request):
     center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=10, alignment=1, leading=12)
     title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=16, alignment=1, leading=18)
     to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=10, alignment=0, leading=12)
-    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=10, alignment=2, leading=12)
+    # Slightly larger font for bill details on the right so they are easier to read.
+    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=11, alignment=2, leading=13)
     total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=10, alignment=2, leading=12)
     to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=9, alignment=0, leading=10)
     # Uniform header style for all column names - slightly smaller so long labels fit in one line
@@ -1732,7 +1734,10 @@ def download_generate_invoice_pdf(request):
         
         dispatches_sorted = sorted(dispatches, key=sort_key)
     
-        total_pages = len(list(groupby(dispatches_sorted, key=attrgetter('district'))))
+        # Total pages should be based on the total number of dispatch rows and the
+        # page capacity, NOT just the number of districts. Otherwise we can end up
+        # with situations like "Page 5 of 4" when some districts need multiple pages.
+        total_pages = math.ceil(len(dispatches_sorted) / chunk_size)
         # Group by district
         for district, district_dispatches_iter in groupby(dispatches_sorted, key=attrgetter('district')):
             district_dispatches = list(district_dispatches_iter)
