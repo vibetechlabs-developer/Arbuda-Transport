@@ -7,7 +7,8 @@ class Company_user(models.Model):
     company_name = models.CharField(max_length=100)
     gst_number = models.CharField(max_length=24 ,unique=True)
     email = models.CharField(max_length=50 , unique=True)
-    mobile = models.BigIntegerField(unique=True)
+    # Allow the same mobile number for multiple companies (remove uniqueness)
+    mobile = models.BigIntegerField()
     password = models.CharField(max_length=3128)
     company_profile_status = models.BooleanField(default=False)
 

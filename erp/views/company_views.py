@@ -44,11 +44,9 @@ def Company_registraion(request):
         if not tc:
             errors['tc'] = "Please accept the privacy policy & terms."
 
-        # Uniqueness validation
+        # Uniqueness validation (email & GST only; mobile can repeat)
         if cemail and Company_user.objects.filter(email=cemail).exists():
             errors['email'] = "This email already exists. Try a different email."
-        if cmobile and Company_user.objects.filter(mobile=cmobile).exists():
-            errors['mobile'] = "This mobile number already exists. Try a different mobile number."
         if cgstin and Company_user.objects.filter(gst_number=cgstin).exists():
             errors['gstin'] = "This GSTIN already exists. Try a different GSTIN."
 
