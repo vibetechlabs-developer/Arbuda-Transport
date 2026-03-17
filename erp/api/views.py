@@ -1062,6 +1062,9 @@ def get_report_dispatches(request):
             "loading_charge": float(d.loading_charge) if d.loading_charge else 0,
             "grand_total": total_amount,  # Use calculated amount
             "gc_note_no": d.gc_note_no,
+            # Party hierarchy fields used in invoice & reports
+            "main_party": d.main_party or "",
+            "sub_party": d.sub_party or "",
             # Internal report fields
             "truck_booking_rate": float(d.truck_booking_rate) if d.truck_booking_rate else 0,
             "total_paid_truck_onwer": float(d.total_paid_truck_onwer) if d.total_paid_truck_onwer else 0,
