@@ -171,7 +171,27 @@ def download_report(request):
         # If user requested CSV export, generate CSV instead of PDF
         if export_type == "csv":
             # Use same fields as invoice/report table
-            fields = contract.invoice_fields or []
+            fields = list(contract.invoice_fields or [])
+
+            # Always keep main_party and sub_party (if enabled in invoice_fields)
+            # and reposition them so they appear directly after dc_field,
+            # mirroring the invoice layout.
+            main_party_in_fields = "main_party" in fields
+            sub_party_in_fields = "sub_party" in fields
+            if main_party_in_fields or sub_party_in_fields:
+                # Remove from current positions
+                fields = [f for f in fields if f not in ("main_party", "sub_party")]
+                try:
+                    dc_field_idx = fields.index("dc_field")
+                    insert_idx = dc_field_idx + 1
+                except ValueError:
+                    # If dc_field is not present, keep them at the beginning
+                    insert_idx = 0
+                if main_party_in_fields:
+                    fields.insert(insert_idx, "main_party")
+                    insert_idx += 1
+                if sub_party_in_fields:
+                    fields.insert(insert_idx, "sub_party")
 
             # Build readable header labels similar to PDF
             dc_field_label = getattr(contract, "dc_field", None)
@@ -190,6 +210,10 @@ def download_report(request):
                     header_text = "Truck No"
                 elif f == "party_name":
                     header_text = "Party Name"
+                elif f == "main_party":
+                    header_text = "Main Party"
+                elif f == "sub_party":
+                    header_text = "Sub Party"
                 elif f in ("product_name", "product"):
                     header_text = "Product"
                 elif f == "gc_note":
@@ -226,7 +250,7 @@ def download_report(request):
                 )
 
                 row = []
-                for field in fields:
+                for field in active_fields:
                     if field == "sr_no":
                         row.append(idx)
                     elif field in ("depature_date", "dep_date"):
@@ -246,6 +270,10 @@ def download_report(request):
                         row.append(f"{total_amount:.2f}")
                     elif field == "gc_note":
                         row.append(d.gc_note_no)
+                    elif field == "main_party":
+                        row.append(getattr(d, "main_party", "") or "")
+                    elif field == "sub_party":
+                        row.append(getattr(d, "sub_party", "") or "")
                     else:
                         row.append(getattr(d, field, ""))
 
@@ -354,12 +382,30 @@ def download_report(request):
 
         # --- Build table for a page ---
         def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=0):
+            # Reorder fields so main_party / sub_party (if enabled) appear directly after dc_field,
+            # mirroring the invoice and keeping layout consistent between invoice and reports.
+            active_fields = list(fields)
+            main_party_in_fields = "main_party" in active_fields
+            sub_party_in_fields = "sub_party" in active_fields
+            if main_party_in_fields or sub_party_in_fields:
+                active_fields = [f for f in active_fields if f not in ("main_party", "sub_party")]
+                try:
+                    dc_field_idx = active_fields.index("dc_field")
+                    insert_idx = dc_field_idx + 1
+                except ValueError:
+                    insert_idx = 0
+                if main_party_in_fields:
+                    active_fields.insert(insert_idx, "main_party")
+                    insert_idx += 1
+                if sub_party_in_fields:
+                    active_fields.insert(insert_idx, "sub_party")
+
             # Header row with readable labels
             header_row = []
             dc_field_label = getattr(contract, "dc_field", None)
             dc_field_label = dc_field_label if dc_field_label not in [None, "None", "null", ""] else "Challan No"
 
-            for f in fields:
+            for f in active_fields:
                 if f == "dc_field":
                     header_text = dc_field_label
                 elif f == "sr_no":
@@ -370,6 +416,10 @@ def download_report(request):
                     header_text = "Truck No"
                 elif f == "party_name":
                     header_text = "Party Name"
+                elif f == "main_party":
+                    header_text = "Main Party"
+                elif f == "sub_party":
+                    header_text = "Sub Party"
                 elif f in ("product_name", "product"):
                     header_text = "Product"
                 elif f == "gc_note":
@@ -450,7 +500,7 @@ def download_report(request):
                 total_weight += float(d.weight or 0)
 
                 row = []
-                for field in fields:
+                for field in active_fields:
                     if field == "sr_no":
                         row.append(idx)
                     elif field in ("depature_date", "dep_date"):
@@ -471,6 +521,10 @@ def download_report(request):
                         row.append(_num2(d.weight))
                     elif field == "gc_note":
                         row.append(d.gc_note_no)
+                    elif field == "main_party":
+                        row.append(getattr(d, "main_party", "") or "")
+                    elif field == "sub_party":
+                        row.append(getattr(d, "sub_party", "") or "")
                     elif field == "rate":
                         # Rate with exactly 2 decimals
                         row.append(_num2(d.rate))
@@ -531,27 +585,29 @@ def download_report(request):
 
             # Special column widths
             # Column widths tuned for readability:
-            # - More width for important text columns (Party, Destination, District, Product)
-            # - Slightly tighter numeric / money columns
+            # - Extra width for important text columns (Party, Destination, District, Product)
+            #   so they do not look cramped.
+            # - Numeric / money columns kept a bit tighter so the full table can stretch
+            #   across the page.
             special_widths = {
                 # Sr / date / challan / truck
-                "Sr": 9 * mm,
-                "Sr No": 9 * mm,
-                "Dep Date": 18 * mm,
-                f"{contract.dc_field}": 16 * mm,
-                "Truck No": 14 * mm,
+                "Sr": 10 * mm,
+                "Sr No": 10 * mm,
+                "Dep Date": 20 * mm,
+                f"{contract.dc_field}": 18 * mm,
+                "Truck No": 18 * mm,
                 # Key text columns – give them generous width so they don't look cramped
-                "Party Name": 28 * mm,
-                "Product": 20 * mm,
-                "Product Name": 20 * mm,
-                "Destination": 28 * mm,
-                "District": 22 * mm,
-                "Taluka": 18 * mm,
+                "Party Name": 34 * mm,
+                "Product": 24 * mm,
+                "Product Name": 24 * mm,
+                "Destination": 34 * mm,
+                "District": 26 * mm,
+                "Taluka": 22 * mm,
                 "Gc Note": 10 * mm,
                 # Quantities / numeric
-                "Weight": 11 * mm,
-                "Km": 8 * mm,
-                "Rate": 10 * mm,
+                "Weight": 12 * mm,
+                "Km": 9 * mm,
+                "Rate": 11 * mm,
                 # Money columns: compact but still readable
                 "Lugg": 11 * mm,
                 "Luggage": 11 * mm,
@@ -562,8 +618,8 @@ def download_report(request):
                 "Unloading Charge 1": 12 * mm,
                 "Loading Charge": 11 * mm,
                 "Load": 11 * mm,
-                "Amount": 13 * mm,
-                "Totalfreight": 13 * mm,
+                "Amount": 14 * mm,
+                "Totalfreight": 14 * mm,
             }
 
             # Use the full printable width for the table so this report matches
@@ -876,6 +932,24 @@ def download_our_report(request):
         if export_type == "csv":
             # Base fields come from contract.invoice_fields; append internal-only columns
             base_fields = list(contract.invoice_fields or [])
+
+            # Reorder base fields so main_party / sub_party (if enabled) appear directly after dc_field,
+            # keeping internal report layout consistent with invoice and client report.
+            main_party_in_fields = "main_party" in base_fields
+            sub_party_in_fields = "sub_party" in base_fields
+            if main_party_in_fields or sub_party_in_fields:
+                base_fields = [f for f in base_fields if f not in ("main_party", "sub_party")]
+                try:
+                    dc_field_idx = base_fields.index("dc_field")
+                    insert_idx = dc_field_idx + 1
+                except ValueError:
+                    insert_idx = 0
+                if main_party_in_fields:
+                    base_fields.insert(insert_idx, "main_party")
+                    insert_idx += 1
+                if sub_party_in_fields:
+                    base_fields.insert(insert_idx, "sub_party")
+
             additional_fields = ["truck_booking_rate", "total_paid_truck_onwer", "advance_paid", "panding_amount", "net_profit"]
             fields = base_fields + additional_fields
 
@@ -895,6 +969,10 @@ def download_our_report(request):
                     header_text = "Truck No"
                 elif f == "party_name":
                     header_text = "Party Name"
+                elif f == "main_party":
+                    header_text = "Main Party"
+                elif f == "sub_party":
+                    header_text = "Sub Party"
                 elif f in ("product_name", "product"):
                     header_text = "Product"
                 elif f == "gc_note":
@@ -959,6 +1037,10 @@ def download_our_report(request):
                         row.append(f"{total_amount:.2f}")
                     elif field == "gc_note":
                         row.append(d.gc_note_no)
+                    elif field == "main_party":
+                        row.append(getattr(d, "main_party", "") or "")
+                    elif field == "sub_party":
+                        row.append(getattr(d, "sub_party", "") or "")
                     else:
                         row.append(getattr(d, field, ""))
 
@@ -1064,7 +1146,7 @@ def download_our_report(request):
         header_table = Table(header_data, colWidths=[available_width])
         header_table.setStyle(TableStyle([('LINEBELOW', (0,2), (-1,2), 0.5, colors.black), ('LINEBELOW', (0,1), (-1,1), 0.5, colors.black)]))
 
-        fields = contract.invoice_fields
+        fields = list(contract.invoice_fields or [])
         # Add internal-only columns for internal report (including truck_booking_rate)
         additional_fields = [
             "truck_booking_rate",
@@ -1086,6 +1168,24 @@ def download_our_report(request):
             - Treat all money/amount columns as right‑aligned with fixed decimals.
             - Keep key text columns on a single line using non‑breaking spaces.
             """
+            # Reorder fields so main_party / sub_party (if enabled) appear directly after dc_field,
+            # mirroring invoice and client report layouts.
+            active_fields = list(fields)
+            main_party_in_fields = "main_party" in active_fields
+            sub_party_in_fields = "sub_party" in active_fields
+            if main_party_in_fields or sub_party_in_fields:
+                active_fields = [f for f in active_fields if f not in ("main_party", "sub_party")]
+                try:
+                    dc_field_idx = active_fields.index("dc_field")
+                    insert_idx = dc_field_idx + 1
+                except ValueError:
+                    insert_idx = 0
+                if main_party_in_fields:
+                    active_fields.insert(insert_idx, "main_party")
+                    insert_idx += 1
+                if sub_party_in_fields:
+                    active_fields.insert(insert_idx, "sub_party")
+
             # Header row with readable, compact labels
             header_row = []
             dc_field_label = (
@@ -1094,7 +1194,7 @@ def download_our_report(request):
                 else "Challan No"
             )
 
-            for f in fields:
+            for f in active_fields:
                 if f == "dc_field":
                     header_text = dc_field_label
                 elif f == "sr_no":
@@ -1105,6 +1205,10 @@ def download_our_report(request):
                     header_text = "Truck No"
                 elif f == "party_name":
                     header_text = "Party Name"
+                elif f == "main_party":
+                    header_text = "Main Party"
+                elif f == "sub_party":
+                    header_text = "Sub Party"
                 elif f in ("product_name", "product"):
                     header_text = "Product"
                 elif f == "gc_note":
@@ -1221,6 +1325,10 @@ def download_our_report(request):
                         row.append(_money(total_amount))
                     elif field == "gc_note":
                         row.append(d.gc_note_no)
+                    elif field == "main_party":
+                        row.append(getattr(d, "main_party", "") or "")
+                    elif field == "sub_party":
+                        row.append(getattr(d, "sub_party", "") or "")
                     elif field == "weight":
                         row.append(_num2(d.weight))
                     elif field == "rate":

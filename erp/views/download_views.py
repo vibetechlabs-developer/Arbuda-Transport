@@ -2310,4 +2310,12 @@ def generate_summary_pdf(request):
     buffer.seek(0)
     
     filename = f"{contract.company_name}_{summary_date.strftime('%Y%m%d')}_Summary.pdf"
-    return FileResponse(buffer, as_attachment=True, filename=filename) 
+    # Inline preview by default; only download when ?download=1 or hidden input is sent
+    download_flag = request.POST.get("download") or request.GET.get("download")
+    response = FileResponse(
+        buffer,
+        as_attachment=bool(download_flag),
+        filename=filename,
+        content_type="application/pdf",
+    )
+    return response 

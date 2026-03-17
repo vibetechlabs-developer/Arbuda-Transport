@@ -1287,12 +1287,34 @@ def view_gc_note(request):
     
     try:
         start_date, end_date = get_financial_year_start_end(financial_year)
-        allcontract = Invoice.objects.filter(
+        # Base queryset: all invoices for the company in the selected financial year
+        invoices_qs = Invoice.objects.filter(
             company_id=company_id,
             Bill_date__gte=start_date,
             Bill_date__lte=end_date
-        )
-        alldata['allinvoice'] = allcontract
+        ).select_related("contract_id")
+
+        # All contracts that have at least one invoice in this financial year
+        allcontract = T_Contract.objects.filter(
+            company_id=company_id,
+            invoice__company_id=company_id,
+            invoice__Bill_date__gte=start_date,
+            invoice__Bill_date__lte=end_date,
+        ).distinct().order_by('-id')
+
+        # Optional filter: limit invoices to a selected contract (same as View/Update Invoice)
+        selected_contract_id = request.GET.get("contract_id")
+        if selected_contract_id:
+            try:
+                selected_contract_id_int = int(selected_contract_id)
+                invoices_qs = invoices_qs.filter(contract_id_id=selected_contract_id_int)
+                alldata["selected_contract_id"] = selected_contract_id_int
+            except (TypeError, ValueError):
+                # Ignore invalid IDs and show all invoices
+                pass
+
+        alldata['allinvoice'] = invoices_qs
+        alldata['allcontract'] = allcontract
         alldata['financial_year'] = financial_year
     except Invoice.DoesNotExist:
         messages.error(request , 'Invoice not fonded')

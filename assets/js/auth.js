@@ -54,8 +54,10 @@ function registraion_validation(form) {
   const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const mobilePattern = /^[6-9][0-9]{9}$/;
 
-  if (company_name.value.length <= 0 || company_name.value.length > 20) {
-    setError(company_name, "Company name is required (max 20 characters).");
+  // Only require that a company name is provided; do not enforce a small
+  // character limit here so that longer legal names are allowed.
+  if (company_name.value.length <= 0) {
+    setError(company_name, "Company name is required.");
     status = false;
   } else {
     clearError(company_name);
@@ -135,7 +137,7 @@ function company_profile_validation(form) {
   const pinRegex = /^[1-9][0-9]{5}$/;
 
 
-  if (company_name.value.length <= 0 || company_name.value.length > 20) {
+  if (company_name.value.length <= 0) {
     company_name.classList.add("invalid");
     status = false;
   }
@@ -231,7 +233,7 @@ function client_profile_validation(form) {
     /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 
-  if (company_name.value.length <= 0 || company_name.value.length > 20) {
+  if (company_name.value.length <= 0) {
     company_name.classList.add("invalid");
     status = false;
   }

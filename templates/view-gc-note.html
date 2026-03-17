@@ -24,6 +24,31 @@
       <!-- Register Card -->
       <div class="card">
         <div class="card-body">
+              <!-- Contract filter (GET) to limit invoices, same as View & Download Invoice -->
+              <form method="get" class="mb-3">
+                <div class="row">
+                  <div class="mb-3 col-sm-6">
+                    <label for="filter_contract_id" class="form-label">Filter by Contract</label>
+                    <select
+                      class="form-select"
+                      name="contract_id"
+                      id="filter_contract_id"
+                      onchange="this.form.submit()"
+                    >
+                      <option value="">All Contracts</option>
+                      {% for contract in allcontract %}
+                        <option
+                          value="{{ contract.id }}"
+                          {% if selected_contract_id and contract.id == selected_contract_id %}selected{% endif %}
+                        >
+                          {{ contract.contract_no }} - {{ contract.company_name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </form>
+
           <form id="formAuthentication" class="mb-3" method="POST" action="download-gc-pdf">
             {% csrf_token %}
             <h5 class="text-primary fw-semibold mb-3">Invoice Details</h5>

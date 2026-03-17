@@ -3,7 +3,8 @@ from django.contrib.auth.hashers import   make_password, check_password
 
 
 class Company_user(models.Model):
-    company_name = models.CharField(max_length=20)
+    # Allow longer legal company names (was max_length=20, which was too small)
+    company_name = models.CharField(max_length=100)
     gst_number = models.CharField(max_length=24 ,unique=True)
     email = models.CharField(max_length=50 , unique=True)
     mobile = models.BigIntegerField(unique=True)

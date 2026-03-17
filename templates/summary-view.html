@@ -102,8 +102,28 @@
               </table>
             </div>
           </div>
-          <div class="col-sm-6">
-            <button type="submit" class="btn btn-primary d-grid w-100">Generate Summary PDF</button>
+          <div class="col-sm-8 d-flex gap-2 mt-1">
+            <!-- Preview button: opens PDF in new tab (inline viewer with browser download button) -->
+            <button
+              type="submit"
+              name="export_type"
+              value="pdf"
+              class="btn btn-outline-primary flex-fill"
+              formtarget="_blank"
+            >
+              Preview Summary PDF
+            </button>
+
+            <!-- Explicit download button: same PDF but forces attachment -->
+            <button
+              type="submit"
+              name="export_type"
+              value="pdf"
+              class="btn btn-primary flex-fill"
+              onclick="this.form.insertAdjacentHTML('beforeend','<input type=&quot;hidden&quot; name=&quot;download&quot; value=&quot;1&quot; />')"
+            >
+              Download Summary PDF
+            </button>
           </div>
         </form>
       </div>
