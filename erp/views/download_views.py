@@ -361,64 +361,90 @@ def generate_invoice_pdf(request):
     #     return footer_elements
 
     def build_footer_block():
-            footer_elements = []
+        """
+        Common footer used for invoice *creation* PDF:
+        exactly three equal sections:
+            - Verified By
+            - Recommended By
+            - For, <Company>
+        with signature lines directly underneath, matching
+        the visual from the sample invoice.
+        """
+        footer_elements = []
 
-            footer_name = (
-                getattr(contract, "footer_company_name", None)
-                or request.session['company_info']['company_name']
+        footer_name = (
+            getattr(contract, "footer_company_name", None)
+            or request.session['company_info']['company_name']
+        )
+
+        # Labels
+        verified_label = (
+            Paragraph("Verified By", to_style)
+            if getattr(contract, "show_verified_by", False)
+            else Paragraph("", to_style)
+        )
+        recommended_label = (
+            Paragraph("Recommended By", to_style)
+            if getattr(contract, "show_recommended_by", False)
+            else Paragraph("", to_style)
+        )
+        company_label = Paragraph(f"For, {footer_name}", to_style)
+
+        # Signature lines (same width visually as in design)
+        sign_line = "__________________"
+        verified_sign = (
+            Paragraph(sign_line, to_style)
+            if getattr(contract, "show_verified_by", False)
+            else Paragraph("", to_style)
+        )
+        recommended_sign = (
+            Paragraph(sign_line, to_style)
+            if getattr(contract, "show_recommended_by", False)
+            else Paragraph("", to_style)
+        )
+        company_sign = Paragraph(sign_line, to_style)
+
+        # 3 equal columns so spacing matches design precisely
+        footer_data = [
+            [verified_label, recommended_label, company_label],
+            [verified_sign, recommended_sign, company_sign],
+        ]
+
+        # Use a narrower total width than the full printable area so that
+        # left and right margins have some blank space (important for punching).
+        # Tune this factor (currently 0.85) if you want more/less side space.
+        footer_total_width = available_width * 0.85
+        equal_width = footer_total_width / 3.0
+        footer_table = Table(
+            footer_data,
+            colWidths=[equal_width, equal_width, equal_width],
+            splitByRow=0,
+            # Slightly right‑biased so the visual margin on the right side is smaller
+            # (more space on the left, less on the right, matching your requirement).
+            hAlign="RIGHT",
+        )
+
+        footer_table.setStyle(
+            TableStyle(
+                [
+                    # Center all three sections horizontally, like the sample
+                    ("ALIGN", (0, 0), (2, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (2, -1), "TOP"),
+
+                    # Tight padding so labels and lines stay visually grouped
+                    ("LEFTPADDING", (0, 0), (2, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (2, -1), 0),
+
+                    ("TOPPADDING", (0, 0), (2, 0), 10),   # space above labels
+                    ("BOTTOMPADDING", (0, 0), (2, 0), 3),
+                    ("TOPPADDING", (0, 1), (2, 1), 3),    # space between label and line
+                    ("BOTTOMPADDING", (0, 1), (2, 1), 12),
+                ]
             )
+        )
 
-            # Labels
-            verified_label = Paragraph("Verified By", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
-            recommended_label = Paragraph("Recommended By", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
-            company_label = Paragraph(f"For, {footer_name}", to_right_style)
-
-            # Signature lines
-            verified_sign = Paragraph("__________________", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
-            recommended_sign = Paragraph("__________________", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
-            company_sign = Paragraph("__________________", to_right_style)
-
-            # 3-column layout
-            footer_data = [
-                [verified_label, recommended_label, company_label],
-                [verified_sign, recommended_sign, company_sign],
-            ]
-
-            # Slightly bias widths so the visual center of text (not just the column)
-            # makes "Recommended By" appear perfectly centered on the page.
-            footer_table = Table(
-                footer_data,
-                colWidths=[
-                    available_width * 0.28,  # Verified
-                    available_width * 0.44,  # Recommended (shifted a bit to the right)
-                    available_width * 0.28,  # Company
-                ],
-                splitByRow=0
-            )
-
-            footer_table.setStyle(TableStyle([
-                # Alignment
-                ("ALIGN", (0, 0), (0, -1), "CENTER"),   # Center "Verified By"
-                ("ALIGN", (1, 0), (1, -1), "CENTER"),   # Center "Recommended By"
-                ("ALIGN", (2, 0), (2, -1), "RIGHT"),    # Company on the right
-
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-
-                # Remove side padding so centering is mathematically exact
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-
-                # Spacing (important for clean look)
-                ("TOPPADDING", (0, 0), (-1, 0), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
-
-                ("TOPPADDING", (0, 1), (-1, 1), 5),
-                ("BOTTOMPADDING", (0, 1), (-1, 1), 10),
-
-            ]))
-
-            footer_elements.append(KeepTogether(footer_table))
-            return footer_elements
+        footer_elements.append(KeepTogether(footer_table))
+        return footer_elements
             
     fields = contract.invoice_fields
     # Target 12 rows per page so header + 12 rows + TOTAL + signatures fit on one page
@@ -1179,6 +1205,12 @@ def download_generate_invoice_pdf(request):
 
     # --- Invoice footer helper ---
     def build_footer_block():
+        """
+        Common footer used for invoice *download* PDF.
+        Layout is kept identical to the create-invoice PDF:
+            Verified By | Recommended By | For, <Company>
+        with three equal columns and signature lines underneath.
+        """
         footer_elements = []
 
         footer_name = (
@@ -1187,52 +1219,60 @@ def download_generate_invoice_pdf(request):
         )
 
         # Labels
-        verified_label = Paragraph("Verified By", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
-        recommended_label = Paragraph("Recommended By", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
-        company_label = Paragraph(f"For, {footer_name}", to_right_style)
+        verified_label = (
+            Paragraph("Verified By", to_style)
+            if getattr(contract, "show_verified_by", False)
+            else Paragraph("", to_style)
+        )
+        recommended_label = (
+            Paragraph("Recommended By", to_style)
+            if getattr(contract, "show_recommended_by", False)
+            else Paragraph("", to_style)
+        )
+        company_label = Paragraph(f"For, {footer_name}", to_style)
 
         # Signature lines
-        verified_sign = Paragraph("__________________", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
-        recommended_sign = Paragraph("__________________", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
-        company_sign = Paragraph("__________________", to_right_style)
+        sign_line = "__________________"
+        verified_sign = (
+            Paragraph(sign_line, to_style)
+            if getattr(contract, "show_verified_by", False)
+            else Paragraph("", to_style)
+        )
+        recommended_sign = (
+            Paragraph(sign_line, to_style)
+            if getattr(contract, "show_recommended_by", False)
+            else Paragraph("", to_style)
+        )
+        company_sign = Paragraph(sign_line, to_style)
 
-        # 3-column layout: Verified (left), Recommended (center), Company (right)
         footer_data = [
             [verified_label, recommended_label, company_label],
             [verified_sign, recommended_sign, company_sign],
         ]
 
-        # Use slightly biased widths so the **visual** center of text makes
-        # "Recommended By" look perfectly centered between left and right.
+        # Match the same visual margins as the create-invoice PDF footer
+        # (narrower block centered on the page so both sides have equal space)
+        footer_total_width = available_width * 0.85
+        equal_width = footer_total_width / 3.0
         footer_table = Table(
             footer_data,
-            colWidths=[
-                available_width * 0.28,  # Verified
-                available_width * 0.44,  # Recommended
-                available_width * 0.28,  # Company
-            ],
+            colWidths=[equal_width, equal_width, equal_width],
             splitByRow=0,
+            # Keep same right‑biased alignment as create‑invoice PDF
+            hAlign="RIGHT",
         )
 
         footer_table.setStyle(
             TableStyle(
                 [
-                    # Alignment
-                    ("ALIGN", (0, 0), (0, -1), "CENTER"),   # Center "Verified By"
-                    ("ALIGN", (1, 0), (1, -1), "CENTER"),   # Center "Recommended By"
-                    ("ALIGN", (2, 0), (2, -1), "RIGHT"),    # Company on the right
-
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-
-                    # Remove side padding so centering is mathematically exact
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-
-                    # Spacing: keep labels and signature lines visually grouped
-                    ("TOPPADDING", (0, 0), (-1, 0), 10),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
-                    ("TOPPADDING", (0, 1), (-1, 1), 5),
-                    ("BOTTOMPADDING", (0, 1), (-1, 1), 10),
+                    ("ALIGN", (0, 0), (2, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (2, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (2, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (2, -1), 0),
+                    ("TOPPADDING", (0, 0), (2, 0), 10),
+                    ("BOTTOMPADDING", (0, 0), (2, 0), 3),
+                    ("TOPPADDING", (0, 1), (2, 1), 3),
+                    ("BOTTOMPADDING", (0, 1), (2, 1), 12),
                 ]
             )
         )
