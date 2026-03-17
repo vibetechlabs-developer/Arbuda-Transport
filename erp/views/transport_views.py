@@ -1164,11 +1164,21 @@ def update_dispatch_Invoice(request):
         # `bill_no` select holds the existing invoice ID (primary key)
         dbill_id = request.POST.get("bill_no")
         dcontract_no = request.POST.get("contract_no")
-        dispatch_ids = [int(i) for i in request.POST.getlist("dispatch_ids")]
+
+        # Safely parse dispatch IDs – ignore any bad / empty values instead of crashing
+        raw_dispatch_ids = request.POST.getlist("dispatch_ids")
+        dispatch_ids = []
+        for val in raw_dispatch_ids:
+            try:
+                dispatch_ids.append(int(val))
+            except (TypeError, ValueError):
+                continue
+
         # Optional new bill number text field (for updating Invoice.Bill_no)
         new_bill_no = (request.POST.get("new_bill_no") or "").strip()
         bill_date_str = request.POST.get("bill_date")
         rr_number = request.POST.get("rr_number", "").strip()
+
         # Validation    
         if not dbill_id or not dcontract_no:
             messages.error(request, "Invalid request: missing invoice or contract.")
@@ -1183,14 +1193,20 @@ def update_dispatch_Invoice(request):
             messages.error(request, "Invalid contract or company.")
             return redirect("update-dispatch-invoice")
 
-        # Convert date safely
-        bill_date = None
+        # Convert date safely.
+        # Start from existing invoice date so we don't accidentally set it to None.
+        bill_date = invoice.Bill_date
         if bill_date_str:
             try:
                 bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date()
             except ValueError:
                 messages.error(request, "Invalid bill date format.")
                 return redirect("update-dispatch-invoice")
+
+        # If your Invoice.Bill_date is NOT nullable, enforce presence here
+        if bill_date is None:
+            messages.error(request, "Bill date is required.")
+            return redirect("update-dispatch-invoice")
 
         # If user entered a new bill number, check for duplicates (excluding current invoice)
         if new_bill_no:
