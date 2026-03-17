@@ -275,91 +275,151 @@ def generate_invoice_pdf(request):
     )
 
     # --- Invoice footer helper ---
+    # def build_footer_block():
+    #     footer_elements = []
+        
+    #     # Decide footer "For" company name – prefer explicit footer name,
+    #     # else fall back to logged-in main company profile name.
+    #     footer_name = (
+    #         getattr(contract, "footer_company_name", None)
+    #         or request.session['company_info']['company_name']
+    #     )
+
+    #     # Build left side content: Verified By and Recommended By on same line
+    #     left_items = []
+    #     if getattr(contract, "show_verified_by", False):
+    #         left_items.append(Paragraph("Verified By", to_style))
+    #     if getattr(contract, "show_recommended_by", False):
+    #         left_items.append(Paragraph("Recommended By", to_style))
+        
+    #     # Create nested table for left side to place items side by side
+    #     if left_items:
+    #         left_table_data = [left_items]
+    #         left_table = Table(left_table_data, colWidths=[available_width * 0.2] * len(left_items))
+    #         left_table.setStyle(TableStyle([
+    #             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+    #             ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    #             ("LEFTPADDING", (0, 0), (-1, -1), 0),
+    #             ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+    #             ("TOPPADDING", (0, 0), (-1, -1), 0),
+    #             ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    #         ]))
+    #         left_label = left_table
+    #     else:
+    #         left_label = Paragraph("", to_style)
+        
+    #     # Right side: Company name always on the right
+    #     right_label = Paragraph(f"For, {footer_name}", to_right_style)
+
+    #     # Create signature rows - need to match the nested table structure
+    #     if left_items:
+    #         left_sig_items = [Paragraph("__________________", to_style) for _ in left_items]
+    #         left_sig_table = Table([left_sig_items], colWidths=[available_width * 0.2] * len(left_items))
+    #         left_sig_table.setStyle(TableStyle([
+    #             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+    #             ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    #             ("LEFTPADDING", (0, 0), (-1, -1), 0),
+    #             ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+    #             ("TOPPADDING", (0, 0), (-1, -1), 0),
+    #             ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    #         ]))
+    #         left_signature = left_sig_table
+    #     else:
+    #         left_signature = Paragraph("", to_style)
+    #     right_signature = Paragraph("__________________", to_right_style)
+
+    #     # Always use 50/50 split to keep layout consistent
+    #     # Left side always reserved for Verified By/Recommended By (even if empty)
+    #     # Right side always for company name
+    #     left_width = available_width * 0.5
+    #     right_width = available_width * 0.5
+
+    #     # Create table with left and right columns
+    #     footer_data = [
+    #         [left_label, right_label],  # Labels row
+    #         [left_signature, right_signature],  # Signatures row
+    #     ]
+
+    #     # Do not allow the footer table to split between rows across pages
+    #     footer_table = Table(footer_data, colWidths=[left_width, right_width], splitByRow=0)
+    #     footer_table.setStyle(
+    #         TableStyle(
+    #             [
+    #                 ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
+    #                 ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
+    #                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    #                 # Very tight vertical padding so labels and lines stay close
+    #                 ("TOPPADDING", (0, 0), (-1, 0), 2),
+    #                 ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
+    #                 ("TOPPADDING", (0, 1), (-1, -1), 1),
+    #                 ("BOTTOMPADDING", (0, 1), (-1, -1), 1),
+    #             ]
+    #         )
+    #     )
+    #     # Keep the entire footer block (labels + signatures) together
+    #     footer_elements.append(KeepTogether(footer_table))
+    #     return footer_elements
+
     def build_footer_block():
-        footer_elements = []
-        
-        # Decide footer "For" company name – prefer explicit footer name,
-        # else fall back to logged-in main company profile name.
-        footer_name = (
-            getattr(contract, "footer_company_name", None)
-            or request.session['company_info']['company_name']
-        )
+            footer_elements = []
 
-        # Build left side content: Verified By and Recommended By on same line
-        left_items = []
-        if getattr(contract, "show_verified_by", False):
-            left_items.append(Paragraph("Verified By", to_style))
-        if getattr(contract, "show_recommended_by", False):
-            left_items.append(Paragraph("Recommended By", to_style))
-        
-        # Create nested table for left side to place items side by side
-        if left_items:
-            left_table_data = [left_items]
-            left_table = Table(left_table_data, colWidths=[available_width * 0.2] * len(left_items))
-            left_table.setStyle(TableStyle([
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ]))
-            left_label = left_table
-        else:
-            left_label = Paragraph("", to_style)
-        
-        # Right side: Company name always on the right
-        right_label = Paragraph(f"For, {footer_name}", to_right_style)
-
-        # Create signature rows - need to match the nested table structure
-        if left_items:
-            left_sig_items = [Paragraph("__________________", to_style) for _ in left_items]
-            left_sig_table = Table([left_sig_items], colWidths=[available_width * 0.2] * len(left_items))
-            left_sig_table.setStyle(TableStyle([
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ]))
-            left_signature = left_sig_table
-        else:
-            left_signature = Paragraph("", to_style)
-        right_signature = Paragraph("__________________", to_right_style)
-
-        # Always use 50/50 split to keep layout consistent
-        # Left side always reserved for Verified By/Recommended By (even if empty)
-        # Right side always for company name
-        left_width = available_width * 0.5
-        right_width = available_width * 0.5
-
-        # Create table with left and right columns
-        footer_data = [
-            [left_label, right_label],  # Labels row
-            [left_signature, right_signature],  # Signatures row
-        ]
-
-        # Do not allow the footer table to split between rows across pages
-        footer_table = Table(footer_data, colWidths=[left_width, right_width], splitByRow=0)
-        footer_table.setStyle(
-            TableStyle(
-                [
-                    ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
-                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    # Very tight vertical padding so labels and lines stay close
-                    ("TOPPADDING", (0, 0), (-1, 0), 2),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
-                    ("TOPPADDING", (0, 1), (-1, -1), 1),
-                    ("BOTTOMPADDING", (0, 1), (-1, -1), 1),
-                ]
+            footer_name = (
+                getattr(contract, "footer_company_name", None)
+                or request.session['company_info']['company_name']
             )
-        )
-        # Keep the entire footer block (labels + signatures) together
-        footer_elements.append(KeepTogether(footer_table))
-        return footer_elements
 
+            # Labels
+            verified_label = Paragraph("Verified By", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
+            recommended_label = Paragraph("Recommended By", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
+            company_label = Paragraph(f"For, {footer_name}", to_right_style)
+
+            # Signature lines
+            verified_sign = Paragraph("__________________", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
+            recommended_sign = Paragraph("__________________", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
+            company_sign = Paragraph("__________________", to_right_style)
+
+            # 3-column layout
+            footer_data = [
+                [verified_label, recommended_label, company_label],
+                [verified_sign, recommended_sign, company_sign],
+            ]
+
+            # Slightly bias widths so the visual center of text (not just the column)
+            # makes "Recommended By" appear perfectly centered on the page.
+            footer_table = Table(
+                footer_data,
+                colWidths=[
+                    available_width * 0.28,  # Verified
+                    available_width * 0.44,  # Recommended (shifted a bit to the right)
+                    available_width * 0.28,  # Company
+                ],
+                splitByRow=0
+            )
+
+            footer_table.setStyle(TableStyle([
+                # Alignment
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),   # Center "Verified By"
+                ("ALIGN", (1, 0), (1, -1), "CENTER"),   # Center "Recommended By"
+                ("ALIGN", (2, 0), (2, -1), "RIGHT"),    # Company on the right
+
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+
+                # Remove side padding so centering is mathematically exact
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+
+                # Spacing (important for clean look)
+                ("TOPPADDING", (0, 0), (-1, 0), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
+
+                ("TOPPADDING", (0, 1), (-1, 1), 5),
+                ("BOTTOMPADDING", (0, 1), (-1, 1), 10),
+
+            ]))
+
+            footer_elements.append(KeepTogether(footer_table))
+            return footer_elements
+            
     fields = contract.invoice_fields
     # Target 12 rows per page so header + 12 rows + TOTAL + signatures fit on one page
     # (UI is locked to 12 so this stays consistent)
@@ -1120,81 +1180,64 @@ def download_generate_invoice_pdf(request):
     # --- Invoice footer helper ---
     def build_footer_block():
         footer_elements = []
-        
-        footer_name = getattr(contract, "footer_company_name", None) or request.session['company_info']['company_name']
 
-        # Build left side content: Verified By and Recommended By on same line
-        left_items = []
-        if getattr(contract, "show_verified_by", False):
-            left_items.append(Paragraph("Verified By", to_style))
-        if getattr(contract, "show_recommended_by", False):
-            left_items.append(Paragraph("Recommended By", to_style))
-        
-        # Create nested table for left side to place items side by side
-        if left_items:
-            left_table_data = [left_items]
-            left_table = Table(left_table_data, colWidths=[available_width * 0.2] * len(left_items))
-            left_table.setStyle(TableStyle([
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ]))
-            left_label = left_table
-        else:
-            left_label = Paragraph("", to_style)
-        
-        # Right side: Company name always on the right
-        right_label = Paragraph(f"For, {footer_name}", to_right_style)
+        footer_name = (
+            getattr(contract, "footer_company_name", None)
+            or request.session['company_info']['company_name']
+        )
 
-        # Create signature rows - need to match the nested table structure
-        if left_items:
-            left_sig_items = [Paragraph("__________________", to_style) for _ in left_items]
-            left_sig_table = Table([left_sig_items], colWidths=[available_width * 0.2] * len(left_items))
-            left_sig_table.setStyle(TableStyle([
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ]))
-            left_signature = left_sig_table
-        else:
-            left_signature = Paragraph("", to_style)
-        right_signature = Paragraph("__________________", to_right_style)
+        # Labels
+        verified_label = Paragraph("Verified By", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
+        recommended_label = Paragraph("Recommended By", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
+        company_label = Paragraph(f"For, {footer_name}", to_right_style)
 
-        # Always use 50/50 split to keep layout consistent
-        # Left side always reserved for Verified By/Recommended By (even if empty)
-        # Right side always for company name
-        left_width = available_width * 0.5
-        right_width = available_width * 0.5
+        # Signature lines
+        verified_sign = Paragraph("__________________", to_style) if getattr(contract, "show_verified_by", False) else Paragraph("", to_style)
+        recommended_sign = Paragraph("__________________", to_style) if getattr(contract, "show_recommended_by", False) else Paragraph("", to_style)
+        company_sign = Paragraph("__________________", to_right_style)
 
-        # Create table with left and right columns
+        # 3-column layout: Verified (left), Recommended (center), Company (right)
         footer_data = [
-            [left_label, right_label],  # Labels row
-            [left_signature, right_signature],  # Signatures row
+            [verified_label, recommended_label, company_label],
+            [verified_sign, recommended_sign, company_sign],
         ]
 
-        # Do not allow the footer table to split between rows across pages
-        footer_table = Table(footer_data, colWidths=[left_width, right_width], splitByRow=0)
+        # Use slightly biased widths so the **visual** center of text makes
+        # "Recommended By" look perfectly centered between left and right.
+        footer_table = Table(
+            footer_data,
+            colWidths=[
+                available_width * 0.28,  # Verified
+                available_width * 0.44,  # Recommended
+                available_width * 0.28,  # Company
+            ],
+            splitByRow=0,
+        )
+
         footer_table.setStyle(
             TableStyle(
                 [
-                    ("ALIGN", (0, 0), (0, -1), "LEFT"),  # Left column left-aligned
-                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),  # Right column right-aligned
+                    # Alignment
+                    ("ALIGN", (0, 0), (0, -1), "CENTER"),   # Center "Verified By"
+                    ("ALIGN", (1, 0), (1, -1), "CENTER"),   # Center "Recommended By"
+                    ("ALIGN", (2, 0), (2, -1), "RIGHT"),    # Company on the right
+
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    # Very tight vertical padding so labels and lines stay close
-                    ("TOPPADDING", (0, 0), (-1, 0), 2),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
-                    ("TOPPADDING", (0, 1), (-1, -1), 1),
-                    ("BOTTOMPADDING", (0, 1), (-1, -1), 1),
+
+                    # Remove side padding so centering is mathematically exact
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+
+                    # Spacing: keep labels and signature lines visually grouped
+                    ("TOPPADDING", (0, 0), (-1, 0), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
+                    ("TOPPADDING", (0, 1), (-1, 1), 5),
+                    ("BOTTOMPADDING", (0, 1), (-1, 1), 10),
                 ]
             )
         )
-        footer_elements.append(footer_table)
+
+        footer_elements.append(KeepTogether(footer_table))
         return footer_elements
 
     fields = contract.invoice_fields
