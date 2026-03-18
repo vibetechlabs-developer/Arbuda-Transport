@@ -865,28 +865,9 @@ def generate_invoice_pdf(request):
                         style = to_right_style_desc_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(str(cell), style)
 
-        # Set explicit row heights (in points) so the preview PDF matches the
-        # view/download PDF layout (12 uniform rows per page, consistent header
-        # and TOTAL row sizing).
-        if add_total:
-            # Header row slightly taller, data rows medium, total row slightly taller
-            if len(data) >= 2:
-                row_heights = [24]  # header
-                if len(data) > 2:
-                    row_heights += [21] * (len(data) - 2)  # data rows
-                row_heights += [23]  # total row
-            else:
-                row_heights = [24] * len(data)
-        else:
-            # Header row slightly taller, data rows medium
-            if len(data) >= 1:
-                row_heights = [24]  # header
-                if len(data) > 1:
-                    row_heights += [21] * (len(data) - 1)
-            else:
-                row_heights = None
-
-        table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
+        # Let ReportLab auto-size row heights so rows with large text (e.g. long
+        # party names) grow vertically instead of visually overriding the next row.
+        table = Table(data, colWidths=col_widths, repeatRows=1)
 
         # Table styles - keep fully in sync with download_generate_invoice_pdf so
         # that both PDFs have identical visual layout (padding, borders, etc.).
@@ -908,9 +889,10 @@ def generate_invoice_pdf(request):
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
             # Grid lines for all cells - simple and standard
             ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            # NOTE: We intentionally do NOT enable table-level word wrapping here because
-            # this invoice uses fixed row heights. Wrapping can increase the rendered
-            # line count and visually overlap into the next row.
+            # Allow wrapping inside cells so that long text breaks into multiple
+            # lines within the same row (together with auto row heights above,
+            # this keeps each logical row visually separate).
+            ("WORDWRAP", (0,0), (-1,-1), "CJK"),
         ]
         # No zebra striping - clean and simple
         if add_total:
@@ -1736,7 +1718,9 @@ def download_generate_invoice_pdf(request):
             else:
                 row_heights = None
 
-        table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
+        # Let ReportLab auto-size row heights in the *download* invoice as well so
+        # long text wraps inside its own row instead of overriding the next row.
+        table = Table(data, colWidths=col_widths, repeatRows=1)
 
         # Table styles - simple, elegant, standard structure (no background colors)
         styles = [
@@ -1757,9 +1741,9 @@ def download_generate_invoice_pdf(request):
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
             # Grid lines for all cells - simple and standard
             ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            # Do not enable table-level word wrapping when using fixed row heights.
-            # Wrapping can increase the rendered height of a cell beyond the row height,
-            # causing text to overlap into the next row.
+            # Allow wrapping; together with auto row heights above this keeps each
+            # logical row visually distinct even with large content.
+            ("WORDWRAP", (0,0), (-1,-1), "CJK"),
         ]
         # No zebra striping - clean and simple
         if add_total:
