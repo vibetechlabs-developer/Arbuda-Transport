@@ -1721,26 +1721,46 @@ def download_generate_invoice_pdf(request):
 
     # --- Split dispatches per page ---
     if contract.rate_type == "Distric-Wise":
-        page_no=1  
+        page_no = 1
+
         # Sort dispatches by district, then by challan_no (ascending) within each district
         def sort_key(d):
             def get_numeric_value(challan_no):
                 if not challan_no:
                     return 0
-                num_match = re.search(r'\d+', str(challan_no))
+                num_match = re.search(r"\d+", str(challan_no))
                 return int(num_match.group(0)) if num_match else 0
+
             # Positive for ascending challan order within each district
-            return (d.district or '', get_numeric_value(d.challan_no))
-        
+            return (d.district or "", get_numeric_value(d.challan_no))
+
         dispatches_sorted = sorted(dispatches, key=sort_key)
-    
-        # Total pages should be based on the total number of dispatch rows and the
-        # page capacity, NOT just the number of districts. Otherwise we can end up
-        # with situations like "Page 5 of 4" when some districts need multiple pages.
-        total_pages = math.ceil(len(dispatches_sorted) / chunk_size)
-        # Group by district
-        for district, district_dispatches_iter in groupby(dispatches_sorted, key=attrgetter('district')):
-            district_dispatches = list(district_dispatches_iter)
+
+        # --- Correct total page count for district-wise pagination ---
+        # We cannot simply do ceil(len(dispatches_sorted) / chunk_size) because
+        # pagination is RESET for every district. Example:
+        #   District A -> 13 rows (needs 2 pages with chunk_size=12)
+        #   District B -> 13 rows (also 2 pages)
+        #   Total rows = 26 → ceil(26 / 12) = 3  (WRONG)
+        #   Actual pages = 2 + 2 = 4          (CORRECT)
+        #
+        # To avoid "Page 5 of 4" style mismatches, we first materialise all
+        # district groups and then sum the pages required for each group.
+        district_groups = []
+        for district, district_dispatches_iter in groupby(
+            dispatches_sorted, key=attrgetter("district")
+        ):
+            district_list = list(district_dispatches_iter)
+            district_groups.append((district, district_list))
+
+        total_pages = 0
+        for _district, district_list in district_groups:
+            if district_list:
+                total_pages += math.ceil(len(district_list) / chunk_size)
+
+        # Group by district using the pre-built list so our page counter matches
+        # the actual rendered pages.
+        for district, district_dispatches in district_groups:
             # print(district_dispatches)
             # Paginate within the district
             for i in range(0, len(district_dispatches), chunk_size):
