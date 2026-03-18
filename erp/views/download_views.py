@@ -22,6 +22,37 @@ from django.db.models import Q
 from reportlab.platypus import KeepTogether
 
 
+def _safe_filename_part(value: object) -> str:
+    """
+    Make a value safe for use in a filename across OSes (Windows in particular).
+    Keeps alphanumerics, dash, underscore, and dot; converts other runs to '-'
+    and trims leading/trailing separators.
+    """
+    s = str(value or "").strip()
+    # Replace slashes first (common in bill numbers like "GJ-07/059")
+    s = s.replace("/", "-").replace("\\", "-")
+    # Collapse any remaining unsafe characters
+    s = re.sub(r"[^A-Za-z0-9._-]+", "-", s)
+    s = re.sub(r"-{2,}", "-", s).strip("-. _")
+    return s or "NA"
+
+
+def _invoice_pdf_filename(*, company_name: str, contract_no: str, bill_no: str, invoice_id: int | None = None) -> str:
+    """
+    Generate a stable, unique-ish filename for an invoice PDF.
+
+    We include contract_no because Bill_no can repeat across different contracts,
+    which otherwise causes downloaded files to overwrite on the user's machine.
+    """
+    parts = [
+        _safe_filename_part(company_name),
+        _safe_filename_part(contract_no),
+        _safe_filename_part(bill_no),
+    ]
+    if invoice_id is not None:
+        parts.append(str(invoice_id))
+    return "_".join([p for p in parts if p]) + ".pdf"
+
 
 def sort_dispatches_by_challan_asc(dispatches):
     """
@@ -1090,7 +1121,12 @@ def generate_invoice_pdf(request):
     # --- Build PDF (no Verified / Recommended / For footer, as per latest requirement) ---
     doc.build(elements)
     buffer.seek(0)
-    filename = f"{contract.company_name}_{i_bill_no.replace('/','-')}.pdf"
+    filename = _invoice_pdf_filename(
+        company_name=contract.company_name,
+        contract_no=contract.contract_no,
+        bill_no=i_bill_no,
+        invoice_id=getattr(invoice, "id", None),
+    )
 
     # For the "preview" flow this view is used for, we always want an inline preview,
     # not a forced download. The explicit download button should call the dedicated
@@ -1903,7 +1939,12 @@ def download_generate_invoice_pdf(request):
     # --- Build PDF ---
     doc.build(elements)
     buffer.seek(0)
-    filename = f"{contract.company_name}_{invoice.Bill_no.replace('/','-')}.pdf"
+    filename = _invoice_pdf_filename(
+        company_name=contract.company_name,
+        contract_no=contract.contract_no,
+        bill_no=invoice.Bill_no,
+        invoice_id=getattr(invoice, "id", None),
+    )
 
     # Decide whether to preview inline or force download based on the "download" flag
     download_flag = (request.POST.get("download") or "").strip()
