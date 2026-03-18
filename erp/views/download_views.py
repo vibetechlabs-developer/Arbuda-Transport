@@ -488,6 +488,26 @@ def generate_invoice_pdf(request):
 
     # --- Build table for a page ---
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=1):
+        def _sanitize_cell_text(val: object) -> str:
+            """
+            ReportLab Tables in this file use *fixed row heights* to guarantee a stable
+            "N rows per page" layout. If any cell contains explicit line breaks
+            (e.g. user data with '\\n' or '<br>'), ReportLab will render multiple lines
+            inside the fixed-height row and the extra line visually "overwrites" the
+            next row (what users report as 'override/breaking').
+            This helper forces single-line cell text by removing hard line breaks and
+            collapsing whitespace.
+            """
+            if val in (None, "None", "null", "NULL"):
+                return ""
+            s = str(val)
+            # Normalise common HTML line breaks into spaces
+            s = re.sub(r"(?i)<\s*br\s*/?\s*>", " ", s)
+            # Normalise newline chars into spaces
+            s = s.replace("\r", " ").replace("\n", " ")
+            # Collapse runs of whitespace
+            s = re.sub(r"\s{2,}", " ", s).strip()
+            return s
 
         # Use exactly the fields selected on the contract for the invoice.
         # Do NOT auto-hide loading / unloading columns even if all values are 0,
@@ -888,8 +908,9 @@ def generate_invoice_pdf(request):
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
             # Grid lines for all cells - simple and standard
             ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            # Allow wrapping inside cells so text doesn't visually overwrite in narrow columns
-            ("WORDWRAP", (0,0), (-1,-1), "CJK"),
+            # NOTE: We intentionally do NOT enable table-level word wrapping here because
+            # this invoice uses fixed row heights. Wrapping can increase the rendered
+            # line count and visually overlap into the next row.
         ]
         # No zebra striping - clean and simple
         if add_total:
@@ -1467,6 +1488,19 @@ def download_generate_invoice_pdf(request):
             wordWrap="NOBREAK",
         )
 
+        def _sanitize_cell_text(val: object) -> str:
+            """
+            Force single-line text to prevent cell contents from overflowing fixed row heights.
+            This avoids the visual 'override/breaking' when values contain '\\n' or '<br>'.
+            """
+            if val in (None, "None", "null", "NULL"):
+                return ""
+            s = str(val)
+            s = re.sub(r"(?i)<\s*br\s*/?\s*>", " ", s)
+            s = s.replace("\r", " ").replace("\n", " ")
+            s = re.sub(r"\s{2,}", " ", s).strip()
+            return s
+
         # Initialize page totals
         total_freight_sum = total_unloading_sum_1 = total_loading_sum = total_unloading_sum_2 = total_amount_sum = total_weight = 0
 
@@ -1533,21 +1567,21 @@ def download_generate_invoice_pdf(request):
                 elif field in ("depature_date", "dep_date"):
                     row.append(d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "")
                 elif field == "dc_field" or field == "None":
-                    row.append(d.challan_no)
+                    row.append(_sanitize_cell_text(d.challan_no))
                 elif field in ("luggage", "totalfreight"):
                     # Freight per row (Rs.) – 2 decimals
                     row.append(_money(d.totalfreight))
                 elif field in ("product_name", "product"):
-                    row.append(d.product_name)
+                    row.append(_sanitize_cell_text(d.product_name))
                 elif field == "amount":
                     # Total amount (Rs.) per row – 2 decimals
                     row.append(_money(total_amount))
                 elif field == "gc_note":
-                    row.append(d.gc_note_no)
+                    row.append(_sanitize_cell_text(d.gc_note_no))
                 elif field == "main_party":
-                    row.append(d.main_party or "")
+                    row.append(_sanitize_cell_text(d.main_party))
                 elif field == "sub_party":
-                    row.append(d.sub_party or "")
+                    row.append(_sanitize_cell_text(d.sub_party))
                 elif field in ("unloading_charge_1", "unloading_charge_2", "loading_charge"):
                     # Loading / unloading (Rs.) – 2 decimals
                     row.append(_money(getattr(d, field, None)))
@@ -1561,7 +1595,7 @@ def download_generate_invoice_pdf(request):
                     row.append(_num(getattr(d, field, None), decimals=2))
                 else:
                     v = getattr(d, field, "")
-                    row.append("" if v in (None, "None", "null", "NULL") else v)
+                    row.append(_sanitize_cell_text(v))
             data.append(row)                
 
         # Determine total row logic
@@ -1723,8 +1757,9 @@ def download_generate_invoice_pdf(request):
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
             # Grid lines for all cells - simple and standard
             ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            # Allow wrapping inside cells so long text never visually overwrites or clips
-            ("WORDWRAP", (0,0), (-1,-1), "CJK"),
+            # Do not enable table-level word wrapping when using fixed row heights.
+            # Wrapping can increase the rendered height of a cell beyond the row height,
+            # causing text to overlap into the next row.
         ]
         # No zebra striping - clean and simple
         if add_total:
