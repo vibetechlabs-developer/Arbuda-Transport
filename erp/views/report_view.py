@@ -1209,7 +1209,8 @@ def download_our_report(request):
             "net_profit",
         ]
         fields = fields + additional_fields if fields else additional_fields
-        # Use 12 rows per page for internal report as well, to keep all reports consistent
+        # Use strictly 12 rows per page as per explicit requirement.
+        # We manually stretch the heights later to fulfill the page footprint.
         chunk_size = 12
 
         # --- Build table for a page ---
@@ -1569,7 +1570,26 @@ def download_our_report(request):
                             )
                         row[j] = Paragraph(_escape_para_text(cell), style)
 
-            table = Table(data, colWidths=col_widths, repeatRows=1)
+            # The user explicitly requested ONLY 12 rows per page, but wants the table
+            # to stretch out to take the full page vertical height anyway. We do this by
+            # manually extending the rowHeights heavily for each data row.
+            if add_total:
+                if len(data) >= 2:
+                    row_heights = [36]  # header
+                    if len(data) > 2:
+                        row_heights += [32] * (len(data) - 2)  # data rows vertically stretched
+                    row_heights += [30]  # total row
+                else:
+                    row_heights = [36] * len(data)
+            else:
+                if len(data) >= 1:
+                    row_heights = [36]  # header
+                    if len(data) > 1:
+                        row_heights += [32] * (len(data) - 1)
+                else:
+                    row_heights = None
+
+            table = Table(data, colWidths=col_widths, rowHeights=row_heights, repeatRows=1)
 
             # Table styles - optimized padding for better fit
             styles = [
@@ -1584,9 +1604,9 @@ def download_our_report(request):
                 ("TOPPADDING", (0,0), (-1,0), 2),  # Reduced padding
                 # Slightly thicker grid line improves visual separation.
                 ('GRID', (0, 0), (-1, -1), 0.7, colors.black),
-                ("BOTTOMPADDING", (0,0), (-1,0), 2),  # Reduced padding
-                ("TOPPADDING", (0,1), (-1,-2), 1),  
-                ("BOTTOMPADDING", (0,1), (-1,-2), 1),
+                ("BOTTOMPADDING", (0,0), (-1,0), 3),  
+                ("TOPPADDING", (0,1), (-1,-2), 3.5),  
+                ("BOTTOMPADDING", (0,1), (-1,-2), 3.5),
                 # Prevent numeric strings (including TOTAL row) from splitting into multiple lines.
                 ("WORDWRAP", (0,0), (-1,-1), "NOBREAK"),
                 ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
@@ -1596,8 +1616,8 @@ def download_our_report(request):
                 styles += [
                     ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
                     ("SPAN", (0,-1), (2,-1)),
-                    ("TOPPADDING", (0,-1), (-1,-1), 2),  # Reduced padding
-                    ("BOTTOMPADDING", (0,-1), (-1,-1), 2),  # Reduced padding
+                    ("TOPPADDING", (0,-1), (-1,-1), 4),  
+                    ("BOTTOMPADDING", (0,-1), (-1,-1), 4),  
                     ("LINEABOVE", (0,-1), (-1,-1), 0.2, colors.black),
                     ("LINEBELOW", (0,-1), (-1,-1), 0.2, colors.black),
                 ]
