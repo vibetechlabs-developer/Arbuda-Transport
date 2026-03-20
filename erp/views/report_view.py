@@ -18,6 +18,25 @@ from operator import attrgetter
 from itertools import groupby
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from xml.sax.saxutils import escape as xml_escape
+
+
+def _escape_para_text(value: object) -> str:
+    """
+    Escape dynamic text for ReportLab Paragraph mini-XML markup.
+
+    ReportLab's Paragraph parser is sensitive to characters like <, >, &.
+    If such characters come from DB values (party names, addresses, etc),
+    Paragraph can fail internally and later crash with errors like:
+    "AttributeError: 'Paragraph' object has no attribute 'bPara'".
+    """
+    if value is None:
+        return ""
+
+    # Normalize newlines first; escape everything else; then turn newlines into <br/>.
+    s = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    s = xml_escape(s, {'"': "&quot;", "'": "&apos;"})
+    return s.replace("\n", "<br/>")
 
 @session_required
 def client_report_view(request):
@@ -288,10 +307,10 @@ def download_report(request):
         doc = SimpleDocTemplate(
             buffer,
             pagesize=landscape(A4),
-            rightMargin=0,
-            leftMargin=0,
-            topMargin=0,
-            bottomMargin=0,
+            rightMargin=4 * mm,
+            leftMargin=4 * mm,
+            topMargin=4 * mm,
+            bottomMargin=4 * mm,
         )
         styles = getSampleStyleSheet()
         elements = []
@@ -306,12 +325,28 @@ def download_report(request):
         # Slightly smaller data fonts so 12 rows fit without text overriding cells
         center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=7.5, alignment=1 ,leading=9)
         title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=11, alignment=1 ,leading=13) 
-        to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=0 ,leading=11)
-        to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=2 ,leading=11)
-        total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=8.5, alignment=2, leading=10)
-        to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=7.5, alignment=0 ,leading=9)
-        to_right_style_desc_heading = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=7.5, alignment=2 ,leading=9)
-        to_right_style_desc = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=7.5, alignment=2 ,leading=9)
+        to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=1 ,leading=11)
+        to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=1 ,leading=11)
+        total_style = ParagraphStyle(
+            name="TotalStyle",
+            fontName="Helvetica-Bold",
+            fontSize=7.5,
+            alignment=1,
+            leading=10,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
+        )
+        to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=7.5, alignment=1 ,leading=9)
+        to_right_style_desc_heading = ParagraphStyle(name="ToRightDesc", fontName="Helvetica", fontSize=7.5, alignment=1 ,leading=9)
+        to_right_style_desc = ParagraphStyle(
+            name="ToRightDesc",
+            fontName="Helvetica",
+            fontSize=7.5,
+            alignment=1,
+            leading=9,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
+        )
 
         # Header (column name) styles - slightly smaller font
         # Header styles: slightly smaller font and **no wrapping** so column
@@ -323,7 +358,7 @@ def download_report(request):
             leading=center_style_desc.leading - 0.5,
             # Allow header labels like "Party Name" / "Dep Date" to wrap
             # inside their own cell instead of visually overwriting neighbours.
-            wordWrap="CJK",
+            wordWrap="NOBREAK",
             splitLongWords=0,
         )
         header_to_style_desc = ParagraphStyle(
@@ -331,7 +366,7 @@ def download_report(request):
             parent=to_style_desc,
             fontSize=to_style_desc.fontSize - 0.5,
             leading=to_style_desc.leading - 0.5,
-            wordWrap="CJK",
+            wordWrap="NOBREAK",
             splitLongWords=0,
         )
         header_to_right_style_desc_heading = ParagraphStyle(
@@ -368,9 +403,9 @@ def download_report(request):
         else:
             report_title = f"<b>{base_title}</b>"
         header_data = [
-            [Paragraph(f"<font color='black' size='14'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
+            [Paragraph(f"<font color='black' size='14'><b>{_escape_para_text(request.session['company_info']['company_name'])}</b></font><br/>{_escape_para_text(company_profile.address)}, {_escape_para_text(company_profile.city)}, {_escape_para_text(company_profile.state)}-{_escape_para_text(company_profile.pincode)}", center_style)],    
             # [Paragraph(f"{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],
-            [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
+            [Paragraph(f"GST : {_escape_para_text(company.gst_number)}, Pan no. : {_escape_para_text(company_profile.pan_number)}", center_style)],
             [Paragraph(report_title, title_style)]
         ]
         header_table = Table(header_data, colWidths=[available_width])
@@ -517,8 +552,8 @@ def download_report(request):
                         # Per‑row total amount with 2 decimals
                         row.append(_money(total_amount))
                     elif field == "weight":
-                        # Weight with exactly 2 decimals for this report
-                        row.append(_num2(d.weight))
+                        # Weight with exactly 3 decimals for this report
+                        row.append(f"{float(d.weight or 0):.3f}")
                     elif field == "gc_note":
                         row.append(d.gc_note_no)
                     elif field == "main_party":
@@ -533,11 +568,11 @@ def download_report(request):
                 data.append(row)                
 
             # Determine total row logic
-            # For this client report, show a TOTAL row **on every page**.
-            # Each page's TOTAL reflects only the dispatches shown on that page.
-            add_total = True
+            # For this client report, show a TOTAL row only on the last page.
+            # The TOTAL reflects all dispatches across all pages.
+            add_total = is_last_page
             total_row = []
-            dispatches_to_sum = dispatch_subset
+            dispatches_to_sum = all_dispatches if is_last_page else []
 
             if add_total:
                 total_weight = total_freight_sum = total_unloading_sum_1 = total_unloading_sum_2 = total_loading_sum = total_amount_sum = total_rate = total_km = 0
@@ -555,10 +590,10 @@ def download_report(request):
                     total_rate += float(d.rate or 0)
                     total_km += float(d.km or 0)
 
-                for i, field in enumerate(fields):
+                for i, field in enumerate(active_fields):
                     if field == "weight":
-                        # Show total weight (MT) with 2 decimals
-                        total_row.append(_num2(total_weight))
+                        # Show total weight (MT) with 3 decimals
+                        total_row.append(f"{float(total_weight or 0):.3f}")
                     elif field in ("km", "rate"):
                         # Do not show totals for km and rate fields
                         total_row.append("")
@@ -597,29 +632,29 @@ def download_report(request):
                 f"{contract.dc_field}": 18 * mm,
                 "Truck No": 18 * mm,
                 # Key text columns – give them generous width so they don't look cramped
-                "Party Name": 34 * mm,
-                "Product": 24 * mm,
-                "Product Name": 24 * mm,
-                "Destination": 34 * mm,
-                "District": 26 * mm,
-                "Taluka": 22 * mm,
+                "Party Name": 26 * mm,
+                "Product": 22 * mm,
+                "Product Name": 22 * mm,
+                "Destination": 26 * mm,
+                "District": 24 * mm,
+                "Taluka": 20 * mm,
                 "Gc Note": 10 * mm,
                 # Quantities / numeric
-                "Weight": 12 * mm,
+                "Weight": 14 * mm,
                 "Km": 9 * mm,
                 "Rate": 11 * mm,
                 # Money columns: compact but still readable
-                "Lugg": 11 * mm,
-                "Luggage": 11 * mm,
+                "Lugg": 13 * mm,
+                "Luggage": 13 * mm,
                 "Unld1": 12 * mm,
                 "Unld2": 12 * mm,
                 "Unload Chg 1": 12 * mm,
                 "Unload Chg 2": 12 * mm,
                 "Unloading Charge 1": 12 * mm,
-                "Loading Charge": 11 * mm,
-                "Load": 11 * mm,
-                "Amount": 14 * mm,
-                "Totalfreight": 14 * mm,
+                "Loading Charge": 12 * mm,
+                "Load": 12 * mm,
+                "Amount": 16 * mm,
+                "Totalfreight": 16 * mm,
             }
 
             # Use the full printable width for the table so this report matches
@@ -630,20 +665,22 @@ def download_report(request):
             # Calculate column widths
             col_widths = []
             for col_name in headers:
-                col_widths.append(special_widths.get(col_name, None))
+                width = special_widths.get(col_name)
+                if width is None:
+                    # Default width for unknown columns
+                    width = 14 * mm
+                col_widths.append(width)
 
-            # Adjust remaining width
-            fixed_total = sum(w for w in col_widths if w is not None)
-            remaining = table_width - fixed_total
-            num_other_cols = sum(1 for w in col_widths if w is None)
-            if num_other_cols > 0:
-                other_width = remaining / num_other_cols
-                col_widths = [w if w is not None else other_width for w in col_widths]
+            # Scale widths to fit exactly into the available table width
+            fixed_total = sum(col_widths)
+            if fixed_total > 0:
+                scale_factor = table_width / fixed_total
+                col_widths = [w * scale_factor for w in col_widths]
 
             # Format cells
             for i, row in enumerate(data):
                 for j, cell in enumerate(row):
-                    field_name = fields[j]
+                    field_name = active_fields[j]
                     if i == 0:  # header
                         # Allow header labels to wrap naturally within their cell
                         # so they never draw over adjacent columns.
@@ -655,9 +692,9 @@ def download_report(request):
                             if field_name in center_fields
                             else header_to_style_desc
                         )
-                        row[j] = Paragraph(f"<b>{cell_text}</b>", style)
+                        row[j] = Paragraph(f"<b>{_escape_para_text(cell_text)}</b>", style)
                     elif add_total and i == len(data) - 1:  # total/grand total row
-                        row[j] = Paragraph(str(cell), total_style)
+                        row[j] = Paragraph(_escape_para_text(cell), total_style)
                     else:
                         # Keep dates on a single line; allow text columns to wrap
                         # instead of visually overwriting neighbouring cells.
@@ -671,7 +708,7 @@ def download_report(request):
                                 if field_name in center_fields
                                 else to_style_desc
                             )
-                        row[j] = Paragraph(str(cell), style)
+                        row[j] = Paragraph(_escape_para_text(cell), style)
 
             # --- Explicit row heights so exactly 12 rows (11 data + 1 TOTAL or
             #     12 data rows without TOTAL) fill most of the page height,
@@ -715,7 +752,9 @@ def download_report(request):
                 ("BOTTOMPADDING", (0,1), (-1,-2), 2),
                 # Ensure all text wraps within its own cell instead of
                 # visually overriding neighbouring columns.
-                ("WORDWRAP", (0,0), (-1,-1), "CJK"),
+                # Prevent numeric totals (and any other cell values) from breaking
+                # into multiple lines inside the same table cell.
+                ("WORDWRAP", (0,0), (-1,-1), "NOBREAK"),
                 ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
                 ("LINEBELOW", (0,0), (-1,0), 0.2, colors.black),
             ]
@@ -756,12 +795,12 @@ def download_report(request):
                 date_range_text = f"Dispatch Report To <b>{f_to_date.strftime('%d-%m-%Y')}</b>"
             
             to_content = [
-                    Paragraph(f"Dispatch From : <b>{contract.from_center}</b>", to_style),
+                    Paragraph(f"Dispatch From : <b>{_escape_para_text(contract.from_center)}</b>", to_style),
                     Paragraph(date_range_text, to_style) if date_range_text else Paragraph("", to_style),
                 ]
             bill_no_content = [
                     Paragraph(f"Report Date : {date.today().strftime('%d-%m-%Y')}", to_style),
-                    Paragraph(f"Dispacth Product : <b>{i_product_name}</b>", to_style) if i_report_type == "product_wise" else Paragraph(f"", to_style), 
+                    Paragraph(f"Dispacth Product : <b>{_escape_para_text(i_product_name)}</b>", to_style) if i_report_type == "product_wise" else Paragraph(f"", to_style), 
                     # Paragraph(f"From : {contract.from_center}", to_style),
                     # Paragraph(f"District : {district}", to_style),
                     # Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
@@ -782,7 +821,9 @@ def download_report(request):
             ]))
             elements.append(to_table)
             # No extra spacer here: keep PARTICULARS almost touching the TO block
-            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
+            # ReportLab Paragraph doesn't reliably support the <center> tag;
+            # alignment is already handled by center_style.
+            elements.append(Paragraph("<b>PARTICULARS</b>", center_style))
             # Always show a TOTAL row per page for this client report
             add_total_row = True
             
@@ -990,8 +1031,7 @@ def download_our_report(request):
                 elif f == "truck_booking_rate":
                     header_text = "Truck Rate"
                 elif f == "total_paid_truck_onwer":
-                    # Stack into two lines so it doesn't collide with neighbours
-                    header_text = "Total Paid<br/>Owner"
+                    header_text = "Total Paid Owner"
                 elif f == "advance_paid":
                     header_text = "Advance Paid"
                 elif f == "panding_amount":
@@ -1068,26 +1108,39 @@ def download_our_report(request):
         # --- Styles ---
         # Keep internal report visually consistent with client report, just with
         # a slightly more compact data font so additional columns fit cleanly.
-        center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=10, alignment=1, leading=12)
-        center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
+        center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
+        center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=7, alignment=1, leading=9)
         title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=11, alignment=1, leading=13)
-        to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=0, leading=11)
-        to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
-        total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)
-        to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=8, alignment=0, leading=10)
+        to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=8, alignment=1, leading=10)
+        to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=8, alignment=1, leading=10)
+        # TOTAL row numbers must NEVER split into multiple lines.
+        total_style = ParagraphStyle(
+            name="TotalStyle",
+            fontName="Helvetica-Bold",
+            # Keep TOTAL numbers inside their cells (no visual overflow).
+            fontSize=6.5,
+            alignment=1,
+            leading=10,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
+        )
+        to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=6.5, alignment=1, leading=9)
         to_right_style_desc_heading = ParagraphStyle(
             name="ToRightDescHeading",
             fontName="Helvetica-Bold",
-            fontSize=8,
-            alignment=2,
-            leading=10,
+            fontSize=6.5,
+            alignment=1,
+            leading=9,
         )
         to_right_style_desc = ParagraphStyle(
             name="ToRightDesc",
             fontName="Helvetica",
-            fontSize=8,
-            alignment=2,
-            leading=10,
+            # Smaller numeric font prevents values from overflowing into neighbour columns.
+            fontSize=6.5,
+            alignment=1,
+            leading=9,
+            wordWrap="NOBREAK",
+            splitLongWords=0,
         )
 
         # Header styles: use non‑breaking spaces and no wrapping so column names
@@ -1100,7 +1153,7 @@ def download_our_report(request):
             fontSize=center_style_desc.fontSize - 1.5,
             leading=center_style_desc.leading - 1,
             # allow natural wrapping for long labels
-            wordWrap="CJK",
+            wordWrap="NOBREAK",
             splitLongWords=0,
         )
         header_to_style_desc_internal = ParagraphStyle(
@@ -1108,7 +1161,7 @@ def download_our_report(request):
             parent=to_style_desc,
             fontSize=to_style_desc.fontSize - 1.5,
             leading=to_style_desc.leading - 1,
-            wordWrap="CJK",
+            wordWrap="NOBREAK",
             splitLongWords=0,
         )
         header_to_right_style_desc_heading_internal = ParagraphStyle(
@@ -1137,9 +1190,9 @@ def download_our_report(request):
         # --- Header Table ---
         report_title = "<b>Date Wise Dispacth Report</b>" if i_report_type == "date_wise" else "<b>Product Wise Dispacth Report</b>"
         header_data = [
-            [Paragraph(f"<font color='black' size='14'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
+            [Paragraph(f"<font color='black' size='14'><b>{_escape_para_text(request.session['company_info']['company_name'])}</b></font><br/>{_escape_para_text(company_profile.address)}, {_escape_para_text(company_profile.city)}, {_escape_para_text(company_profile.state)}-{_escape_para_text(company_profile.pincode)}", center_style)],    
             # [Paragraph(f"{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],
-            [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
+            [Paragraph(f"GST : {_escape_para_text(company.gst_number)}, Pan no. : {_escape_para_text(company_profile.pan_number)}", center_style)],
             [Paragraph(report_title, title_style)]
         ]
         # Stretch header across the full printable width.
@@ -1226,11 +1279,11 @@ def download_our_report(request):
                 elif f == "total_paid_truck_onwer":
                     header_text = "Total Paid Owner"
                 elif f == "advance_paid":
-                    header_text = "Adv<br/>Paid"
+                    header_text = "Adv Paid"
                 elif f == "panding_amount":
-                    header_text = "Pending<br/>Amt"
+                    header_text = "Pending Amt"
                 elif f == "net_profit":
-                    header_text = "Net<br/>Profit"
+                    header_text = "Net Profit"
                 else:
                     header_text = f.replace("_", " ").title()
                 header_row.append(header_text)
@@ -1307,7 +1360,7 @@ def download_our_report(request):
                 total_net_profit += float(d.net_profit or 0)
 
                 row = []
-                for field in fields:
+                for field in active_fields:
                     if field == "sr_no":
                         row.append(idx)
                     elif field in ("depature_date", "dep_date"):
@@ -1330,7 +1383,7 @@ def download_our_report(request):
                     elif field == "sub_party":
                         row.append(getattr(d, "sub_party", "") or "")
                     elif field == "weight":
-                        row.append(_num2(d.weight))
+                        row.append(f"{float(d.weight or 0):.3f}")
                     elif field == "rate":
                         row.append(_num2(d.rate))
                     elif field == "km":
@@ -1391,10 +1444,10 @@ def download_our_report(request):
                     total_panding_amount += float(d.panding_amount or 0)
                     total_net_profit += float(d.net_profit or 0)
 
-                for i, field in enumerate(fields):
+                for i, field in enumerate(active_fields):
                     if field == "weight":
-                        # Show total weight (MT) with 2 decimals
-                        total_row.append(_num2(total_weight))
+                        # Show total weight (MT) with 3 decimals
+                        total_row.append(f"{float(total_weight or 0):.3f}")
                     elif field in ("km", "rate", "truck_booking_rate"):
                         # No totals for km, rate, or truck booking rate
                         total_row.append("")
@@ -1431,29 +1484,33 @@ def download_our_report(request):
                 # extra space between Sr / Date / Truck so they don't feel glued together
                 "Sr No": 12 * mm,
                 "Dep Date": 22 * mm,
-                dc_field_label: 20 * mm,
-                "Truck No": 20 * mm,
-                "Party Name": 24 * mm,
+                dc_field_label: 18 * mm,
+                "Truck No": 18 * mm,
+                "Party Name": 20 * mm,
+                # Give Product / Weight slightly more breathing room so header and TOTAL
+                # values don't visually overflow into each other.
                 "Product": 18 * mm,
                 "Product Name": 18 * mm,
                 "GC Note": 11 * mm,
                 "Gc Note": 11 * mm,
-                "Weight": 11 * mm,
-                "Km": 9 * mm,
-                "Rate": 11 * mm,
-                "Truck Rate": 11 * mm,
-                "Lugg": 12 * mm,
-                "Luggage": 12 * mm,
-                "Unld1": 13 * mm,
-                "Unld2": 13 * mm,
-                "Unload Chg 1": 13 * mm,
-                "Unload Chg 2": 13 * mm,
-                "Load": 12 * mm,
-                "Loading Chg": 12 * mm,
-                "Total Paid Owner": 17 * mm,
+                "Weight": 14 * mm,
+                "Km": 7 * mm,
+                "Rate": 10 * mm,
+                "Truck Rate": 10 * mm,
+                "Lugg": 13 * mm,
+                "Luggage": 13 * mm,
+                "Unld1": 11 * mm,
+                "Unld2": 11 * mm,
+                "Unload Chg 1": 11 * mm,
+                "Unload Chg 2": 11 * mm,
+                "Load": 11 * mm,
+                "Loading Chg": 11 * mm,
+                "Amount": 15 * mm,
+                "Totalfreight": 15 * mm,
+                "Total Paid Owner": 18 * mm,
                 "Adv Paid": 13 * mm,
                 "Pending Amt": 15 * mm,
-                "Net Profit": 13 * mm,
+                "Net Profit": 14 * mm,
                 "District": 18 * mm,
                 "Destination": 22 * mm,
                 "Taluka": 14 * mm,
@@ -1481,7 +1538,7 @@ def download_our_report(request):
             # Format cells
             for i, row in enumerate(data):
                 for j, cell in enumerate(row):
-                    field_name = fields[j]
+                    field_name = active_fields[j]
                     if i == 0:  # header
                         # For internal header row, allow normal spaces / <br/> so
                         # long labels can wrap inside their own cells instead of
@@ -1494,9 +1551,9 @@ def download_our_report(request):
                             if field_name in center_fields
                             else header_to_style_desc_internal
                         )
-                        row[j] = Paragraph(f"<b>{cell_text}</b>", style)
+                        row[j] = Paragraph(f"<b>{_escape_para_text(cell_text)}</b>", style)
                     elif add_total and i == len(data) - 1:  # total/grand total row
-                        row[j] = Paragraph(str(cell), total_style)
+                        row[j] = Paragraph(_escape_para_text(cell), total_style)
                     else:
                         # Keep dates on a single line; allow long text columns to wrap
                         # so they don't overwrite neighbouring cells.
@@ -1510,7 +1567,7 @@ def download_our_report(request):
                                 if field_name in center_fields
                                 else to_style_desc
                             )
-                        row[j] = Paragraph(str(cell), style)
+                        row[j] = Paragraph(_escape_para_text(cell), style)
 
             table = Table(data, colWidths=col_widths, repeatRows=1)
 
@@ -1520,13 +1577,18 @@ def download_our_report(request):
                 ("VALIGN", (0,0), (-1,-1), "MIDDLE"),  # Changed to MIDDLE for better vertical alignment
                 ("ALIGN", (0,0), (-1,0), "CENTER"),
                 ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-                ("LEFTPADDING", (0,0), (-1,-1), 1),  # Reduced padding
-                ("RIGHTPADDING", (0,0), (-1,-1), 1),  # Reduced padding
+                # Small horizontal padding prevents values from visually
+                # touching neighbouring cell borders (looks like "merging").
+                ("LEFTPADDING", (0,0), (-1,-1), 0.5),
+                ("RIGHTPADDING", (0,0), (-1,-1), 0.5),
                 ("TOPPADDING", (0,0), (-1,0), 2),  # Reduced padding
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                # Slightly thicker grid line improves visual separation.
+                ('GRID', (0, 0), (-1, -1), 0.7, colors.black),
                 ("BOTTOMPADDING", (0,0), (-1,0), 2),  # Reduced padding
                 ("TOPPADDING", (0,1), (-1,-2), 1),  
                 ("BOTTOMPADDING", (0,1), (-1,-2), 1),
+                # Prevent numeric strings (including TOTAL row) from splitting into multiple lines.
+                ("WORDWRAP", (0,0), (-1,-1), "NOBREAK"),
                 ("LINEABOVE", (0,0), (-1,0), 0.2, colors.black),
                 ("LINEBELOW", (0,0), (-1,0), 0.2, colors.black),
             ]
@@ -1567,12 +1629,12 @@ def download_our_report(request):
                 date_range_text = f"Dispatch Report To <b>{f_to_date.strftime('%d-%m-%Y')}</b>"
             
             to_content = [
-                    Paragraph(f"Dispatch From : <b>{contract.from_center}</b>", to_style),
+                    Paragraph(f"Dispatch From : <b>{_escape_para_text(contract.from_center)}</b>", to_style),
                     Paragraph(date_range_text, to_style) if date_range_text else Paragraph("", to_style),
                 ]
             bill_no_content = [
                     Paragraph(f"Report Date : {date.today().strftime('%d-%m-%Y')}", to_style),
-                    Paragraph(f"Dispacth Product : <b>{i_product_name}</b>", to_style) if i_report_type == "product_wise" else Paragraph(f"", to_style), 
+                    Paragraph(f"Dispacth Product : <b>{_escape_para_text(i_product_name)}</b>", to_style) if i_report_type == "product_wise" else Paragraph(f"", to_style), 
                     # Paragraph(f"From : {contract.from_center}", to_style),
                     # Paragraph(f"District : {district}", to_style),
                     # Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
@@ -1593,7 +1655,9 @@ def download_our_report(request):
             elements.append(to_table)
             # Match spacing/layout of standard (use) report:
             # no extra spacer or HR here so "PARTICULARS" sits just below TO block
-            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
+            # ReportLab Paragraph doesn't reliably support the <center> tag;
+            # alignment is already handled by center_style.
+            elements.append(Paragraph("<b>PARTICULARS</b>", center_style))
             add_total_row = contract.rate_type == "Distric-Wise"
             
             # Build table only (no Verified / Recommended / For footer as per latest requirement)
@@ -1744,7 +1808,9 @@ def download_distance_master_pdf(request):
         ]))
         elements.append(date_table)
         elements.append(Spacer(1, 3))
-        elements.append(Paragraph("<center><b>DISTANCE MASTER DATA</b></center>", center_style))
+        # ReportLab Paragraph doesn't reliably support the <center> tag;
+        # alignment is already handled by center_style.
+        elements.append(Paragraph("<b>DISTANCE MASTER DATA</b>", center_style))
         elements.append(Spacer(1, 3))
         elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.black))
         elements.append(Spacer(1, 3))

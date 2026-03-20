@@ -617,6 +617,9 @@
           td.textContent = rawValue;
         } else {
           rawValue = dest[field]?.toString() || "";
+          if (field === "weight" && rawValue) {
+            rawValue = parseFloat(rawValue || 0).toFixed(3);
+          }
           td.textContent = rawValue;
         }
         if (field !== "sr_no") {
@@ -638,7 +641,7 @@
         td.style.fontWeight = "bold";
       } else if (numericFields.has(field)) {
         const totalValue = totals[field] || 0;
-        td.textContent = formatNumber(totalValue);
+        td.textContent = field === "weight" ? parseFloat(totalValue || 0).toFixed(3) : formatNumber(totalValue);
         td.style.fontWeight = "bold";
       } else {
         td.textContent = "";
