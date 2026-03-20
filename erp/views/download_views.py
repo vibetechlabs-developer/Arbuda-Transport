@@ -1584,7 +1584,8 @@ def download_generate_invoice_pdf(request):
         # Standard invoice pagination: 12 rows per page, and show a per-page TOTAL row on every page.
         add_total = bool(add_total_row)
         # If it's the last page and we're showing totals, use all_dispatches for grand total
-        if is_last_page and add_total and all_dispatches is not None:
+        # UNLESS the user explicitly requested "every_page", which strictly means page-totals only.
+        if is_last_page and add_total and all_dispatches is not None and total_option != "every_page":
             dispatches_to_sum = all_dispatches
         else:
             dispatches_to_sum = dispatch_subset
@@ -1697,29 +1698,9 @@ def download_generate_invoice_pdf(request):
                         style = to_right_style_desc_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(str(cell), style)
 
-        # Set explicit row heights (in points).
-        # Slightly larger so the table feels bigger, but still compact enough that
-        # header + 12 data rows + TOTAL + footer fit on a single page.
-        if add_total:
-            # Header row slightly taller, data rows medium, total row slightly taller
-            if len(data) >= 2:
-                row_heights = [24]  # header
-                if len(data) > 2:
-                    row_heights += [21] * (len(data) - 2)  # data rows
-                row_heights += [23]  # total row
-            else:
-                row_heights = [24] * len(data)
-        else:
-            # Header row slightly taller, data rows medium
-            if len(data) >= 1:
-                row_heights = [24]  # header
-                if len(data) > 1:
-                    row_heights += [21] * (len(data) - 1)
-            else:
-                row_heights = None
-
-        # Let ReportLab auto-size row heights in the *download* invoice as well so
-        # long text wraps inside its own row instead of overriding the next row.
+        # Let ReportLab dynamically auto-size row heights based on font size and strict padding.
+        # This prevents hardcoded heights from catastrophically breaking page boundaries if a 
+        # specific company has an oversized multi-line header/address that dynamically shrinks available height.
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
         # Table styles - simple, elegant, standard structure (no background colors)
@@ -1729,13 +1710,13 @@ def download_generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Moderately tight paddings so the table appears larger but still fits 12 rows per page
+            # Moderately tight paddings so the table appears larger but still fits 12 rows per page plus footer
             ("LEFTPADDING", (0,0), (-1,-1), 1.0),
             ("RIGHTPADDING", (0,0), (-1,-1), 1.0),
-            ("TOPPADDING", (0,0), (-1,0), 2),   # Header padding
-            ("BOTTOMPADDING", (0,0), (-1,0), 2),
-            ("TOPPADDING", (0,1), (-1,-2), 2),  # Data rows padding
-            ("BOTTOMPADDING", (0,1), (-1,-2), 2),
+            ("TOPPADDING", (0,0), (-1,0), 3.5),   # Header padding stretched
+            ("BOTTOMPADDING", (0,0), (-1,0), 3.5),
+            ("TOPPADDING", (0,1), (-1,-2), 3.5),  # Data rows padding stretched softly
+            ("BOTTOMPADDING", (0,1), (-1,-2), 3.5),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
