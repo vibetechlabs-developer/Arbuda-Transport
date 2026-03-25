@@ -1979,7 +1979,23 @@ def download_gc_pdf(request):
             messages.error(request, "No GC Notes selected for PDF generation.")
             return redirect("view-gc-note")
 
-        gc_notes = GC_Note.objects.filter(id__in=selected_gc_ids, company_id=request.session['company_info']['company_id']).order_by('gc_no')
+        # The UI sends selected ids via the `dispatch_ids` key.
+        # Sometimes it can contain invalid values (e.g. "undefined") which would raise a 500.
+        selected_gc_ids_int = []
+        for _id in selected_gc_ids:
+            try:
+                selected_gc_ids_int.append(int(_id))
+            except (TypeError, ValueError):
+                continue
+
+        if not selected_gc_ids_int:
+            messages.error(request, "No valid GC Notes selected for PDF generation.")
+            return redirect("view-gc-note")
+
+        gc_notes = GC_Note.objects.filter(
+            id__in=selected_gc_ids_int,
+            company_id=request.session['company_info']['company_id'],
+        ).order_by('gc_no')
    
 
     buffer = BytesIO()

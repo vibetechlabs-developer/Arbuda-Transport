@@ -423,6 +423,7 @@ def get_gc(request):
                 company_id=request.session['company_info']['company_id'],
             )
             .values(
+                'id',
                 'gc_no',
                 'bill_no',
                 'gc_date',
