@@ -1266,7 +1266,8 @@ def update_dispatch_Invoice(request):
                         gc_no = contract.gc_series_from
                     gc_note = GC_Note.objects.create(
                         gc_no=str(gc_no),
-                        gc_date=bill_date,
+                        # GC Note date should match the dispatch (dep_date), not the invoice bill_date.
+                        gc_date=(d.dep_date or bill_date),
                         consignor=contract.company_name,
                         consignee=d.party_name,
                         dispatch_from=contract.from_center,

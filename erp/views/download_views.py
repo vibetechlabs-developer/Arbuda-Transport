@@ -216,7 +216,8 @@ def generate_invoice_pdf(request):
                 gc_no = contract.gc_series_from
             gc_note = GC_Note.objects.create(
                 gc_no=gc_no,
-                gc_date=bill_date,
+                # GC Note date should match the dispatch (dep_date), not the invoice bill_date.
+                gc_date=(d.dep_date or bill_date),
                 consignor=contract.company_name,
                 consignee=d.party_name,
                 dispatch_from=contract.from_center,
@@ -1967,6 +1968,11 @@ def download_generate_invoice_pdf(request):
 
 @session_required
 def download_gc_pdf(request):
+    if request.method != "POST":
+        return redirect("view-gc-note")
+
+    preview_flag = (request.POST.get("preview") or "").strip()
+
     if request.method == "POST":
         selected_gc_ids = request.POST.getlist('dispatch_ids')
         if not selected_gc_ids:
@@ -1988,6 +1994,13 @@ def download_gc_pdf(request):
     elements = []  
 
     def make_gc_note(gc):
+        # GC Note date should match dispatch (dep_date), not the stored gc_date (which may be older).
+        date_val = None
+        if getattr(gc, "dispatch_id", None):
+            date_val = gc.dispatch_id.dep_date
+        if not date_val:
+            date_val = gc.gc_date
+
         to_table_data = [[Paragraph("<b>GOODS CONSINGNMENT NOTE</b>",styles["Normal"]), Paragraph(f"<b>NO : {gc.gc_no} </b>", styles["Normal"])]]
 
         to_table = Table(to_table_data, colWidths=[400, 88])  #adjust widths to fit page
@@ -2000,9 +2013,10 @@ def download_gc_pdf(request):
         ]))  
 
         details_table_data = [
-            [Paragraph(f"<b>Date</b>",styles["font9"]),":",Paragraph(f"{gc.gc_date.strftime('%d-%m-%Y') if gc.gc_date else ''}",styles["font9"]), Paragraph(f"<b>Truck No. </b>", styles["font9"]),":", Paragraph(f"{gc.truck_no}",styles["font9"])],
+            [Paragraph(f"<b>Date</b>",styles["font9"]),":",Paragraph(f"{date_val.strftime('%d-%m-%Y') if date_val else ''}",styles["font9"]), Paragraph(f"<b>Truck No. </b>", styles["font9"]),":", Paragraph(f"{gc.truck_no}",styles["font9"])],
             [Paragraph(f"<b>Consignor</b>",styles["font9"]),":",Paragraph(f"{gc.consignor}",styles["font9"]), "", "" , ""],
-            [Paragraph(f"<b>Depacth From</b>",styles["font9"]),":",Paragraph(f"{gc.dispatch_from}",styles["font9"]), Paragraph(f"<b>Weight</b>",styles["font9"]), ":" , Paragraph(f"{gc.weight}",styles["font9"])],
+            # Always show 3 digits after decimal for weight (e.g. 12.345)
+            [Paragraph(f"<b>Depacth From</b>",styles["font9"]),":",Paragraph(f"{gc.dispatch_from}",styles["font9"]), Paragraph(f"<b>Weight</b>",styles["font9"]), ":" , Paragraph(f"{(gc.weight or 0):.3f}",styles["font9"])],
             [Paragraph(f"<b>Consignee</b>",styles["font9"]),":",Paragraph(f"{gc.consignee}",styles["font9"]),Paragraph(f"<b>Products</b>",styles["font9"]),":",Paragraph(f"{gc.product_name}",styles["font9"])],
             [Paragraph(f"<b>Challan no.</b>",styles["font9"]),":",Paragraph(f"{gc.dc_field}",styles["font9"]), Paragraph(f"<b>Bill No.</b>", styles["font9"]), ":" , Paragraph(f"{gc.bill_no}",styles["font9"])],
             [Paragraph(f"<b>Destination</b>",styles["font9"]),":",Paragraph(f"{gc.destination}",styles["font9"]), "" , "" , ""],
@@ -2066,7 +2080,12 @@ def download_gc_pdf(request):
 
     # Return the response
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="gc_notes.pdf"'
+    # Preview means show inline in browser; download means download as attachment.
+    response['Content-Disposition'] = (
+        'inline; filename="gc_notes.pdf"'
+        if preview_flag
+        else 'attachment; filename="gc_notes.pdf"'
+    )
     response.write(pdf)
     return response
 

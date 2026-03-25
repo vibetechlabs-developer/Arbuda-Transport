@@ -400,7 +400,8 @@ def get_gc(request):
             (
                 g.gc_no,
                 g.bill_no,
-                g.gc_date,
+                # GC Date should match dispatch (dep_date), not the stored gc_date.
+                (g.dispatch_id.dep_date if getattr(g, "dispatch_id", None) else g.gc_date),
                 g.consignor,
                 g.consignee,
                 g.dc_field,
@@ -409,13 +410,35 @@ def get_gc(request):
                 g.district,
                 g.product_name,
                 g.truck_no,
-                g.weight,
+                # Keep weight consistent with GC note PDF formatting: always 3 decimals.
+                f"{(g.weight or 0):.3f}",
             )
             for g in gc_qs
         )
         return csv_response(filename="gc_notes_backup", header=header, rows=rows)
     try:
-        gc = GC_Note.objects.filter(bill_id_id=bill_id , company_id = request.session['company_info']['company_id']).values().order_by('gc_no')   
+        gc = (
+            GC_Note.objects.filter(
+                bill_id_id=bill_id,
+                company_id=request.session['company_info']['company_id'],
+            )
+            .values(
+                'gc_no',
+                'bill_no',
+                'gc_date',
+                'consignor',
+                'consignee',
+                'dc_field',
+                'dispatch_from',
+                'destination',
+                'district',
+                'product_name',
+                'truck_no',
+                'weight',
+                'dispatch_id__dep_date',
+            )
+            .order_by('gc_no')
+        )
         fields = [
             'gc_no',
             'bill_no',
@@ -431,9 +454,19 @@ def get_gc(request):
             'weight', 
             ]
 
+        gc_list = list(gc)
+        # Ensure weight always has 3 digits after decimal in the GC note table preview.
+        for item in gc_list:
+            # Override "gc_date" with dispatch dep_date for consistency with GC note PDF.
+            dep_date = item.get('dispatch_id__dep_date')
+            item['gc_date'] = dep_date or item.get('gc_date')
+            item.pop('dispatch_id__dep_date', None)
+            if 'weight' in item:
+                item['weight'] = f"{(item.get('weight') or 0):.3f}"
+
         return JsonResponse({  
             'fields' : fields,
-            'destinations': list(gc),
+            'destinations': gc_list,
         })
 
     except Invoice.DoesNotExist:
