@@ -65,6 +65,19 @@
           </div>
           <h5 class="text-primary fw-semibold mb-3 mt-4">Select Bills</h5>
           <div class="row">
+            <div class="mb-3 col-sm-4 d-flex align-items-center">
+              <div class="form-check mt-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="page_wise_summary"
+                  name="page_wise_summary"
+                />
+                <label class="form-check-label" for="page_wise_summary">
+                  Show page wise summary (use Page No. instead of Bill No.)
+                </label>
+              </div>
+            </div>
             <div class="table-responsive mb-3">
               <table id="billsTable" class="table table-bordered w-100">
                 <thead>
@@ -171,6 +184,7 @@
         // Set contract details
         document.getElementById("from_center").value = data.contract.from_center || "";
         document.getElementById("product_name").value = data.contract.product_name || "";
+        document.getElementById("page_wise_summary").checked = !!data.contract.default_page_wise_summary;
 
         renderBillsTable();
       })

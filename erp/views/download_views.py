@@ -2125,6 +2125,9 @@ def generate_summary_pdf(request):
     contract_id = request.POST.get("contract_no")
     bill_ids = [int(i) for i in request.POST.getlist("bill_ids")]
     summary_date_str = request.POST.get("summary_date")
+    # Optional flag: when enabled, summary becomes "page wise" –
+    # the Bill No column is replaced by Page No (simply the running page index).
+    page_wise_summary = (request.POST.get("page_wise_summary") or "").lower() in ("1", "true", "yes", "on")
     
     if not contract_id or not bill_ids:
         messages.error(request, "Please select contract and at least one bill.")
@@ -2162,7 +2165,7 @@ def generate_summary_pdf(request):
     else:
         summary_date = datetime.now().date()
     
-    # Collect bill data with totals
+    # Collect bill/page data with totals
     bills_data = []
     total_mt = 0
     total_bill_amount = 0
@@ -2171,28 +2174,61 @@ def generate_summary_pdf(request):
     total_unloading2 = 0
     total_grand_total = 0
     
+    chunk_size = 12  # Must match invoice pagination (12 rows per page)
     for invoice in invoices:
-        dispatches = invoice.dispatch_list.all()
-        
-        if dispatches.exists():
+        dispatches_qs = invoice.dispatch_list.all()
+        dispatches = list(sort_dispatches_by_challan_asc(dispatches_qs))
+
+        if not dispatches:
+            continue
+
+        if page_wise_summary:
+            # One summary row per invoice page (page totals), not one row per bill.
+            for page_idx in range(0, len(dispatches), chunk_size):
+                page_dispatches = dispatches[page_idx:page_idx + chunk_size]
+                page_mt = sum(float(d.weight) for d in page_dispatches if d.weight)
+                page_amount = sum(float(d.totalfreight) for d in page_dispatches if d.totalfreight)
+                page_loading = sum(float(d.loading_charge) for d in page_dispatches if d.loading_charge)
+                page_unloading1 = sum(float(d.unloading_charge_1) for d in page_dispatches if d.unloading_charge_1)
+                page_unloading2 = sum(float(d.unloading_charge_2) for d in page_dispatches if d.unloading_charge_2)
+                page_grand_total = page_amount + page_loading + page_unloading1 + page_unloading2
+
+                bills_data.append({
+                    "bill_no": invoice.Bill_no,
+                    "page_no": (page_idx // chunk_size) + 1,
+                    "mt": page_mt,
+                    "bill_amount": page_amount,
+                    "loading": page_loading,
+                    "unloading1": page_unloading1,
+                    "unloading2": page_unloading2,
+                    "grand_total": page_grand_total,
+                })
+
+                total_mt += page_mt
+                total_bill_amount += page_amount
+                total_loading += page_loading
+                total_unloading1 += page_unloading1
+                total_unloading2 += page_unloading2
+                total_grand_total += page_grand_total
+        else:
             bill_mt = sum(float(d.weight) for d in dispatches if d.weight)
             bill_amount = sum(float(d.totalfreight) for d in dispatches if d.totalfreight)
             bill_loading = sum(float(d.loading_charge) for d in dispatches if d.loading_charge)
             bill_unloading1 = sum(float(d.unloading_charge_1) for d in dispatches if d.unloading_charge_1)
             bill_unloading2 = sum(float(d.unloading_charge_2) for d in dispatches if d.unloading_charge_2)
-            
+
             bill_grand_total = bill_amount + bill_loading + bill_unloading1 + bill_unloading2
-            
+
             bills_data.append({
-                'bill_no': invoice.Bill_no,
-                'mt': bill_mt,
-                'bill_amount': bill_amount,
-                'loading': bill_loading,
-                'unloading1': bill_unloading1,
-                'unloading2': bill_unloading2,
-                'grand_total': bill_grand_total,
+                "bill_no": invoice.Bill_no,
+                "mt": bill_mt,
+                "bill_amount": bill_amount,
+                "loading": bill_loading,
+                "unloading1": bill_unloading1,
+                "unloading2": bill_unloading2,
+                "grand_total": bill_grand_total,
             })
-            
+
             total_mt += bill_mt
             total_bill_amount += bill_amount
             total_loading += bill_loading
@@ -2233,6 +2269,7 @@ def generate_summary_pdf(request):
     cell_center = ParagraphStyle(name="CellCenter", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
     cell_right = ParagraphStyle(name="CellRight", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
     cell_header = ParagraphStyle(name="CellHeader", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)
+    left_normal = ParagraphStyle(name="LeftNormal", parent=normal, alignment=0)
 
     company_name = (company.company_name or "").upper()
     pan_no = (company_profile.pan_number if company_profile and company_profile.pan_number else "") if company_profile else ""
@@ -2249,6 +2286,7 @@ def generate_summary_pdf(request):
             header_lines.append(Paragraph(addr, small_center))
 
     pan_gst_line = "  ".join([p for p in [f"PAN NO.{pan_no}" if pan_no else "", f"GSTIN:{gstin_no}" if gstin_no else ""] if p])
+    sac_line = f"SAC-{contract.sac_number}" if getattr(contract, "sac_number", None) else ""
 
     header_cell = [
         Paragraph(company_name, title_center),
@@ -2256,6 +2294,7 @@ def generate_summary_pdf(request):
         *header_lines,
         Spacer(1, 2),
         Paragraph(pan_gst_line, small_center) if pan_gst_line else Paragraph("", small_center),
+        Paragraph(sac_line, small_center) if sac_line else Paragraph("", small_center),
     ]
     header_table = Table([[header_cell]], colWidths=[available_w])
     header_table.setStyle(
@@ -2290,9 +2329,18 @@ def generate_summary_pdf(request):
         to_lines.append(Paragraph(f"PIN: {contract.billing_pin}", normal))
     if contract.gst_number:
         to_lines.append(Paragraph(f"GST NO.{contract.gst_number}", normal))
+    if getattr(contract, "sac_number", None):
+        to_lines.append(Paragraph(f"SAC : {contract.sac_number}", normal))
+
+    right_header_lines = []
+    if page_wise_summary:
+        bill_no_list = [str(b.Bill_no) for b in invoices if getattr(b, "Bill_no", None)]
+        if bill_no_list:
+            right_header_lines.append(Paragraph(f"Bill No.: {', '.join(bill_no_list)}", right))
+    right_header_lines.append(Paragraph(f"Date: {date_str}", right))
 
     to_date_table = Table(
-        [[to_lines, [Paragraph(f"Date: {date_str}", right)]]],
+        [[to_lines, right_header_lines]],
         colWidths=[available_w * 0.7, available_w * 0.3],
     )
     to_date_table.setStyle(
@@ -2309,6 +2357,21 @@ def generate_summary_pdf(request):
     )
     elements.append(to_date_table)
     elements.append(Spacer(1, 6))
+
+    # Intro text block before summary table: show only when enabled in contract settings
+    if getattr(contract, "show_summary_intro", False):
+        elements.append(Paragraph("Sub: Submission of our Transportation Bill Summary", center_bold))
+        elements.append(Spacer(1, 4))
+        elements.append(Paragraph("Dear Sir,", left_normal))
+        elements.append(Spacer(1, 3))
+        from_center_text = contract.from_center or "our dispatch location"
+        company_target = (contract.company_name or "").strip() or "your locations"
+        intro_line = (
+            "Please find enclosed herewith the following bills of transportation "
+            f"from {from_center_text} to various destinations of {company_target}"
+        )
+        elements.append(Paragraph(intro_line, normal))
+        elements.append(Spacer(1, 8))
 
     elements.append(Paragraph("Bill Summary", center_bold))
     elements.append(Spacer(1, 6))
@@ -2344,7 +2407,7 @@ def generate_summary_pdf(request):
     # Build header row dynamically
     table_header = [
         Paragraph("Sr.", cell_header),
-        Paragraph("Bill No.", cell_header),
+        Paragraph("Page No." if page_wise_summary else "Bill No.", cell_header),
         Paragraph("M.T", cell_header),
         Paragraph("Bill Amount Rs.", cell_header),
     ]
@@ -2362,9 +2425,10 @@ def generate_summary_pdf(request):
     
     # Build data rows dynamically
     for idx, bill in enumerate(bills_data, 1):
+        display_ref = bill.get("page_no") if page_wise_summary else bill["bill_no"]
         row = [
             Paragraph(str(idx), cell_center),
-            Paragraph(str(bill["bill_no"]), cell_center),
+            Paragraph(str(display_ref), cell_center),
             Paragraph(f"{bill['mt']:.3f}", cell_right),
             Paragraph(f"{bill['bill_amount']:.2f}", cell_right),
         ]
@@ -2461,8 +2525,10 @@ def generate_summary_pdf(request):
 
     # ---- Footer note + Signature ----
     client_company_name = contract.company_name or "the Company"
-    elements.append(Paragraph(f"*GST Shall be paid by {client_company_name} under", normal))
-    elements.append(Paragraph("RCM", normal))
+    summary_footer_note = (contract.summary_footer_note or "").strip()
+    if not summary_footer_note:
+        summary_footer_note = f"Remark : GST shall be Payable by {client_company_name} under Reverse Charge Mechanism"
+    elements.append(Paragraph(summary_footer_note, normal))
     elements.append(Spacer(1, 14))
 
     sig_table = Table(

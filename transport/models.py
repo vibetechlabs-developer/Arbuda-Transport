@@ -26,6 +26,7 @@ class T_Contract(models.Model):
     c_start_date = models.DateField(blank=True, null=True)
     c_end_date = models.DateField(blank=True, null=True)
     dc_field = models.CharField(max_length=100, blank=True, null=True)
+    sac_number = models.CharField(max_length=20, blank=True, null=True)
     gc_note_required = models.BooleanField(default=False)
     gc_series_from = models.CharField(max_length=20, blank=True, null=True)
 
@@ -64,6 +65,9 @@ class T_Contract(models.Model):
     show_verified_by = models.BooleanField(default=False)
     show_recommended_by = models.BooleanField(default=False)
     footer_company_name = models.CharField(max_length=255, blank=True, null=True)
+    default_page_wise_summary = models.BooleanField(default=False)
+    summary_footer_note = models.CharField(max_length=500, blank=True, null=True)
+    show_summary_intro = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

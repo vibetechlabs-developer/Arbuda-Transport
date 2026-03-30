@@ -122,6 +122,11 @@
                   autofocus value="{{ contract.dc_field }}" oninput=" this.classList.remove('invalid')" />
               </div>
               <div class="mb-3 col-sm-6">
+                <label for="sac_number" class="form-label">SAC Number</label>
+                <input type="text" class="form-control" id="sac_number" name="sac_number" placeholder="Enter SAC number"
+                  value="{{ contract.sac_number|default:'' }}" oninput="this.classList.remove('invalid')" />
+              </div>
+              <div class="mb-3 col-sm-6">
                 {% if contract.gc_note_required %}
 
                 <label for="gc_note_required" class="form-label">GC Note required ?</label>
@@ -984,6 +989,50 @@
                     value="{{ contract.footer_company_name|default:request.session.company_info.company_name }}"
                   >
                   <small class="text-muted">This name will appear as <strong>For, &lt;Company&gt;</strong> at the bottom of every invoice for this contract.</small>
+                </div>
+              </div>
+            </div>
+
+            <h5 class="text-primary fw-semibold mb-3 mt-4">Summary Settings</h5>
+            <div class="row">
+              <div class="col-sm-4">
+                <div class="form-check mt-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="default_page_wise_summary"
+                    name="default_page_wise_summary"
+                    {% if contract.default_page_wise_summary %}checked{% endif %}
+                  >
+                  <label class="form-check-label" for="default_page_wise_summary">
+                    Default Page Wise Summary
+                  </label>
+                </div>
+                <div class="form-check mt-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="show_summary_intro"
+                    name="show_summary_intro"
+                    {% if contract.show_summary_intro %}checked{% endif %}
+                  >
+                  <label class="form-check-label" for="show_summary_intro">
+                    Show "Dear Sir" Intro In Summary
+                  </label>
+                </div>
+              </div>
+              <div class="col-sm-8">
+                <div class="mb-3 mt-3">
+                  <label for="summary_footer_note" class="form-label">Summary Footer Wording</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="summary_footer_note"
+                    name="summary_footer_note"
+                    placeholder="Remark : GST shall be Payable by ... under Reverse Charge Mechanism"
+                    value="{{ contract.summary_footer_note|default:'' }}"
+                  >
+                  <small class="text-muted">Leave blank to use the default GST reverse charge wording in summary PDF.</small>
                 </div>
               </div>
             </div>

@@ -52,6 +52,7 @@ def add_contract(request):
                 c_start_date=request.POST.get("c_start_date"),
                 c_end_date=request.POST.get("c_end_date"),
                 dc_field=request.POST.get("dc_field"),
+                sac_number=request.POST.get("sac_number"),
                 gc_note_required = True if request.POST.get("gc_note_required") == 'yes' else False,
                 gc_series_from = request.POST.get("gc_start"),
 
@@ -81,6 +82,9 @@ def add_contract(request):
                     or request.session['company_info']['company_name']
                     or None
                 ),
+                default_page_wise_summary=bool(request.POST.get("default_page_wise_summary")),
+                summary_footer_note=request.POST.get("summary_footer_note"),
+                show_summary_intro=bool(request.POST.get("show_summary_intro")),
             )
 
             rate_type = request.POST.get("rate_type")
@@ -267,6 +271,7 @@ def update_contract(request, ):
             contract.c_start_date = request.POST.get("c_start_date") or None
             contract.c_end_date = request.POST.get("c_end_date") or None
             contract.dc_field = request.POST.get("dc_field") or None
+            contract.sac_number = request.POST.get("sac_number") or None
             contract.gc_note_required = True if request.POST.get("gc_note_required") == 'yes' else False
             contract.gc_series_from = request.POST.get("gc_start")
 
@@ -307,6 +312,9 @@ def update_contract(request, ):
             contract.footer_company_name = (
                 footer_name or request.session['company_info']['company_name']
             )
+            contract.default_page_wise_summary = bool(request.POST.get("default_page_wise_summary"))
+            contract.summary_footer_note = request.POST.get("summary_footer_note") or None
+            contract.show_summary_intro = bool(request.POST.get("show_summary_intro"))
 
             # Save the contract first
             contract.save()
