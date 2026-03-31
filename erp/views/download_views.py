@@ -2186,33 +2186,145 @@ def generate_summary_pdf(request):
             continue
 
         if page_wise_summary:
-            # One summary row per invoice page (page totals), not one row per bill.
-            for page_idx in range(0, len(dispatches), chunk_size):
-                page_dispatches = dispatches[page_idx:page_idx + chunk_size]
-                page_mt = sum(float(d.weight) for d in page_dispatches if d.weight)
-                page_amount = sum(float(d.totalfreight) for d in page_dispatches if d.totalfreight)
-                page_loading = sum(float(d.loading_charge) for d in page_dispatches if d.loading_charge)
-                page_unloading1 = sum(float(d.unloading_charge_1) for d in page_dispatches if d.unloading_charge_1)
-                page_unloading2 = sum(float(d.unloading_charge_2) for d in page_dispatches if d.unloading_charge_2)
-                page_grand_total = page_amount + page_loading + page_unloading1 + page_unloading2
+            # One summary row per **invoice page** (page totals), not one row per bill.
+            #
+            # IMPORTANT:
+            #   The way rows are split into pages must exactly mirror the invoice
+            #   PDF pagination logic, otherwise "Page 1" in the invoice will not
+            #   match "Page 1" in this summary.
+            #
+            # For normal (non "Distric-Wise") contracts the invoice groups rows in
+            # simple chunks of 12.  For "Distric-Wise" contracts, however, the
+            # invoice groups rows by district first and then paginates **inside**
+            # each district (see download_generate_invoice_pdf).
+            #
+            # We reproduce that behaviour here so the per‑page totals line up.
 
-                bills_data.append({
-                    "bill_no": invoice.Bill_no,
-                    "page_no": (page_idx // chunk_size) + 1,
-                    "mt": page_mt,
-                    "bill_amount": page_amount,
-                    "loading": page_loading,
-                    "unloading1": page_unloading1,
-                    "unloading2": page_unloading2,
-                    "grand_total": page_grand_total,
-                })
+            page_counter = 0  # running page index for this invoice
 
-                total_mt += page_mt
-                total_bill_amount += page_amount
-                total_loading += page_loading
-                total_unloading1 += page_unloading1
-                total_unloading2 += page_unloading2
-                total_grand_total += page_grand_total
+            if getattr(contract, "rate_type", "") == "Distric-Wise":
+                # --- District‑wise pagination (must match download_generate_invoice_pdf) ---
+                def _challan_numeric(challan_no):
+                    if not challan_no:
+                        return 0
+                    num_match = re.search(r"\d+", str(challan_no))
+                    return int(num_match.group(0)) if num_match else 0
+
+                # Order by (district, challan number ascending) just like invoice PDF
+                dispatches_sorted = sorted(
+                    dispatches,
+                    key=lambda d: (d.district or "", _challan_numeric(d.challan_no)),
+                )
+
+                # Group by district then paginate each district block
+                for _district, district_dispatches_iter in groupby(
+                    dispatches_sorted, key=attrgetter("district")
+                ):
+                    district_dispatches = list(district_dispatches_iter)
+
+                    for i in range(0, len(district_dispatches), chunk_size):
+                        page_counter += 1
+                        page_dispatches = district_dispatches[i : i + chunk_size]
+
+                        page_mt = sum(
+                            float(d.weight) for d in page_dispatches if d.weight
+                        )
+                        page_amount = sum(
+                            float(d.totalfreight)
+                            for d in page_dispatches
+                            if d.totalfreight
+                        )
+                        page_loading = sum(
+                            float(d.loading_charge)
+                            for d in page_dispatches
+                            if d.loading_charge
+                        )
+                        page_unloading1 = sum(
+                            float(d.unloading_charge_1)
+                            for d in page_dispatches
+                            if d.unloading_charge_1
+                        )
+                        page_unloading2 = sum(
+                            float(d.unloading_charge_2)
+                            for d in page_dispatches
+                            if d.unloading_charge_2
+                        )
+                        page_grand_total = (
+                            page_amount
+                            + page_loading
+                            + page_unloading1
+                            + page_unloading2
+                        )
+
+                        bills_data.append(
+                            {
+                                "bill_no": invoice.Bill_no,
+                                "page_no": page_counter,
+                                "mt": page_mt,
+                                "bill_amount": page_amount,
+                                "loading": page_loading,
+                                "unloading1": page_unloading1,
+                                "unloading2": page_unloading2,
+                                "grand_total": page_grand_total,
+                            }
+                        )
+
+                        total_mt += page_mt
+                        total_bill_amount += page_amount
+                        total_loading += page_loading
+                        total_unloading1 += page_unloading1
+                        total_unloading2 += page_unloading2
+                        total_grand_total += page_grand_total
+            else:
+                # --- Standard pagination: simple sequential chunks of 12 rows ---
+                for page_idx in range(0, len(dispatches), chunk_size):
+                    page_counter += 1
+                    page_dispatches = dispatches[page_idx : page_idx + chunk_size]
+                    page_mt = sum(float(d.weight) for d in page_dispatches if d.weight)
+                    page_amount = sum(
+                        float(d.totalfreight) for d in page_dispatches if d.totalfreight
+                    )
+                    page_loading = sum(
+                        float(d.loading_charge)
+                        for d in page_dispatches
+                        if d.loading_charge
+                    )
+                    page_unloading1 = sum(
+                        float(d.unloading_charge_1)
+                        for d in page_dispatches
+                        if d.unloading_charge_1
+                    )
+                    page_unloading2 = sum(
+                        float(d.unloading_charge_2)
+                        for d in page_dispatches
+                        if d.unloading_charge_2
+                    )
+                    page_grand_total = (
+                        page_amount
+                        + page_loading
+                        + page_unloading1
+                        + page_unloading2
+                    )
+
+                    bills_data.append(
+                        {
+                            "bill_no": invoice.Bill_no,
+                            "page_no": page_counter,
+                            "mt": page_mt,
+                            "bill_amount": page_amount,
+                            "loading": page_loading,
+                            "unloading1": page_unloading1,
+                            "unloading2": page_unloading2,
+                            "grand_total": page_grand_total,
+                        }
+                    )
+
+                    total_mt += page_mt
+                    total_bill_amount += page_amount
+                    total_loading += page_loading
+                    total_unloading1 += page_unloading1
+                    total_unloading2 += page_unloading2
+                    total_grand_total += page_grand_total
         else:
             bill_mt = sum(float(d.weight) for d in dispatches if d.weight)
             bill_amount = sum(float(d.totalfreight) for d in dispatches if d.totalfreight)
