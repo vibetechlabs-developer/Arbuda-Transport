@@ -2128,6 +2128,9 @@ def generate_summary_pdf(request):
     # Optional flag: when enabled, summary becomes "page wise" –
     # the Bill No column is replaced by Page No (simply the running page index).
     page_wise_summary = (request.POST.get("page_wise_summary") or "").lower() in ("1", "true", "yes", "on")
+    show_bill_summary_title = (request.POST.get("show_bill_summary_title") or "").lower() in ("1", "true", "yes", "on")
+    show_from_product_row = (request.POST.get("show_from_product_row") or "").lower() in ("1", "true", "yes", "on")
+    show_total_weight = (request.POST.get("show_total_weight") or "").lower() in ("1", "true", "yes", "on")
     
     if not contract_id or not bill_ids:
         messages.error(request, "Please select contract and at least one bill.")
@@ -2273,6 +2276,7 @@ def generate_summary_pdf(request):
 
     company_name = (company.company_name or "").upper()
     pan_no = (company_profile.pan_number if company_profile and company_profile.pan_number else "") if company_profile else ""
+    # Header should show our own company GSTIN (as before), not the customer's GST.
     gstin_no = (company.gst_number or "") if hasattr(company, "gst_number") else ""
 
     # ---- Header box ----
@@ -2286,7 +2290,8 @@ def generate_summary_pdf(request):
             header_lines.append(Paragraph(addr, small_center))
 
     pan_gst_line = "  ".join([p for p in [f"PAN NO.{pan_no}" if pan_no else "", f"GSTIN:{gstin_no}" if gstin_no else ""] if p])
-    sac_line = f"SAC-{contract.sac_number}" if getattr(contract, "sac_number", None) else ""
+    has_sac = bool(getattr(contract, "sac_number", None))
+    sac_line = f"SAC-{contract.sac_number}" if has_sac else ""
 
     header_cell = [
         Paragraph(company_name, title_center),
@@ -2294,7 +2299,6 @@ def generate_summary_pdf(request):
         *header_lines,
         Spacer(1, 2),
         Paragraph(pan_gst_line, small_center) if pan_gst_line else Paragraph("", small_center),
-        Paragraph(sac_line, small_center) if sac_line else Paragraph("", small_center),
     ]
     header_table = Table([[header_cell]], colWidths=[available_w])
     header_table.setStyle(
@@ -2311,7 +2315,15 @@ def generate_summary_pdf(request):
         )
     )
     elements.append(header_table)
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 4))
+
+    # Center SAC and INVOICE text in the middle area just below the header box.
+    if has_sac:
+        elements.append(Paragraph(sac_line, small_center))
+        elements.append(Paragraph("<b>INVOICE</b>", small_center))
+        elements.append(Spacer(1, 8))
+    else:
+        elements.append(Spacer(1, 4))
 
     # ---- To + Date row ----
     date_str = summary_date.strftime("%d-%m-%Y")
@@ -2329,9 +2341,6 @@ def generate_summary_pdf(request):
         to_lines.append(Paragraph(f"PIN: {contract.billing_pin}", normal))
     if contract.gst_number:
         to_lines.append(Paragraph(f"GST NO.{contract.gst_number}", normal))
-    if getattr(contract, "sac_number", None):
-        to_lines.append(Paragraph(f"SAC : {contract.sac_number}", normal))
-
     right_header_lines = []
     if page_wise_summary:
         bill_no_list = [str(b.Bill_no) for b in invoices if getattr(b, "Bill_no", None)]
@@ -2373,30 +2382,32 @@ def generate_summary_pdf(request):
         elements.append(Paragraph(intro_line, normal))
         elements.append(Spacer(1, 8))
 
-    elements.append(Paragraph("Bill Summary", center_bold))
-    elements.append(Spacer(1, 6))
+    if show_bill_summary_title:
+        elements.append(Paragraph("Bill Summary", center_bold))
+        elements.append(Spacer(1, 6))
 
     # ---- FROM + Product row ----
-    from_text = contract.from_center or ""
-    product_text = product_name or ""
-    from_prod_table = Table(
-        [[Paragraph(f"<b>FROM:</b> {from_text}", normal), Paragraph(f"<b>Product :</b> {product_text}", right)]],
-        colWidths=[available_w * 0.5, available_w * 0.5],
-    )
-    from_prod_table.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ]
+    if show_from_product_row:
+        from_text = contract.from_center or ""
+        product_text = product_name or ""
+        from_prod_table = Table(
+            [[Paragraph(f"<b>FROM:</b> {from_text}", normal), Paragraph(f"<b>Product :</b> {product_text}", right)]],
+            colWidths=[available_w * 0.5, available_w * 0.5],
         )
-    )
-    elements.append(from_prod_table)
-    elements.append(Spacer(1, 6))
+        from_prod_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+        elements.append(from_prod_table)
+        elements.append(Spacer(1, 6))
 
     # ---- Determine which columns to show (hide if all values are zero) ----
     show_loading = any(bill['loading'] > 0 for bill in bills_data)
@@ -2514,14 +2525,15 @@ def generate_summary_pdf(request):
     elements.append(bill_table)
     elements.append(Spacer(1, 10))
 
-    # Display overall total weight prominently below the summary table
-    elements.append(
-        Paragraph(
-            f"Total Weight (M.T): {total_mt:.3f}",
-            normal_bold,
+    # Display overall total weight prominently below the summary table when enabled.
+    if show_total_weight:
+        elements.append(
+            Paragraph(
+                f"Total Weight (M.T): {total_mt:.3f}",
+                normal_bold,
+            )
         )
-    )
-    elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 8))
 
     # ---- Footer note + Signature ----
     client_company_name = contract.company_name or "the Company"
