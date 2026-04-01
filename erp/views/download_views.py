@@ -2157,6 +2157,22 @@ def generate_summary_pdf(request):
     if not invoices.exists():
         messages.error(request, "No valid bills found.")
         return redirect("summary-view")
+
+    # Build "from center" text from selected bill dispatches (e.g. G-8, G-7)
+    # so the Dear Sir intro reflects actual bill data instead of only contract default.
+    raw_from_centers = []
+    for invoice in invoices:
+        raw_from_centers.extend(
+            invoice.dispatch_list.values_list("from_center", flat=True)
+        )
+    unique_from_centers = []
+    seen_from_centers = set()
+    for center in raw_from_centers:
+        center_text = (center or "").strip()
+        if center_text and center_text not in seen_from_centers:
+            seen_from_centers.add(center_text)
+            unique_from_centers.append(center_text)
+    summary_from_centers_text = ", ".join(unique_from_centers) or contract.from_center or "our dispatch location"
     
     # Parse summary date
     summary_date = None
@@ -2380,7 +2396,7 @@ def generate_summary_pdf(request):
     normal_bold = ParagraphStyle(name="NormalBold", fontName="Helvetica-Bold", fontSize=9, alignment=0, leading=11)
     right = ParagraphStyle(name="Right", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
     right_bold = ParagraphStyle(name="RightBold", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)
-    center_bold = ParagraphStyle(name="CenterBold", fontName="Helvetica-Bold", fontSize=10, alignment=1, leading=12)
+    center_bold = ParagraphStyle(name="CenterBold", fontName="Helvetica-Bold", fontSize=11, alignment=1, leading=13)
     cell_center = ParagraphStyle(name="CellCenter", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
     cell_right = ParagraphStyle(name="CellRight", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
     cell_header = ParagraphStyle(name="CellHeader", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)
@@ -2441,7 +2457,7 @@ def generate_summary_pdf(request):
     date_str = summary_date.strftime("%d-%m-%Y")
     to_lines = [
         Paragraph("To,", normal),
-        Paragraph("The State Manager", normal_bold),
+        Paragraph("Sr. Manager [D&T.]", normal_bold),
         Paragraph(f"{(contract.company_name or '').upper()}.", normal_bold),
     ]
     if contract.billing_address:
@@ -2485,7 +2501,7 @@ def generate_summary_pdf(request):
         elements.append(Spacer(1, 4))
         elements.append(Paragraph("Dear Sir,", left_normal))
         elements.append(Spacer(1, 3))
-        from_center_text = contract.from_center or "our dispatch location"
+        from_center_text = summary_from_centers_text
         company_target = (contract.company_name or "").strip() or "your locations"
         intro_line = (
             "Please find enclosed herewith the following bills of transportation "
