@@ -2158,12 +2158,16 @@ def generate_summary_pdf(request):
         messages.error(request, "No valid bills found.")
         return redirect("summary-view")
 
-    # Build "from center" text from selected bill dispatches (e.g. G-8, G-7)
-    # so the Dear Sir intro reflects actual bill data instead of only contract default.
+    # Build intro text parts from selected bill dispatches so Dear Sir section
+    # reflects actual invoice data instead of only contract defaults.
     raw_from_centers = []
+    raw_destinations = []
     for invoice in invoices:
         raw_from_centers.extend(
             invoice.dispatch_list.values_list("from_center", flat=True)
+        )
+        raw_destinations.extend(
+            invoice.dispatch_list.values_list("destination", flat=True)
         )
     unique_from_centers = []
     seen_from_centers = set()
@@ -2172,7 +2176,15 @@ def generate_summary_pdf(request):
         if center_text and center_text not in seen_from_centers:
             seen_from_centers.add(center_text)
             unique_from_centers.append(center_text)
+    unique_destinations = []
+    seen_destinations = set()
+    for destination in raw_destinations:
+        destination_text = (destination or "").strip()
+        if destination_text and destination_text not in seen_destinations:
+            seen_destinations.add(destination_text)
+            unique_destinations.append(destination_text)
     summary_from_centers_text = ", ".join(unique_from_centers) or contract.from_center or "our dispatch location"
+    summary_destinations_text = ", ".join(unique_destinations) or (contract.company_name or "").strip() or "your locations"
     
     # Parse summary date
     summary_date = None
@@ -2502,10 +2514,9 @@ def generate_summary_pdf(request):
         elements.append(Paragraph("Dear Sir,", left_normal))
         elements.append(Spacer(1, 3))
         from_center_text = summary_from_centers_text
-        company_target = (contract.company_name or "").strip() or "your locations"
         intro_line = (
             "Please find enclosed herewith the following bills of transportation "
-            f"from {from_center_text} to various destinations of {company_target}"
+            f"from {from_center_text} to various destinations of {summary_destinations_text}"
         )
         elements.append(Paragraph(intro_line, normal))
         elements.append(Spacer(1, 8))
