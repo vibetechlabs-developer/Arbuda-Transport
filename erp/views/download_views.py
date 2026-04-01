@@ -2176,15 +2176,22 @@ def generate_summary_pdf(request):
         if center_text and center_text not in seen_from_centers:
             seen_from_centers.add(center_text)
             unique_from_centers.append(center_text)
-    unique_destinations = []
-    seen_destinations = set()
+    # Destination text should follow invoice style, e.g. "Gujarat G-8".
+    # Extract unique G-codes from destination values and prefix with Gujarat.
+    unique_g_codes = []
+    seen_g_codes = set()
     for destination in raw_destinations:
-        destination_text = (destination or "").strip()
-        if destination_text and destination_text not in seen_destinations:
-            seen_destinations.add(destination_text)
-            unique_destinations.append(destination_text)
+        destination_text = (destination or "").upper()
+        g_codes = re.findall(r"\bG\s*-\s*\d+\b", destination_text)
+        for g_code in g_codes:
+            normalized_code = re.sub(r"\s+", "", g_code)  # "G - 8" -> "G-8"
+            if normalized_code not in seen_g_codes:
+                seen_g_codes.add(normalized_code)
+                unique_g_codes.append(normalized_code)
     summary_from_centers_text = ", ".join(unique_from_centers) or contract.from_center or "our dispatch location"
-    summary_destinations_text = ", ".join(unique_destinations) or (contract.company_name or "").strip() or "your locations"
+    summary_destinations_text = (
+        f"Gujarat {', '.join(unique_g_codes)}" if unique_g_codes else "Gujarat"
+    )
     
     # Parse summary date
     summary_date = None
