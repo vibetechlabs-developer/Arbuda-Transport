@@ -1080,16 +1080,22 @@ def create_dispatch_Invoice(request):
         financial_year = request.session.get('financial_year', get_current_financial_year())
         start_date, end_date = get_financial_year_start_end(financial_year)
         
-        # Filter contracts that are active during the financial year
-        # A contract is active if it overlaps with the financial year period
-        # Contract overlaps if: (c_start_date <= end_date) AND (c_end_date >= start_date OR c_end_date is NULL)
+        # Show contracts that are active in selected FY.
+        # Also keep contracts visible when they still have pending (uninvoiced)
+        # dispatches from earlier years, so carry-forward invoicing can continue.
+        pending_contract_ids = Dispatch.objects.filter(
+            company_id=company_id,
+            invoices__isnull=True,
+        ).values_list("contract_id", flat=True)
+
         allcontract = T_Contract.objects.filter(
             company_id=company_id
         ).filter(
             Q(c_start_date__lte=end_date) & (
                 Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True)
             )
-        ).order_by('-id')
+            | Q(id__in=pending_contract_ids)
+        ).distinct().order_by('-id')
         alldata['allcontract'] = allcontract
     except T_Contract.DoesNotExist:
         messages.error(request , 'Contract not fonded')

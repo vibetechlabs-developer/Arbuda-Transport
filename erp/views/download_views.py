@@ -86,7 +86,13 @@ def generate_invoice_pdf(request):
         financial_year = request.session.get('financial_year', get_current_financial_year())
         start_date, end_date = get_financial_year_start_end(financial_year)
         
-        # Filter contracts that are active during the financial year
+        # Keep same contract list behavior as create_dispatch_Invoice:
+        # active FY contracts + contracts with pending (uninvoiced) dispatches.
+        pending_contract_ids = Dispatch.objects.filter(
+            company_id=company_id,
+            invoices__isnull=True,
+        ).values_list("contract_id", flat=True)
+
         allcontract = T_Contract.objects.filter(
             company_id=company_id
         ).filter(
@@ -94,9 +100,10 @@ def generate_invoice_pdf(request):
                 Q(c_start_date__lte=end_date) & (
                     Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True)
                 )
-            ) |
-            Q(c_start_date__isnull=True)
-        ).order_by('-id')
+            )
+            | Q(c_start_date__isnull=True)
+            | Q(id__in=pending_contract_ids)
+        ).distinct().order_by('-id')
         alldata['allcontract'] = allcontract
     except Exception as e:
         messages.error(request, f'Error loading contracts: {str(e)}')

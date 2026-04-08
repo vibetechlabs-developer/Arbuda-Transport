@@ -284,6 +284,7 @@ def get_dispacth(request):
             )
 
             inv = Invoice.objects.filter(company_id = request.session['company_info']['company_id'], contract_id = dcontract_id).order_by('-id').first()
+            new_bill_no = contract.bill_series_from
 
             # Extract last numeric part
             if inv:
@@ -293,11 +294,14 @@ def get_dispacth(request):
                     num_str = match.group(1)             # e.g. '001'
                     new_num = str(int(num_str) + 1).zfill(len(num_str))  # keep zero padding
                     new_bill_no = re.sub(r'\d+$', new_num, bill_no)  # replace last number with new one
+                else:
+                    # If bill_no doesn't end with digits, keep last invoice bill as-is.
+                    new_bill_no = bill_no
 
             return JsonResponse({
                 'fields' : contract.invoice_fields,
                 'destinations': list(dispatch),
-                'bill_no' : new_bill_no if inv else contract.bill_series_from,
+                'bill_no' : new_bill_no,
             })
         except Dispatch.DoesNotExist:
             return JsonResponse({
