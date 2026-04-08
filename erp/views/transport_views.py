@@ -924,6 +924,7 @@ def dispatch_view(request):
     # - Always include selected FY dispatches
     # - Also include previous FY dispatches that are still unbilled, so they
     #   carry forward into the next year's dispatch register until billed.
+    # Use invoice existence as source of truth for carry-forward rows.
     pending_invoice_exists = Invoice.objects.filter(
         dispatch_list=OuterRef("pk"),
         company_id=company["company_id"],
@@ -935,7 +936,7 @@ def dispatch_view(request):
             Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
             | (
                 Q(dep_date__lt=fy_start_date)
-                & (Q(has_invoice=False) | Q(inv_status=False))
+                & Q(has_invoice=False)
             )
         )
         .distinct()
