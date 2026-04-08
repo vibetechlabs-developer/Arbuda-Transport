@@ -928,8 +928,8 @@ def dispatch_view(request):
         company_id=company['company_id']
     ).filter(
         Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
-        | Q(dep_date__lt=fy_start_date, inv_status=False)
-    )
+        | Q(dep_date__lt=fy_start_date, invoices__isnull=True)
+    ).distinct()
 
     # ✅ Search by Challan No
     if s_challan_no:
