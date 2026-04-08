@@ -7,7 +7,7 @@ from datetime import datetime
 from django.db import transaction, IntegrityError
 from erp.utils.decorators import session_required
 from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year, get_financial_year_start_end
-from django.db.models import Func, Sum, Count, Max, Subquery, OuterRef, Q
+from django.db.models import Func, Sum, Count, Max, Subquery, OuterRef, Q, Exists
 from django.http import HttpResponse
 
 from erp.utils.csv_export import csv_response
@@ -924,15 +924,22 @@ def dispatch_view(request):
     # - Always include selected FY dispatches
     # - Also include previous FY dispatches that are still unbilled, so they
     #   carry forward into the next year's dispatch register until billed.
-    dispatch_qs = Dispatch.objects.filter(
-        company_id=company['company_id']
-    ).filter(
-        Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
-        | (
-            Q(dep_date__lt=fy_start_date)
-            & (Q(invoices__isnull=True) | Q(inv_status=False))
+    pending_invoice_exists = Invoice.objects.filter(
+        dispatch_list=OuterRef("pk"),
+        company_id=company["company_id"],
+    )
+    dispatch_qs = (
+        Dispatch.objects.filter(company_id=company["company_id"])
+        .annotate(has_invoice=Exists(pending_invoice_exists))
+        .filter(
+            Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
+            | (
+                Q(dep_date__lt=fy_start_date)
+                & (Q(has_invoice=False) | Q(inv_status=False))
+            )
         )
-    ).distinct()
+        .distinct()
+    )
 
     # ✅ Search by Challan No
     if s_challan_no:
