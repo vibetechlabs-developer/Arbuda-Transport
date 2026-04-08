@@ -2,7 +2,11 @@ from django.http import JsonResponse
 from django.core.cache import cache
 from erp.utils.csv_export import csv_response
 from erp.utils.decorators import session_required
-from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year
+from erp.utils.financial_year import (
+    filter_by_financial_year,
+    get_current_financial_year,
+    get_financial_year_start_end,
+)
 from transport.models import (
     T_Contract,
     Destination,
@@ -18,7 +22,7 @@ from transport.models import (
 import re
 from decimal import Decimal
 from datetime import datetime
-from django.db.models import Func, F, IntegerField
+from django.db.models import Func, F, IntegerField, Q
 
 ## CONTRACT DETAILS FETCHING ##
 
@@ -248,6 +252,7 @@ def get_dispacth(request):
     dcontract_id = request.GET.get('contract-id')
     district_filter = request.GET.get('district', '').strip()
     financial_year = request.session.get('financial_year', get_current_financial_year())
+    fy_start_date, fy_end_date = get_financial_year_start_end(financial_year)
     try:
         contract = T_Contract.objects.get(id=dcontract_id)
         try:
@@ -255,10 +260,10 @@ def get_dispacth(request):
                 contract_id=dcontract_id,
                 company_id=request.session['company_info']['company_id'],
                 inv_status=False,
+            ).filter(
+                Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
+                | Q(dep_date__lt=fy_start_date)
             )
-
-            # Filter by financial year
-            dispatch = filter_by_financial_year(dispatch, financial_year, 'dep_date')
 
             # Filter by district if provided
             if district_filter:
@@ -308,6 +313,7 @@ def get_dispacth(request):
 def get_ninv_dispacth(request):                  # ninv means not in invoice dispatch
     dbill_id = request.GET.get('bill-id')
     financial_year = request.session.get('financial_year', get_current_financial_year())
+    fy_start_date, fy_end_date = get_financial_year_start_end(financial_year)
     if not dbill_id:
         return JsonResponse({'error': 'bill-id is required'}, status=400)
     
@@ -318,10 +324,10 @@ def get_ninv_dispacth(request):                  # ninv means not in invoice dis
             contract_id=invoice.contract_id.id,
             company_id=request.session['company_info']['company_id'],
             inv_status=False,
+        ).filter(
+            Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
+            | Q(dep_date__lt=fy_start_date)
         )
-        
-        # Filter by financial year
-        dispatch = filter_by_financial_year(dispatch, financial_year, 'dep_date')
 
         # Latest date first, challan_no ascending within date when showing non-invoiced dispatch list
         dispatch = (
