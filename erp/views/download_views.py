@@ -216,8 +216,7 @@ def generate_invoice_pdf(request):
                 gc_no = contract.gc_series_from
             gc_note = GC_Note.objects.create(
                 gc_no=gc_no,
-                # GC Note date should match the dispatch (dep_date), not the invoice bill_date.
-                gc_date=(d.dep_date or bill_date),
+                gc_date=bill_date,
                 consignor=contract.company_name,
                 consignee=d.party_name,
                 dispatch_from=contract.from_center,
@@ -1585,8 +1584,7 @@ def download_generate_invoice_pdf(request):
         # Standard invoice pagination: 12 rows per page, and show a per-page TOTAL row on every page.
         add_total = bool(add_total_row)
         # If it's the last page and we're showing totals, use all_dispatches for grand total
-        # UNLESS the user explicitly requested "every_page", which strictly means page-totals only.
-        if is_last_page and add_total and all_dispatches is not None and total_option != "every_page":
+        if is_last_page and add_total and all_dispatches is not None:
             dispatches_to_sum = all_dispatches
         else:
             dispatches_to_sum = dispatch_subset
@@ -1699,9 +1697,29 @@ def download_generate_invoice_pdf(request):
                         style = to_right_style_desc_local if field_name in numeric_fields else center_style_desc_local if field_name in center_fields else to_style_desc_local
                     row[j] = Paragraph(str(cell), style)
 
-        # Let ReportLab dynamically auto-size row heights based on font size and strict padding.
-        # This prevents hardcoded heights from catastrophically breaking page boundaries if a 
-        # specific company has an oversized multi-line header/address that dynamically shrinks available height.
+        # Set explicit row heights (in points).
+        # Slightly larger so the table feels bigger, but still compact enough that
+        # header + 12 data rows + TOTAL + footer fit on a single page.
+        if add_total:
+            # Header row slightly taller, data rows medium, total row slightly taller
+            if len(data) >= 2:
+                row_heights = [24]  # header
+                if len(data) > 2:
+                    row_heights += [21] * (len(data) - 2)  # data rows
+                row_heights += [23]  # total row
+            else:
+                row_heights = [24] * len(data)
+        else:
+            # Header row slightly taller, data rows medium
+            if len(data) >= 1:
+                row_heights = [24]  # header
+                if len(data) > 1:
+                    row_heights += [21] * (len(data) - 1)
+            else:
+                row_heights = None
+
+        # Let ReportLab auto-size row heights in the *download* invoice as well so
+        # long text wraps inside its own row instead of overriding the next row.
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
         # Table styles - simple, elegant, standard structure (no background colors)
@@ -1711,13 +1729,13 @@ def download_generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Moderately tight paddings so the table appears larger but still fits 12 rows per page plus footer
+            # Moderately tight paddings so the table appears larger but still fits 12 rows per page
             ("LEFTPADDING", (0,0), (-1,-1), 1.0),
             ("RIGHTPADDING", (0,0), (-1,-1), 1.0),
-            ("TOPPADDING", (0,0), (-1,0), 3.5),   # Header padding stretched
-            ("BOTTOMPADDING", (0,0), (-1,0), 3.5),
-            ("TOPPADDING", (0,1), (-1,-2), 3.5),  # Data rows padding stretched softly
-            ("BOTTOMPADDING", (0,1), (-1,-2), 3.5),
+            ("TOPPADDING", (0,0), (-1,0), 2),   # Header padding
+            ("BOTTOMPADDING", (0,0), (-1,0), 2),
+            ("TOPPADDING", (0,1), (-1,-2), 2),  # Data rows padding
+            ("BOTTOMPADDING", (0,1), (-1,-2), 2),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -1946,7 +1964,6 @@ def download_generate_invoice_pdf(request):
         bill_no=invoice.Bill_no,
         invoice_id=getattr(invoice, "id", None),
     )
-
     # Decide whether to preview inline or force download based on the "download" flag
     download_flag = (request.POST.get("download") or "").strip()
     if download_flag:
@@ -1968,34 +1985,13 @@ def download_generate_invoice_pdf(request):
 
 @session_required
 def download_gc_pdf(request):
-    if request.method != "POST":
-        return redirect("view-gc-note")
-
-    preview_flag = (request.POST.get("preview") or "").strip()
-
     if request.method == "POST":
         selected_gc_ids = request.POST.getlist('dispatch_ids')
         if not selected_gc_ids:
             messages.error(request, "No GC Notes selected for PDF generation.")
             return redirect("view-gc-note")
 
-        # The UI sends selected ids via the `dispatch_ids` key.
-        # Sometimes it can contain invalid values (e.g. "undefined") which would raise a 500.
-        selected_gc_ids_int = []
-        for _id in selected_gc_ids:
-            try:
-                selected_gc_ids_int.append(int(_id))
-            except (TypeError, ValueError):
-                continue
-
-        if not selected_gc_ids_int:
-            messages.error(request, "No valid GC Notes selected for PDF generation.")
-            return redirect("view-gc-note")
-
-        gc_notes = GC_Note.objects.filter(
-            id__in=selected_gc_ids_int,
-            company_id=request.session['company_info']['company_id'],
-        ).order_by('gc_no')
+        gc_notes = GC_Note.objects.filter(id__in=selected_gc_ids, company_id=request.session['company_info']['company_id']).order_by('gc_no')
    
 
     buffer = BytesIO()
@@ -2010,13 +2006,6 @@ def download_gc_pdf(request):
     elements = []  
 
     def make_gc_note(gc):
-        # GC Note date should match dispatch (dep_date), not the stored gc_date (which may be older).
-        date_val = None
-        if getattr(gc, "dispatch_id", None):
-            date_val = gc.dispatch_id.dep_date
-        if not date_val:
-            date_val = gc.gc_date
-
         to_table_data = [[Paragraph("<b>GOODS CONSINGNMENT NOTE</b>",styles["Normal"]), Paragraph(f"<b>NO : {gc.gc_no} </b>", styles["Normal"])]]
 
         to_table = Table(to_table_data, colWidths=[400, 88])  #adjust widths to fit page
@@ -2029,10 +2018,9 @@ def download_gc_pdf(request):
         ]))  
 
         details_table_data = [
-            [Paragraph(f"<b>Date</b>",styles["font9"]),":",Paragraph(f"{date_val.strftime('%d-%m-%Y') if date_val else ''}",styles["font9"]), Paragraph(f"<b>Truck No. </b>", styles["font9"]),":", Paragraph(f"{gc.truck_no}",styles["font9"])],
+            [Paragraph(f"<b>Date</b>",styles["font9"]),":",Paragraph(f"{gc.gc_date.strftime('%d-%m-%Y') if gc.gc_date else ''}",styles["font9"]), Paragraph(f"<b>Truck No. </b>", styles["font9"]),":", Paragraph(f"{gc.truck_no}",styles["font9"])],
             [Paragraph(f"<b>Consignor</b>",styles["font9"]),":",Paragraph(f"{gc.consignor}",styles["font9"]), "", "" , ""],
-            # Always show 3 digits after decimal for weight (e.g. 12.345)
-            [Paragraph(f"<b>Depacth From</b>",styles["font9"]),":",Paragraph(f"{gc.dispatch_from}",styles["font9"]), Paragraph(f"<b>Weight</b>",styles["font9"]), ":" , Paragraph(f"{(gc.weight or 0):.3f}",styles["font9"])],
+            [Paragraph(f"<b>Depacth From</b>",styles["font9"]),":",Paragraph(f"{gc.dispatch_from}",styles["font9"]), Paragraph(f"<b>Weight</b>",styles["font9"]), ":" , Paragraph(f"{gc.weight}",styles["font9"])],
             [Paragraph(f"<b>Consignee</b>",styles["font9"]),":",Paragraph(f"{gc.consignee}",styles["font9"]),Paragraph(f"<b>Products</b>",styles["font9"]),":",Paragraph(f"{gc.product_name}",styles["font9"])],
             [Paragraph(f"<b>Challan no.</b>",styles["font9"]),":",Paragraph(f"{gc.dc_field}",styles["font9"]), Paragraph(f"<b>Bill No.</b>", styles["font9"]), ":" , Paragraph(f"{gc.bill_no}",styles["font9"])],
             [Paragraph(f"<b>Destination</b>",styles["font9"]),":",Paragraph(f"{gc.destination}",styles["font9"]), "" , "" , ""],
@@ -2096,12 +2084,7 @@ def download_gc_pdf(request):
 
     # Return the response
     response = HttpResponse(content_type='application/pdf')
-    # Preview means show inline in browser; download means download as attachment.
-    response['Content-Disposition'] = (
-        'inline; filename="gc_notes.pdf"'
-        if preview_flag
-        else 'attachment; filename="gc_notes.pdf"'
-    )
+    response['Content-Disposition'] = 'attachment; filename="gc_notes.pdf"'
     response.write(pdf)
     return response
 
@@ -2125,12 +2108,6 @@ def generate_summary_pdf(request):
     contract_id = request.POST.get("contract_no")
     bill_ids = [int(i) for i in request.POST.getlist("bill_ids")]
     summary_date_str = request.POST.get("summary_date")
-    # Optional flag: when enabled, summary becomes "page wise" –
-    # the Bill No column is replaced by Page No (simply the running page index).
-    page_wise_summary = (request.POST.get("page_wise_summary") or "").lower() in ("1", "true", "yes", "on")
-    show_bill_summary_title = (request.POST.get("show_bill_summary_title") or "").lower() in ("1", "true", "yes", "on")
-    show_from_product_row = (request.POST.get("show_from_product_row") or "").lower() in ("1", "true", "yes", "on")
-    show_total_weight = (request.POST.get("show_total_weight") or "").lower() in ("1", "true", "yes", "on")
     
     if not contract_id or not bill_ids:
         messages.error(request, "Please select contract and at least one bill.")
@@ -2157,64 +2134,6 @@ def generate_summary_pdf(request):
     if not invoices.exists():
         messages.error(request, "No valid bills found.")
         return redirect("summary-view")
-
-    # Build intro text parts from selected bill dispatches so Dear Sir section
-    # reflects actual invoice data instead of only contract defaults.
-    raw_from_centers = []
-    raw_destinations = []
-    raw_bill_numbers = []
-    for invoice in invoices:
-        raw_bill_numbers.append(invoice.Bill_no)
-        raw_from_centers.extend(
-            invoice.dispatch_list.values_list("from_center", flat=True)
-        )
-        raw_destinations.extend(
-            invoice.dispatch_list.values_list("destination", flat=True)
-        )
-    unique_from_centers = []
-    seen_from_centers = set()
-    for center in raw_from_centers:
-        center_text = (center or "").strip()
-        if center_text and center_text not in seen_from_centers:
-            seen_from_centers.add(center_text)
-            unique_from_centers.append(center_text)
-    # Destination text should follow invoice style, e.g. "Gujarat G-8".
-    # Extract unique G-codes from destination/from-center/bill-no values.
-    unique_g_codes = []
-    seen_g_codes = set()
-
-    def _collect_g_codes(value):
-        text = (value or "").upper().strip()
-        if not text:
-            return
-
-        # Matches: G-8, G 8, G/8, G_8 etc.
-        direct_matches = re.findall(r"\bG\W*([0-9]{1,2})\b", text)
-        for num in direct_matches:
-            code = f"G-{int(num)}"
-            if code not in seen_g_codes:
-                seen_g_codes.add(code)
-                unique_g_codes.append(code)
-
-        # Bill-no fallback like: GJ-08/060 => G-8
-        gj_match = re.search(r"\bGJ\W*0*([0-9]{1,2})\b", text)
-        if gj_match:
-            code = f"G-{int(gj_match.group(1))}"
-            if code not in seen_g_codes:
-                seen_g_codes.add(code)
-                unique_g_codes.append(code)
-
-    for destination in raw_destinations:
-        _collect_g_codes(destination)
-    for center in raw_from_centers:
-        _collect_g_codes(center)
-    for bill_no in raw_bill_numbers:
-        _collect_g_codes(bill_no)
-
-    summary_from_centers_text = ", ".join(unique_from_centers) or contract.from_center or "our dispatch location"
-    summary_destinations_text = (
-        f"Gujarat {', '.join(unique_g_codes)}" if unique_g_codes else "Gujarat"
-    )
     
     # Parse summary date
     summary_date = None
@@ -2226,7 +2145,7 @@ def generate_summary_pdf(request):
     else:
         summary_date = datetime.now().date()
     
-    # Collect bill/page data with totals
+    # Collect bill data with totals
     bills_data = []
     total_mt = 0
     total_bill_amount = 0
@@ -2235,173 +2154,28 @@ def generate_summary_pdf(request):
     total_unloading2 = 0
     total_grand_total = 0
     
-    chunk_size = 12  # Must match invoice pagination (12 rows per page)
     for invoice in invoices:
-        dispatches_qs = invoice.dispatch_list.all()
-        dispatches = list(sort_dispatches_by_challan_asc(dispatches_qs))
-
-        if not dispatches:
-            continue
-
-        if page_wise_summary:
-            # One summary row per **invoice page** (page totals), not one row per bill.
-            #
-            # IMPORTANT:
-            #   The way rows are split into pages must exactly mirror the invoice
-            #   PDF pagination logic, otherwise "Page 1" in the invoice will not
-            #   match "Page 1" in this summary.
-            #
-            # For normal (non "Distric-Wise") contracts the invoice groups rows in
-            # simple chunks of 12.  For "Distric-Wise" contracts, however, the
-            # invoice groups rows by district first and then paginates **inside**
-            # each district (see download_generate_invoice_pdf).
-            #
-            # We reproduce that behaviour here so the per‑page totals line up.
-
-            page_counter = 0  # running page index for this invoice
-
-            if getattr(contract, "rate_type", "") == "Distric-Wise":
-                # --- District‑wise pagination (must match download_generate_invoice_pdf) ---
-                def _challan_numeric(challan_no):
-                    if not challan_no:
-                        return 0
-                    num_match = re.search(r"\d+", str(challan_no))
-                    return int(num_match.group(0)) if num_match else 0
-
-                # Order by (district, challan number ascending) just like invoice PDF
-                dispatches_sorted = sorted(
-                    dispatches,
-                    key=lambda d: (d.district or "", _challan_numeric(d.challan_no)),
-                )
-
-                # Group by district then paginate each district block
-                for _district, district_dispatches_iter in groupby(
-                    dispatches_sorted, key=attrgetter("district")
-                ):
-                    district_dispatches = list(district_dispatches_iter)
-
-                    for i in range(0, len(district_dispatches), chunk_size):
-                        page_counter += 1
-                        page_dispatches = district_dispatches[i : i + chunk_size]
-
-                        page_mt = sum(
-                            float(d.weight) for d in page_dispatches if d.weight
-                        )
-                        page_amount = sum(
-                            float(d.totalfreight)
-                            for d in page_dispatches
-                            if d.totalfreight
-                        )
-                        page_loading = sum(
-                            float(d.loading_charge)
-                            for d in page_dispatches
-                            if d.loading_charge
-                        )
-                        page_unloading1 = sum(
-                            float(d.unloading_charge_1)
-                            for d in page_dispatches
-                            if d.unloading_charge_1
-                        )
-                        page_unloading2 = sum(
-                            float(d.unloading_charge_2)
-                            for d in page_dispatches
-                            if d.unloading_charge_2
-                        )
-                        page_grand_total = (
-                            page_amount
-                            + page_loading
-                            + page_unloading1
-                            + page_unloading2
-                        )
-
-                        bills_data.append(
-                            {
-                                "bill_no": invoice.Bill_no,
-                                "page_no": page_counter,
-                                "mt": page_mt,
-                                "bill_amount": page_amount,
-                                "loading": page_loading,
-                                "unloading1": page_unloading1,
-                                "unloading2": page_unloading2,
-                                "grand_total": page_grand_total,
-                            }
-                        )
-
-                        total_mt += page_mt
-                        total_bill_amount += page_amount
-                        total_loading += page_loading
-                        total_unloading1 += page_unloading1
-                        total_unloading2 += page_unloading2
-                        total_grand_total += page_grand_total
-            else:
-                # --- Standard pagination: simple sequential chunks of 12 rows ---
-                for page_idx in range(0, len(dispatches), chunk_size):
-                    page_counter += 1
-                    page_dispatches = dispatches[page_idx : page_idx + chunk_size]
-                    page_mt = sum(float(d.weight) for d in page_dispatches if d.weight)
-                    page_amount = sum(
-                        float(d.totalfreight) for d in page_dispatches if d.totalfreight
-                    )
-                    page_loading = sum(
-                        float(d.loading_charge)
-                        for d in page_dispatches
-                        if d.loading_charge
-                    )
-                    page_unloading1 = sum(
-                        float(d.unloading_charge_1)
-                        for d in page_dispatches
-                        if d.unloading_charge_1
-                    )
-                    page_unloading2 = sum(
-                        float(d.unloading_charge_2)
-                        for d in page_dispatches
-                        if d.unloading_charge_2
-                    )
-                    page_grand_total = (
-                        page_amount
-                        + page_loading
-                        + page_unloading1
-                        + page_unloading2
-                    )
-
-                    bills_data.append(
-                        {
-                            "bill_no": invoice.Bill_no,
-                            "page_no": page_counter,
-                            "mt": page_mt,
-                            "bill_amount": page_amount,
-                            "loading": page_loading,
-                            "unloading1": page_unloading1,
-                            "unloading2": page_unloading2,
-                            "grand_total": page_grand_total,
-                        }
-                    )
-
-                    total_mt += page_mt
-                    total_bill_amount += page_amount
-                    total_loading += page_loading
-                    total_unloading1 += page_unloading1
-                    total_unloading2 += page_unloading2
-                    total_grand_total += page_grand_total
-        else:
+        dispatches = invoice.dispatch_list.all()
+        
+        if dispatches.exists():
             bill_mt = sum(float(d.weight) for d in dispatches if d.weight)
             bill_amount = sum(float(d.totalfreight) for d in dispatches if d.totalfreight)
             bill_loading = sum(float(d.loading_charge) for d in dispatches if d.loading_charge)
             bill_unloading1 = sum(float(d.unloading_charge_1) for d in dispatches if d.unloading_charge_1)
             bill_unloading2 = sum(float(d.unloading_charge_2) for d in dispatches if d.unloading_charge_2)
-
+            
             bill_grand_total = bill_amount + bill_loading + bill_unloading1 + bill_unloading2
-
+            
             bills_data.append({
-                "bill_no": invoice.Bill_no,
-                "mt": bill_mt,
-                "bill_amount": bill_amount,
-                "loading": bill_loading,
-                "unloading1": bill_unloading1,
-                "unloading2": bill_unloading2,
-                "grand_total": bill_grand_total,
+                'bill_no': invoice.Bill_no,
+                'mt': bill_mt,
+                'bill_amount': bill_amount,
+                'loading': bill_loading,
+                'unloading1': bill_unloading1,
+                'unloading2': bill_unloading2,
+                'grand_total': bill_grand_total,
             })
-
+            
             total_mt += bill_mt
             total_bill_amount += bill_amount
             total_loading += bill_loading
@@ -2438,15 +2212,13 @@ def generate_summary_pdf(request):
     normal_bold = ParagraphStyle(name="NormalBold", fontName="Helvetica-Bold", fontSize=9, alignment=0, leading=11)
     right = ParagraphStyle(name="Right", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
     right_bold = ParagraphStyle(name="RightBold", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)
-    center_bold = ParagraphStyle(name="CenterBold", fontName="Helvetica-Bold", fontSize=11, alignment=1, leading=13)
+    center_bold = ParagraphStyle(name="CenterBold", fontName="Helvetica-Bold", fontSize=10, alignment=1, leading=12)
     cell_center = ParagraphStyle(name="CellCenter", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
     cell_right = ParagraphStyle(name="CellRight", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
     cell_header = ParagraphStyle(name="CellHeader", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)
-    left_normal = ParagraphStyle(name="LeftNormal", parent=normal, alignment=0)
 
     company_name = (company.company_name or "").upper()
     pan_no = (company_profile.pan_number if company_profile and company_profile.pan_number else "") if company_profile else ""
-    # Header should show our own company GSTIN (as before), not the customer's GST.
     gstin_no = (company.gst_number or "") if hasattr(company, "gst_number") else ""
 
     # ---- Header box ----
@@ -2460,8 +2232,6 @@ def generate_summary_pdf(request):
             header_lines.append(Paragraph(addr, small_center))
 
     pan_gst_line = "  ".join([p for p in [f"PAN NO.{pan_no}" if pan_no else "", f"GSTIN:{gstin_no}" if gstin_no else ""] if p])
-    has_sac = bool(getattr(contract, "sac_number", None))
-    sac_line = f"SAC-{contract.sac_number}" if has_sac else ""
 
     header_cell = [
         Paragraph(company_name, title_center),
@@ -2485,21 +2255,13 @@ def generate_summary_pdf(request):
         )
     )
     elements.append(header_table)
-    elements.append(Spacer(1, 4))
-
-    # Center SAC and INVOICE text in the middle area just below the header box.
-    if has_sac:
-        elements.append(Paragraph(sac_line, small_center))
-        elements.append(Paragraph("<b>INVOICE</b>", small_center))
-        elements.append(Spacer(1, 8))
-    else:
-        elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 8))
 
     # ---- To + Date row ----
     date_str = summary_date.strftime("%d-%m-%Y")
     to_lines = [
         Paragraph("To,", normal),
-        Paragraph("Sr. Manager [D&T.]", normal_bold),
+        Paragraph("The State Manager", normal_bold),
         Paragraph(f"{(contract.company_name or '').upper()}.", normal_bold),
     ]
     if contract.billing_address:
@@ -2511,15 +2273,9 @@ def generate_summary_pdf(request):
         to_lines.append(Paragraph(f"PIN: {contract.billing_pin}", normal))
     if contract.gst_number:
         to_lines.append(Paragraph(f"GST NO.{contract.gst_number}", normal))
-    right_header_lines = []
-    if page_wise_summary:
-        bill_no_list = [str(b.Bill_no) for b in invoices if getattr(b, "Bill_no", None)]
-        if bill_no_list:
-            right_header_lines.append(Paragraph(f"Bill No.: {', '.join(bill_no_list)}", right))
-    right_header_lines.append(Paragraph(f"Date: {date_str}", right))
 
     to_date_table = Table(
-        [[to_lines, right_header_lines]],
+        [[to_lines, [Paragraph(f"Date: {date_str}", right)]]],
         colWidths=[available_w * 0.7, available_w * 0.3],
     )
     to_date_table.setStyle(
@@ -2537,46 +2293,30 @@ def generate_summary_pdf(request):
     elements.append(to_date_table)
     elements.append(Spacer(1, 6))
 
-    # Intro text block before summary table: show only when enabled in contract settings
-    if getattr(contract, "show_summary_intro", False):
-        elements.append(Paragraph("Sub: Submission of our Transportation Bill Summary", center_bold))
-        elements.append(Spacer(1, 4))
-        elements.append(Paragraph("Dear Sir,", left_normal))
-        elements.append(Spacer(1, 3))
-        from_center_text = summary_from_centers_text
-        intro_line = (
-            "Please find enclosed herewith the following bills of transportation "
-            f"from {from_center_text} to various destinations of {summary_destinations_text}"
-        )
-        elements.append(Paragraph(intro_line, normal))
-        elements.append(Spacer(1, 8))
-
-    if show_bill_summary_title:
-        elements.append(Paragraph("Bill Summary", center_bold))
-        elements.append(Spacer(1, 6))
+    elements.append(Paragraph("Bill Summary", center_bold))
+    elements.append(Spacer(1, 6))
 
     # ---- FROM + Product row ----
-    if show_from_product_row:
-        from_text = contract.from_center or ""
-        product_text = product_name or ""
-        from_prod_table = Table(
-            [[Paragraph(f"<b>FROM:</b> {from_text}", normal), Paragraph(f"<b>Product :</b> {product_text}", right)]],
-            colWidths=[available_w * 0.5, available_w * 0.5],
+    from_text = contract.from_center or ""
+    product_text = product_name or ""
+    from_prod_table = Table(
+        [[Paragraph(f"<b>FROM:</b> {from_text}", normal), Paragraph(f"<b>Product :</b> {product_text}", right)]],
+        colWidths=[available_w * 0.5, available_w * 0.5],
+    )
+    from_prod_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
         )
-        from_prod_table.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ]
-            )
-        )
-        elements.append(from_prod_table)
-        elements.append(Spacer(1, 6))
+    )
+    elements.append(from_prod_table)
+    elements.append(Spacer(1, 6))
 
     # ---- Determine which columns to show (hide if all values are zero) ----
     show_loading = any(bill['loading'] > 0 for bill in bills_data)
@@ -2587,7 +2327,7 @@ def generate_summary_pdf(request):
     # Build header row dynamically
     table_header = [
         Paragraph("Sr.", cell_header),
-        Paragraph("Page No." if page_wise_summary else "Bill No.", cell_header),
+        Paragraph("Bill No.", cell_header),
         Paragraph("M.T", cell_header),
         Paragraph("Bill Amount Rs.", cell_header),
     ]
@@ -2605,10 +2345,9 @@ def generate_summary_pdf(request):
     
     # Build data rows dynamically
     for idx, bill in enumerate(bills_data, 1):
-        display_ref = bill.get("page_no") if page_wise_summary else bill["bill_no"]
         row = [
             Paragraph(str(idx), cell_center),
-            Paragraph(str(display_ref), cell_center),
+            Paragraph(str(bill["bill_no"]), cell_center),
             Paragraph(f"{bill['mt']:.3f}", cell_right),
             Paragraph(f"{bill['bill_amount']:.2f}", cell_right),
         ]
@@ -2694,22 +2433,19 @@ def generate_summary_pdf(request):
     elements.append(bill_table)
     elements.append(Spacer(1, 10))
 
-    # Display overall total weight prominently below the summary table when enabled.
-    if show_total_weight:
-        elements.append(
-            Paragraph(
-                f"Total Weight (M.T): {total_mt:.3f}",
-                normal_bold,
-            )
+    # Display overall total weight prominently below the summary table
+    elements.append(
+        Paragraph(
+            f"Total Weight (M.T): {total_mt:.3f}",
+            normal_bold,
         )
-        elements.append(Spacer(1, 8))
+    )
+    elements.append(Spacer(1, 8))
 
     # ---- Footer note + Signature ----
     client_company_name = contract.company_name or "the Company"
-    summary_footer_note = (contract.summary_footer_note or "").strip()
-    if not summary_footer_note:
-        summary_footer_note = f"Remark : GST shall be Payable by {client_company_name} under Reverse Charge Mechanism"
-    elements.append(Paragraph(summary_footer_note, normal))
+    elements.append(Paragraph(f"*GST Shall be paid by {client_company_name} under", normal))
+    elements.append(Paragraph("RCM", normal))
     elements.append(Spacer(1, 14))
 
     sig_table = Table(

@@ -918,10 +918,18 @@ def dispatch_view(request):
 
     # Get financial year from session, default to current if not set
     financial_year = request.session.get('financial_year', get_current_financial_year())
-    
-    # Base Query - filter by company and financial year
-    dispatch_qs = Dispatch.objects.filter(company_id=company['company_id'])
-    dispatch_qs = filter_by_financial_year(dispatch_qs, financial_year, 'dep_date')
+    fy_start_date, fy_end_date = get_financial_year_start_end(financial_year)
+
+    # Base Query:
+    # - Always include selected FY dispatches
+    # - Also include previous FY dispatches that are still unbilled, so they
+    #   carry forward into the next year's dispatch register until billed.
+    dispatch_qs = Dispatch.objects.filter(
+        company_id=company['company_id']
+    ).filter(
+        Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
+        | Q(dep_date__lt=fy_start_date, inv_status=False)
+    )
 
     # ✅ Search by Challan No
     if s_challan_no:
