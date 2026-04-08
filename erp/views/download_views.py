@@ -89,8 +89,9 @@ def generate_invoice_pdf(request):
         # Keep same contract list behavior as create_dispatch_Invoice:
         # active FY contracts + contracts with pending (uninvoiced) dispatches.
         pending_contract_ids = Dispatch.objects.filter(
-            company_id=company_id,
-            invoices__isnull=True,
+            company_id=company_id
+        ).filter(
+            Q(invoices__isnull=True) | Q(inv_status=False)
         ).values_list("contract_id", flat=True)
 
         allcontract = T_Contract.objects.filter(

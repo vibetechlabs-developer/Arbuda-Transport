@@ -928,7 +928,10 @@ def dispatch_view(request):
         company_id=company['company_id']
     ).filter(
         Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
-        | Q(dep_date__lt=fy_start_date, invoices__isnull=True)
+        | (
+            Q(dep_date__lt=fy_start_date)
+            & (Q(invoices__isnull=True) | Q(inv_status=False))
+        )
     ).distinct()
 
     # ✅ Search by Challan No
@@ -1084,8 +1087,9 @@ def create_dispatch_Invoice(request):
         # Also keep contracts visible when they still have pending (uninvoiced)
         # dispatches from earlier years, so carry-forward invoicing can continue.
         pending_contract_ids = Dispatch.objects.filter(
-            company_id=company_id,
-            invoices__isnull=True,
+            company_id=company_id
+        ).filter(
+            Q(invoices__isnull=True) | Q(inv_status=False)
         ).values_list("contract_id", flat=True)
 
         allcontract = T_Contract.objects.filter(

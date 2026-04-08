@@ -259,10 +259,12 @@ def get_dispacth(request):
             dispatch = Dispatch.objects.filter(
                 contract_id=dcontract_id,
                 company_id=request.session['company_info']['company_id'],
-                invoices__isnull=True,
             ).filter(
                 Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
-                | Q(dep_date__lt=fy_start_date)
+                | (
+                    Q(dep_date__lt=fy_start_date)
+                    & (Q(invoices__isnull=True) | Q(inv_status=False))
+                )
             ).distinct()
 
             # Filter by district if provided
@@ -327,10 +329,12 @@ def get_ninv_dispacth(request):                  # ninv means not in invoice dis
         dispatch = Dispatch.objects.filter(
             contract_id=invoice.contract_id.id,
             company_id=request.session['company_info']['company_id'],
-            invoices__isnull=True,
         ).filter(
             Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
-            | Q(dep_date__lt=fy_start_date)
+            | (
+                Q(dep_date__lt=fy_start_date)
+                & (Q(invoices__isnull=True) | Q(inv_status=False))
+            )
         ).distinct()
 
         # Latest date first, challan_no ascending within date when showing non-invoiced dispatch list
