@@ -22,7 +22,7 @@ from transport.models import (
 import re
 from decimal import Decimal
 from datetime import datetime
-from django.db.models import Func, F, IntegerField, Q, Exists, OuterRef
+from django.db.models import Func, F, IntegerField, Q
 
 ## CONTRACT DETAILS FETCHING ##
 
@@ -256,21 +256,16 @@ def get_dispacth(request):
     try:
         contract = T_Contract.objects.get(id=dcontract_id)
         try:
-            invoice_exists = Invoice.objects.filter(
-                dispatch_list=OuterRef("pk"),
-                company_id=request.session["company_info"]["company_id"],
-            )
             dispatch = (
                 Dispatch.objects.filter(
                     contract_id=dcontract_id,
                     company_id=request.session['company_info']['company_id'],
                 )
-                .annotate(has_invoice=Exists(invoice_exists))
                 .filter(
                     Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
                     | (
                         Q(dep_date__lt=fy_start_date)
-                        & (Q(has_invoice=False) | Q(inv_status=False))
+                        & Q(inv_status=False)
                     )
                 )
                 .distinct()
@@ -335,21 +330,16 @@ def get_ninv_dispacth(request):                  # ninv means not in invoice dis
     try:
         invoice = Invoice.objects.get(id=dbill_id , company_id = request.session['company_info']['company_id'])
         contract = T_Contract.objects.get(id=invoice.contract_id.id)
-        invoice_exists = Invoice.objects.filter(
-            dispatch_list=OuterRef("pk"),
-            company_id=request.session["company_info"]["company_id"],
-        )
         dispatch = (
             Dispatch.objects.filter(
                 contract_id=invoice.contract_id.id,
                 company_id=request.session['company_info']['company_id'],
             )
-            .annotate(has_invoice=Exists(invoice_exists))
             .filter(
                 Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
                 | (
                     Q(dep_date__lt=fy_start_date)
-                    & (Q(has_invoice=False) | Q(inv_status=False))
+                    & Q(inv_status=False)
                 )
             )
             .distinct()
