@@ -4,7 +4,6 @@ from django.core.cache import cache
 from company.models import Company_user , Company_profile
 from transport.models import Rate , T_Contract ,Dispatch ,Destination ,Rate_taluka , Rate_District ,Rate_IncomeTax , Rate_Cumulative , Invoice , GC_Note
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
 from django.db import transaction, IntegrityError
 from erp.utils.decorators import session_required
 from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year, get_financial_year_start_end
@@ -560,12 +559,6 @@ def new_contract_view_2(request):
 @session_required
 def dispatch_form(request):
     alldata = {"errors": {}}
-    def to_decimal(value):
-        try:
-            return Decimal(str(value or 0))
-        except (InvalidOperation, TypeError, ValueError):
-            return Decimal("0")
-
     try:
         company_id = request.session['company_info']['company_id']
         financial_year = request.session.get('financial_year', get_current_financial_year())
@@ -651,18 +644,6 @@ def dispatch_form(request):
             i_loading_charge = request.POST.get("loading_charge") or 0
         else:
             i_loading_charge = 0
-
-        # Server-side source of truth for freight and grand total.
-        weight_value = to_decimal(request.POST.get("weight"))
-        rate_value = to_decimal(request.POST.get("rate"))
-        km_decimal = to_decimal(km_value)
-        totalfreight_value = weight_value * rate_value * km_decimal
-        grand_total_value = (
-            totalfreight_value
-            + to_decimal(i_unloading_charge_1)
-            + to_decimal(i_unloading_charge_2)
-            + to_decimal(i_loading_charge)
-        )
         
         dispatch = Dispatch.objects.create(
             company_id = Company_user.objects.get(id=request.session['company_info']['company_id']),
@@ -676,13 +657,13 @@ def dispatch_form(request):
             destination=save_destination,
             taluka=request.POST.get("taluka"),
             district=request.POST.get("district"),
-            weight=weight_value,
-            rate=rate_value,
-            totalfreight=totalfreight_value,
+            weight=request.POST.get("weight") or 0,
+            rate=request.POST.get("rate") or 0,
+            totalfreight=request.POST.get("totalfreight") or 0,
             unloading_charge_1=i_unloading_charge_1,
             unloading_charge_2=i_unloading_charge_2,
             loading_charge=i_loading_charge,
-            grand_total=grand_total_value,
+            grand_total=request.POST.get("grand_total") or 0,
             truck_booking_rate=request.POST.get("truck_booking_rate") or 0,
             total_paid_truck_onwer=request.POST.get("total_paid_truck_onwer") or 0,
             advance_paid=request.POST.get("advance_paid") or 0,
@@ -777,12 +758,6 @@ def dispatch_update(request):
     alldata['current_destination_id'] = current_destination_id
 
     if request.method == "POST":
-        def to_decimal(value):
-            try:
-                return Decimal(str(value or 0))
-            except (InvalidOperation, TypeError, ValueError):
-                return Decimal("0")
-
         # Check again if dispatch is in any invoice before processing POST
         dispatch.refresh_from_db()
         if dispatch.inv_status:
@@ -813,8 +788,9 @@ def dispatch_update(request):
                 dispatch.taluka = request.POST.get("taluka")
                 dispatch.district = request.POST.get("district")
                 dispatch.km = request.POST.get("km") or 0
-                dispatch.weight = to_decimal(request.POST.get("weight"))
-                dispatch.rate = to_decimal(request.POST.get("rate"))
+                dispatch.weight = request.POST.get("weight") or 0
+                dispatch.rate = request.POST.get("rate") or 0
+                dispatch.totalfreight = request.POST.get("totalfreight") or 0
                 # Handle conditional charges based on radio button selections
                 if request.POST.get("unloading_rate_1") == 'yes':
                     dispatch.unloading_charge_1 = request.POST.get("unloading_charge_1") or 0
@@ -828,13 +804,7 @@ def dispatch_update(request):
                     dispatch.loading_charge = request.POST.get("loading_charge") or 0
                 else:
                     dispatch.loading_charge = 0
-                dispatch.totalfreight = dispatch.weight * dispatch.rate * to_decimal(dispatch.km)
-                dispatch.grand_total = (
-                    dispatch.totalfreight
-                    + to_decimal(dispatch.unloading_charge_1)
-                    + to_decimal(dispatch.unloading_charge_2)
-                    + to_decimal(dispatch.loading_charge)
-                )
+                dispatch.grand_total = request.POST.get("grand_total") or 0
                 dispatch.truck_booking_rate = request.POST.get("truck_booking_rate") or 0
                 dispatch.total_paid_truck_onwer = request.POST.get("total_paid_truck_onwer") or 0
                 dispatch.advance_paid = request.POST.get("advance_paid") or 0
@@ -884,8 +854,9 @@ def dispatch_update(request):
             dispatch.km = request.POST.get("km") or 0
             dispatch.main_party = request.POST.get("main_party") or None
             dispatch.sub_party = request.POST.get("sub_party") or None
-            dispatch.weight = to_decimal(request.POST.get("weight"))
-            dispatch.rate = to_decimal(request.POST.get("rate"))
+            dispatch.weight = request.POST.get("weight") or 0
+            dispatch.rate = request.POST.get("rate") or 0
+            dispatch.totalfreight = request.POST.get("totalfreight") or 0
             # Respect loading / unloading radio flags on update as well
             if request.POST.get("unloading_rate_1") == "yes":
                 dispatch.unloading_charge_1 = request.POST.get("unloading_charge_1") or 0
@@ -901,13 +872,7 @@ def dispatch_update(request):
                 dispatch.loading_charge = request.POST.get("loading_charge") or 0
             else:
                 dispatch.loading_charge = 0
-            dispatch.totalfreight = dispatch.weight * dispatch.rate * to_decimal(dispatch.km)
-            dispatch.grand_total = (
-                dispatch.totalfreight
-                + to_decimal(dispatch.unloading_charge_1)
-                + to_decimal(dispatch.unloading_charge_2)
-                + to_decimal(dispatch.loading_charge)
-            )
+            dispatch.grand_total = request.POST.get("grand_total") or 0
             dispatch.truck_booking_rate = request.POST.get("truck_booking_rate") or 0
             dispatch.total_paid_truck_onwer = request.POST.get("total_paid_truck_onwer") or 0
             dispatch.advance_paid = request.POST.get("advance_paid") or 0
