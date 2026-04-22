@@ -1088,12 +1088,12 @@
         if (data.rate_type == "Incometax-Wise") {
           document.getElementById("km").removeAttribute("oninput", true)
           console.log("removed");
-          document.getElementById("km").setAttribute("oninput", "fecthANDcalcualteincomerate()")
+          document.getElementById("km").setAttribute("oninput", "fecthANDcalcualteincomerate(); calculate_rent();")
         }
         if (data.rate_type == "Cumulative-Wise") {
           document.getElementById("km").removeAttribute("oninput", true)
           console.log("removed");
-          document.getElementById("km").setAttribute("oninput", "fecthCumRate()")
+          document.getElementById("km").setAttribute("oninput", "fecthCumRate(); calculate_rent();")
         }
       })
       .catch(err => {
@@ -1146,21 +1146,20 @@
   }
 
   function fecthrate(km) {
+    if (!String(km || '').trim()) {
+      return;
+    }
     let contract_no = document.getElementById("contract_id").value
     fetch(`/api/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
-        if (data.rate && data.rate_calculation && data.how_calculation) {
+        if (data.rate !== undefined && data.rate !== null && data.rate_calculation && data.how_calculation) {
 
           document.getElementById('rate').value = data.rate;
           document.getElementById('rate').setAttribute('readonly', true);
           document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
           document.getElementById('i_rate_calculation').value = data.rate_calculation;
-        } else {
-          document.getElementById('rate').removeAttribute('readonly', true);
-          document.getElementById('rate').value = '';
-          document.getElementById('rate_calculation').innerHTML = ``;
-          document.getElementById('i_rate_calculation').value = "";
+          calculate_rent();
         }
 
       })
@@ -1173,20 +1172,17 @@
   function fecthCumRate() {
     let contract_no = document.getElementById("contract_id").value
     let km = document.getElementById("km").value
+    if (!String(km || '').trim()) {
+      return;
+    }
     fetch(`/api/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
-        if (data.amount) {
+        if (data.amount !== undefined && data.amount !== null) {
           document.getElementById('rate').value = data.amount;
           document.getElementById('rate').setAttribute('readonly', true);
           document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
-
-
-        } else {
-          document.getElementById('rate').removeAttribute('readonly', true);
-          document.getElementById('rate').value = '';
-          document.getElementById('i_rate_calculation').value = "";
-
+          calculate_rent();
         }
 
       })
@@ -1200,18 +1196,19 @@
     let contract_no = document.getElementById("contract_id").value
     let ton = document.getElementById("weight").value
     let km = document.getElementById("km").value
+    if (!String(km || '').trim()) {
+      return;
+    }
     fetch(`/api/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
       .then(response => response.json())
       .then(data => {
-        if (data.amount) {
+        if (data.amount !== undefined && data.amount !== null) {
           document.getElementById('rate').value = data.amount;
           document.getElementById('rate').setAttribute('readonly', true);
           let income_slab = document.getElementById('income-slab')
           income_slab.classList.remove('d-none')
           document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
-        } else {
-          document.getElementById('rate').removeAttribute('readonly', true);
-          document.getElementById('rate').value = '';
+          calculate_rent();
         }
         if (data.slab) {
           const tbody = document.getElementById("rate-table");
@@ -1263,11 +1260,7 @@
             document.getElementById('rate').setAttribute('readonly', true);
             document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
-          } else {
-            document.getElementById('rate').removeAttribute('readonly', true);
-            document.getElementById('rate').value = '';
-            document.getElementById('rate_calculation').innerHTML = ``;
-            document.getElementById('i_rate_calculation').value = "";
+            calculate_rent();
           }
 
         })
@@ -1291,11 +1284,7 @@
             document.getElementById('rate').setAttribute('readonly', true);
             document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
-          } else {
-            document.getElementById('rate').removeAttribute('readonly', true);
-            document.getElementById('rate').value = '';
-            document.getElementById('rate_calculation').innerHTML = ``;
-            document.getElementById('i_rate_calculation').value = "";
+            calculate_rent();
           }
 
         })
