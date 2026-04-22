@@ -132,7 +132,7 @@
                 <label for="km" class="form-label">KM</label>
                 <input type="text" class="form-control {% if errors.km %}is-invalid{% endif %}" id="km" name="km" placeholder="Enter km" autofocus
                   value="{% if form_data.km %}{{ form_data.km }}{% endif %}"
-                  oninput="this.classList.remove('invalid'); this.classList.remove('is-invalid'); fecthrate(this.value); calculate_rent();" required />
+                  oninput=" this.classList.remove('invalid'); this.classList.remove('is-invalid'); fecthrate(this.value)" required />
                 {% if errors.km %}
                 <div class="invalid-feedback d-block">{{ errors.km }}</div>
                 {% endif %}
@@ -182,7 +182,7 @@
                   </div>
                 </div>
                 <input type="number" class="form-control" id="rate" name="rate" placeholder="Enter rupees per ton"
-                  autofocus oninput="this.classList.remove('invalid'); calculate_rent();" />
+                  autofocus oninput=" this.classList.remove('invalid')" />
               </div>
 
             </div>
@@ -1347,6 +1347,7 @@
   function calculate_rent() {
     let weight = parseFloat(document.getElementById('weight').value) || 0
     let rate = parseFloat(document.getElementById('rate').value) || 0
+    let rate_calculation = document.getElementById('i_rate_calculation').innerHTML
     let totalfreight = document.getElementById('totalfreight')
     let km = parseFloat(document.getElementById('km').value) || 0
     let unloading_charge_1 = parseFloat(document.getElementById("i_unloading_charge_1").value) || 0
@@ -1357,7 +1358,12 @@
     let load_amount = document.getElementById("loading_charge")
     let grand_total = document.getElementById('grand_total')
 
-    let freightAmount = weight * rate * km;
+    let freightAmount;
+    if (rate_calculation == "MT/KM") {
+      freightAmount = weight * rate * km;
+    } else {
+      freightAmount = weight * rate;
+    }
     totalfreight.value = toExactAmount(freightAmount);
     totalfreight.setAttribute("readonly", true)
     unload_amount_1.value = (unloading_charge_1 * weight).toFixed(2);
