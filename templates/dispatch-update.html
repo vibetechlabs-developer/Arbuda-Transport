@@ -128,7 +128,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="km" class="form-label">KM</label>
                 <input type="text" class="form-control" id="km" name="km" placeholder="Enter km"
-                  oninput=" this.classList.remove('invalid') , fecthrate(this.value)" value="{{ dispatch.km }}" required />
+                  oninput="this.classList.remove('invalid'); fecthrate(this.value); calculate_rent();" value="{{ dispatch.km }}" required />
               </div>
             </div>
 
@@ -175,7 +175,7 @@
                   </div>
                 </div>
                 <input type="number" class="form-control" id="rate" name="rate" placeholder="Enter rupees per ton"
-                  oninput=" this.classList.remove('invalid')" step="any" value="{{ dispatch.rate }}" />
+                  oninput="this.classList.remove('invalid'); calculate_rent();" step="any" value="{{ dispatch.rate }}" />
               </div>
 
             </div>
@@ -191,7 +191,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="taluka" class="form-label">Freigth Amount</label>
                 <input type="number" class="form-control" id="totalfreight" name="totalfreight"
-                  placeholder="Enter Freight Amount" step="any" value="{{ dispatch.totalfreight }}" />
+                  placeholder="Enter Freight Amount" step="any" oninput="add_extra_cost();" value="{{ dispatch.totalfreight }}" />
               </div>
 
               <div class="mb-3 col-sm-6">
@@ -481,6 +481,7 @@
           document.getElementById('rate').setAttribute('readonly', true);
           document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
           document.getElementById('i_rate_calculation').value = data.rate_calculation;
+          calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
@@ -503,6 +504,7 @@
           document.getElementById('rate').value = data.amount;
           document.getElementById('rate').setAttribute('readonly', true);
           document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
@@ -527,6 +529,7 @@
           let income_slab = document.getElementById('income-slab')
           income_slab.classList.remove('d-none')
           document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
@@ -573,6 +576,7 @@
             document.getElementById('rate').setAttribute('readonly', true);
             document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
+            calculate_rent();
           } else {
             document.getElementById('rate').removeAttribute('readonly', true);
             document.getElementById('rate').value = '';
@@ -599,6 +603,7 @@
             document.getElementById('rate').setAttribute('readonly', true);
             document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
+            calculate_rent();
           } else {
             document.getElementById('rate').removeAttribute('readonly', true);
             document.getElementById('rate').value = '';
@@ -612,28 +617,40 @@
     }
   }
 
+  function toExactAmount(val) {
+    const n = parseFloat(val);
+    if (isNaN(n) || !isFinite(n)) return '0';
+    const clean = Math.round(n * 1e6) / 1e6;
+    const s = clean.toString();
+    return s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+  }
+
+  function getRateCalculationType() {
+    const calcEl = document.getElementById('i_rate_calculation');
+    if (calcEl && calcEl.textContent) {
+      return calcEl.textContent.trim().toUpperCase();
+    }
+    const wrapperText = (document.getElementById('rate_calculation')?.textContent || '').toUpperCase();
+    if (wrapperText.includes('MT/KM')) {
+      return 'MT/KM';
+    }
+    return '';
+  }
+
   function calculate_rent() {
-    let weight = document.getElementById('weight').value
-    let rate = document.getElementById('rate').value
-    let rate_calculation = document.getElementById('i_rate_calculation') ? document.getElementById('i_rate_calculation').innerHTML : ''
+    let weight = parseFloat(document.getElementById('weight').value) || 0
+    let rate = parseFloat(document.getElementById('rate').value) || 0
     let totalfreight = document.getElementById('totalfreight')
-    let km = document.getElementById('km').value
-    let unloading_charge_1 = document.getElementById("i_unloading_charge_1").value
-    let unloading_charge_2 = document.getElementById("i_unloading_charge_2").value
-    let loading_charge = document.getElementById("i_loading_charge").value
+    let km = parseFloat(document.getElementById('km').value) || 0
+    let unloading_charge_1 = parseFloat(document.getElementById("i_unloading_charge_1").value) || 0
+    let unloading_charge_2 = parseFloat(document.getElementById("i_unloading_charge_2").value) || 0
+    let loading_charge = parseFloat(document.getElementById("i_loading_charge").value) || 0
     let unload_amount_1 = document.getElementById("unloading_charge_1")
     let unload_amount_2 = document.getElementById("unloading_charge_2")
     let load_amount = document.getElementById("loading_charge")
-    let grand_total = document.getElementById('grand_total')
-
-    if (rate_calculation == "MT/KM") {
-      totalfreight.value = (weight * rate * km).toFixed(2);
-      totalfreight.setAttribute("readonly", true)
-    }
-    else {
-      totalfreight.value = (weight * rate).toFixed(2);
-      totalfreight.setAttribute("readonly", true)
-    }
+    let freightAmount = weight * rate * km;
+    totalfreight.value = toExactAmount(freightAmount);
+    totalfreight.setAttribute("readonly", true)
     
     if (document.getElementById("unloadingYes_1").checked) {
       unload_amount_1.value = (unloading_charge_1 * weight).toFixed(2);
