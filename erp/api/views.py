@@ -1426,6 +1426,7 @@ def get_contract_bills(request):
             'pan_number': contract.pan_number or "",
             'sac_number': contract.sac_number or "",
             'default_page_wise_summary': bool(contract.default_page_wise_summary),
+            'show_summary_intro': bool(contract.show_summary_intro),
             'summary_footer_note': contract.summary_footer_note or "",
             'loading_charge': float(contract.loading_charge) if contract.loading_charge else 0,
             'unloading_charge_1': float(contract.unloading_charge_1) if contract.unloading_charge_1 else 0,
