@@ -14,6 +14,7 @@ from reportlab.lib.units import mm
 from operator import attrgetter
 import math
 import re
+from xml.sax.saxutils import escape
 from itertools import groupby
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
@@ -498,13 +499,8 @@ def generate_invoice_pdf(request):
     def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=1):
         def _sanitize_cell_text(val: object) -> str:
             """
-            ReportLab Tables in this file use *fixed row heights* to guarantee a stable
-            "N rows per page" layout. If any cell contains explicit line breaks
-            (e.g. user data with '\\n' or '<br>'), ReportLab will render multiple lines
-            inside the fixed-height row and the extra line visually "overwrites" the
-            next row (what users report as 'override/breaking').
-            This helper forces single-line cell text by removing hard line breaks and
-            collapsing whitespace.
+            Force single-line text and dynamically reduce font size for long strings
+            to prevent cell contents from overflowing fixed tight columns.
             """
             if val in (None, "None", "null", "NULL"):
                 return ""
@@ -515,6 +511,19 @@ def generate_invoice_pdf(request):
             s = s.replace("\r", " ").replace("\n", " ")
             # Collapse runs of whitespace
             s = re.sub(r"\s{2,}", " ", s).strip()
+            
+            # Escape HTML characters to prevent ReportLab XML parsing errors
+            s = escape(s)
+            
+            # Dynamic font resizing for long words to prevent horizontal overlap
+            words = s.split()
+            max_word_len = max((len(w) for w in words), default=0)
+            if max_word_len > 9:
+                # Shrink font size linearly based on the longest word
+                new_size = max(4.5, 8.0 - (max_word_len - 9) * 0.45)
+                # Apply font tag with calculated size
+                return f"<font size='{new_size}' leading='{new_size + 1}'>{s}</font>"
+            
             return s
 
         # Use exactly the fields selected on the contract for the invoice.
@@ -602,22 +611,22 @@ def generate_invoice_pdf(request):
             parent=center_style_desc,
             fontSize=compact_fs or center_style_desc.fontSize,
             leading=compact_leading or center_style_desc.leading,
+            wordWrap="CJK",
         )
         to_style_desc_local = ParagraphStyle(
             name="ToDescLocal",
             parent=to_style_desc,
             fontSize=compact_fs or to_style_desc.fontSize,
             leading=compact_leading or to_style_desc.leading,
-            # Prevent mid-word breaks like "AHMEDABA" + "D" in tight columns
-            splitLongWords=0,
-            wordWrap="NOBREAK",  # keep cell text on a single line
+            splitLongWords=1,
+            wordWrap="CJK",  # ALLOW WRAPPING
         )
         district_style_local = ParagraphStyle(
             name="DistrictCell",
             parent=to_style_desc_local,
             alignment=1,  # center short district names
-            splitLongWords=0,
-            wordWrap="NOBREAK",  # keep long district names on a single line
+            splitLongWords=1,
+            wordWrap="CJK",  # ALLOW WRAPPING
         )
         # Uniform header style for all column names – same sizing as download PDF.
         header_style_uniform = ParagraphStyle(
@@ -626,14 +635,16 @@ def generate_invoice_pdf(request):
             fontSize=8.5,
             leading=10,
             alignment=1,  # Center all headers
-            splitLongWords=0,
+            splitLongWords=1,
+            wordWrap="CJK",
         )
         to_right_style_desc_local = ParagraphStyle(
             name="ToRightDescLocal",
             parent=to_right_style_desc,
             fontSize=compact_fs or to_right_style_desc.fontSize,
             leading=compact_leading or to_right_style_desc.leading,
-            splitLongWords=0,  # don't split long numbers
+            splitLongWords=1,
+            wordWrap="CJK",
         )
         # Uniform header style - same size for all column names
         to_right_style_desc_heading_local = ParagraphStyle(
@@ -1424,28 +1435,30 @@ def download_generate_invoice_pdf(request):
             parent=center_style_desc,
             fontSize=compact_fs or center_style_desc.fontSize,
             leading=compact_leading or center_style_desc.leading,
+            wordWrap="CJK",
         )
         to_style_desc_local = ParagraphStyle(
             name="ToDescLocalDl",
             parent=to_style_desc,
             fontSize=compact_fs or to_style_desc.fontSize,
             leading=compact_leading or to_style_desc.leading,
-            splitLongWords=0,
-            wordWrap="NOBREAK",  # keep cell text on a single line
+            splitLongWords=1,
+            wordWrap="CJK",  # ALLOW WRAPPING
         )
         district_style_local = ParagraphStyle(
             name="DistrictCellDl",
             parent=to_style_desc_local,
             alignment=1,
-            splitLongWords=0,
-            wordWrap="NOBREAK",  # keep long district names on a single line
+            splitLongWords=1,
+            wordWrap="CJK",  # ALLOW WRAPPING
         )
         to_right_style_desc_local = ParagraphStyle(
             name="ToRightDescLocalDl",
             parent=to_right_style_desc,
             fontSize=compact_fs or to_right_style_desc.fontSize,
             leading=compact_leading or to_right_style_desc.leading,
-            splitLongWords=0,  # don't split long numbers
+            splitLongWords=1,
+            wordWrap="CJK",
         )
         # Uniform header style for all column names.
         header_style_uniform = ParagraphStyle(
@@ -1454,7 +1467,8 @@ def download_generate_invoice_pdf(request):
             fontSize=8.5,
             leading=10,
             alignment=1,  # Center all headers
-            splitLongWords=0,
+            splitLongWords=1,
+            wordWrap="CJK",
         )
         to_right_style_desc_heading_local = ParagraphStyle(
             name="ToRightDescHeadingLocalDl",
@@ -1480,8 +1494,8 @@ def download_generate_invoice_pdf(request):
 
         def _sanitize_cell_text(val: object) -> str:
             """
-            Force single-line text to prevent cell contents from overflowing fixed row heights.
-            This avoids the visual 'override/breaking' when values contain '\\n' or '<br>'.
+            Force single-line text and dynamically reduce font size for long strings
+            to prevent cell contents from overflowing fixed tight columns.
             """
             if val in (None, "None", "null", "NULL"):
                 return ""
@@ -1489,6 +1503,19 @@ def download_generate_invoice_pdf(request):
             s = re.sub(r"(?i)<\s*br\s*/?\s*>", " ", s)
             s = s.replace("\r", " ").replace("\n", " ")
             s = re.sub(r"\s{2,}", " ", s).strip()
+            
+            # Escape HTML characters to prevent ReportLab XML parsing errors
+            s = escape(s)
+            
+            # Dynamic font resizing for long words to prevent horizontal overlap
+            words = s.split()
+            max_word_len = max((len(w) for w in words), default=0)
+            if max_word_len > 9:
+                # Shrink font size linearly based on the longest word
+                new_size = max(4.5, 8.0 - (max_word_len - 9) * 0.45)
+                # Apply font tag with calculated size
+                return f"<font size='{new_size}' leading='{new_size + 1}'>{s}</font>"
+                
             return s
 
         # Initialize page totals
@@ -2152,6 +2179,12 @@ def generate_summary_pdf(request):
             summary_date = datetime.now().date()
     else:
         summary_date = datetime.now().date()
+
+    # User toggles from summary screen
+    show_bill_summary_title = request.POST.get("show_bill_summary_title") in ['on', 'true', 'True', '1']
+    show_from_product_row = request.POST.get("show_from_product_row") in ['on', 'true', 'True', '1']
+    show_total_weight = request.POST.get("show_total_weight") in ['on', 'true', 'True', '1']
+    page_wise_summary = request.POST.get("page_wise_summary") in ['on', 'true', 'True', '1']
     
     # Collect bill data with totals
     bills_data = []
@@ -2301,30 +2334,46 @@ def generate_summary_pdf(request):
     elements.append(to_date_table)
     elements.append(Spacer(1, 6))
 
-    elements.append(Paragraph("Bill Summary", center_bold))
-    elements.append(Spacer(1, 6))
+    # Contract setting from master: show letter intro in summary
+    if getattr(contract, "show_summary_intro", False):
+        elements.append(Paragraph("Dear Sir,", normal_bold))
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph("<b>Sub:</b> Bill-wise summary.", normal))
+        elements.append(Spacer(1, 4))
+        elements.append(
+            Paragraph(
+                "With reference to the above subject, please find below the details of bills for your records.",
+                normal,
+            )
+        )
+        elements.append(Spacer(1, 8))
+
+    if show_bill_summary_title:
+        elements.append(Paragraph("Bill Summary", center_bold))
+        elements.append(Spacer(1, 6))
 
     # ---- FROM + Product row ----
-    from_text = contract.from_center or ""
-    product_text = product_name or ""
-    from_prod_table = Table(
-        [[Paragraph(f"<b>FROM:</b> {from_text}", normal), Paragraph(f"<b>Product :</b> {product_text}", right)]],
-        colWidths=[available_w * 0.5, available_w * 0.5],
-    )
-    from_prod_table.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ]
+    if show_from_product_row:
+        from_text = contract.from_center or ""
+        product_text = product_name or ""
+        from_prod_table = Table(
+            [[Paragraph(f"<b>FROM:</b> {from_text}", normal), Paragraph(f"<b>Product :</b> {product_text}", right)]],
+            colWidths=[available_w * 0.5, available_w * 0.5],
         )
-    )
-    elements.append(from_prod_table)
-    elements.append(Spacer(1, 6))
+        from_prod_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+        elements.append(from_prod_table)
+        elements.append(Spacer(1, 6))
 
     # ---- Determine which columns to show (hide if all values are zero) ----
     show_loading = any(bill['loading'] > 0 for bill in bills_data)
@@ -2333,9 +2382,10 @@ def generate_summary_pdf(request):
 
     # ---- Bills table (dynamically show/hide loading and unloading columns) ----
     # Build header row dynamically
+    bill_or_page_label = "Page No." if page_wise_summary else "Bill No."
     table_header = [
         Paragraph("Sr.", cell_header),
-        Paragraph("Bill No.", cell_header),
+        Paragraph(bill_or_page_label, cell_header),
         Paragraph("M.T", cell_header),
         Paragraph("Bill Amount Rs.", cell_header),
     ]
@@ -2353,9 +2403,10 @@ def generate_summary_pdf(request):
     
     # Build data rows dynamically
     for idx, bill in enumerate(bills_data, 1):
+        second_col = str(idx) if page_wise_summary else str(bill["bill_no"])
         row = [
             Paragraph(str(idx), cell_center),
-            Paragraph(str(bill["bill_no"]), cell_center),
+            Paragraph(second_col, cell_center),
             Paragraph(f"{bill['mt']:.3f}", cell_right),
             Paragraph(f"{bill['bill_amount']:.2f}", cell_right),
         ]
@@ -2441,20 +2492,30 @@ def generate_summary_pdf(request):
     elements.append(bill_table)
     elements.append(Spacer(1, 10))
 
-    # Display overall total weight prominently below the summary table
-    elements.append(
-        Paragraph(
-            f"Total Weight (M.T): {total_mt:.3f}",
-            normal_bold,
+    if show_total_weight:
+        elements.append(
+            Paragraph(
+                f"Total Weight (M.T): {total_mt:.3f}",
+                normal_bold,
+            )
         )
-    )
-    elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 8))
 
     # ---- Footer note + Signature ----
     client_company_name = contract.company_name or "the Company"
-    elements.append(Paragraph(f"*GST Shall be paid by {client_company_name} under", normal))
-    elements.append(Paragraph("RCM", normal))
-    elements.append(Spacer(1, 14))
+    footer_note = (getattr(contract, "summary_footer_note", None) or "").strip()
+    if footer_note:
+        for line in footer_note.replace("\r\n", "\n").split("\n"):
+            line = line.strip()
+            if line:
+                elements.append(Paragraph(escape(line), normal))
+            else:
+                elements.append(Spacer(1, 4))
+        elements.append(Spacer(1, 12))
+    else:
+        elements.append(Paragraph(f"*GST Shall be paid by {client_company_name} under", normal))
+        elements.append(Paragraph("RCM", normal))
+        elements.append(Spacer(1, 14))
 
     sig_table = Table(
         [
