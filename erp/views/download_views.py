@@ -1172,8 +1172,14 @@ def download_generate_invoice_pdf(request):
 
         # Fetch contract and dispatch data
         try:
+            if not contract_id or not i_bill_no:
+                raise ValueError("Missing contract or invoice selection.")
             contract = T_Contract.objects.get(id=contract_id)
-            company_profile = Company_profile.objects.get(company_id_id=request.session['company_info']['company_id'])
+            try:
+                company_profile = Company_profile.objects.get(company_id_id=request.session['company_info']['company_id'])
+            except Company_profile.DoesNotExist:
+                messages.error(request, "Company profile not found!")
+                return redirect("view-dispatch-invoice")
             company = Company_user.objects.get(id=request.session['company_info']['company_id'])
             invoice = Invoice.objects.get(id=i_bill_no, company_id = request.session['company_info']['company_id'] , contract_id = contract.id)
         except T_Contract.DoesNotExist:
@@ -1184,6 +1190,9 @@ def download_generate_invoice_pdf(request):
             return redirect("view-dispatch-invoice")
         except Invoice.DoesNotExist:
             messages.error(request, "Invoice not found!")
+            return redirect("view-dispatch-invoice")
+        except ValueError:
+            messages.error(request, "Invalid input data!")
             return redirect("view-dispatch-invoice")
 
         # --- Decide which dispatches to include in the PDF ---
@@ -1205,7 +1214,14 @@ def download_generate_invoice_pdf(request):
         dispatches = sort_dispatches_by_challan_asc(dispatches)
    
         bill_date_str = request.POST.get("bill_date")
-        bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else None
+        try:
+            bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else invoice.Bill_date
+        except ValueError:
+            bill_date = invoice.Bill_date
+            
+        if not bill_date:
+            bill_date = datetime.now().date()
+            
         total_option = request.POST.get("total_option", "every_page")  # Default to every_page
         
     # --- PDF Generation ---
