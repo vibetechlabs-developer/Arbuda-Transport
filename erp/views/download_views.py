@@ -16,6 +16,7 @@ import math
 import re
 import json
 import logging
+import traceback
 from xml.sax.saxutils import escape
 from typing import Optional
 from itertools import groupby
@@ -26,6 +27,7 @@ from django.db.models import Q
 from reportlab.platypus import KeepTogether
 
 logger = logging.getLogger(__name__)
+gunicorn_logger = logging.getLogger("gunicorn.error")
 
 
 def _safe_filename_part(value: object) -> str:
@@ -1239,7 +1241,19 @@ def download_generate_invoice_pdf(request):
     try:
         return _download_generate_invoice_pdf_impl(request)
     except Exception:
-        logger.exception("Invoice PDF download failed", extra={"path": request.path})
+        payload = {
+            "path": request.path,
+            "contract_id": request.POST.get("contract_id"),
+            "bill_no": request.POST.get("bill_no"),
+            "dispatch_ids_count": len(request.POST.getlist("dispatch_ids")),
+        }
+        # Write traceback to both Django logger and gunicorn logger to ensure visibility in production.
+        logger.exception("Invoice PDF download failed | payload=%s", payload)
+        gunicorn_logger.error(
+            "Invoice PDF download failed | payload=%s\n%s",
+            payload,
+            traceback.format_exc(),
+        )
         messages.error(request, "Invoice PDF generate કરતી વખતે error આવ્યો. કૃપા કરીને ફરી પ્રયાસ કરો.")
         return redirect("view-dispatch-invoice")
 
