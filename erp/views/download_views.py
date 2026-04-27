@@ -1167,64 +1167,67 @@ def generate_invoice_pdf(request):
 
 @session_required
 def download_generate_invoice_pdf(request):
-    if request.method == "POST":     
-        contract_id = request.POST.get("contract_id")
-        i_bill_no = request.POST.get("bill_no")
+    if request.method != "POST":
+        messages.error(request, "Invalid request method.")
+        return redirect("view-dispatch-invoice")
 
-        # Fetch contract and dispatch data
+    contract_id = request.POST.get("contract_id")
+    i_bill_no = request.POST.get("bill_no")
+
+    # Fetch contract and dispatch data
+    try:
+        if not contract_id or not i_bill_no:
+            raise ValueError("Missing contract or invoice selection.")
+        contract = T_Contract.objects.get(id=contract_id)
         try:
-            if not contract_id or not i_bill_no:
-                raise ValueError("Missing contract or invoice selection.")
-            contract = T_Contract.objects.get(id=contract_id)
-            try:
-                company_profile = Company_profile.objects.get(company_id_id=request.session['company_info']['company_id'])
-            except Company_profile.DoesNotExist:
-                messages.error(request, "Company profile not found!")
-                return redirect("view-dispatch-invoice")
-            company = Company_user.objects.get(id=request.session['company_info']['company_id'])
-            invoice = Invoice.objects.get(id=i_bill_no, company_id = request.session['company_info']['company_id'] , contract_id = contract.id)
-        except T_Contract.DoesNotExist:
-            messages.error(request, "Contract not found!")
+            company_profile = Company_profile.objects.get(company_id_id=request.session['company_info']['company_id'])
+        except Company_profile.DoesNotExist:
+            messages.error(request, "Company profile not found!")
             return redirect("view-dispatch-invoice")
-        except Company_user.DoesNotExist:
-            messages.error(request, "user not found!")
-            return redirect("view-dispatch-invoice")
-        except Invoice.DoesNotExist:
-            messages.error(request, "Invoice not found!")
-            return redirect("view-dispatch-invoice")
-        except ValueError:
-            messages.error(request, "Invalid input data!")
-            return redirect("view-dispatch-invoice")
+        company = Company_user.objects.get(id=request.session['company_info']['company_id'])
+        invoice = Invoice.objects.get(id=i_bill_no, company_id = request.session['company_info']['company_id'] , contract_id = contract.id)
+    except T_Contract.DoesNotExist:
+        messages.error(request, "Contract not found!")
+        return redirect("view-dispatch-invoice")
+    except Company_user.DoesNotExist:
+        messages.error(request, "user not found!")
+        return redirect("view-dispatch-invoice")
+    except Invoice.DoesNotExist:
+        messages.error(request, "Invoice not found!")
+        return redirect("view-dispatch-invoice")
+    except ValueError:
+        messages.error(request, "Invalid input data!")
+        return redirect("view-dispatch-invoice")
 
-        # --- Decide which dispatches to include in the PDF ---
-        # On the "View & Download Invoice" screen, checkboxes are hidden; in that case,
-        # no dispatch_ids are posted and we should include all dispatches attached to the invoice.
-        dispatch_ids_raw = request.POST.getlist("dispatch_ids")
-        if dispatch_ids_raw:
-            try:
-                dispatch_ids = [int(i) for i in dispatch_ids_raw]
-                dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
-            except (TypeError, ValueError):
-                # Fallback to all invoice dispatches if anything goes wrong with IDs
-                dispatches = invoice.dispatch_list.all().order_by('dep_date')
-        else:
-            # No explicit selection → use all dispatch rows for this invoice
+    # --- Decide which dispatches to include in the PDF ---
+    # On the "View & Download Invoice" screen, checkboxes are hidden; in that case,
+    # no dispatch_ids are posted and we should include all dispatches attached to the invoice.
+    dispatch_ids_raw = request.POST.getlist("dispatch_ids")
+    if dispatch_ids_raw:
+        try:
+            dispatch_ids = [int(i) for i in dispatch_ids_raw]
+            dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
+        except (TypeError, ValueError):
+            # Fallback to all invoice dispatches if anything goes wrong with IDs
             dispatches = invoice.dispatch_list.all().order_by('dep_date')
+    else:
+        # No explicit selection → use all dispatch rows for this invoice
+        dispatches = invoice.dispatch_list.all().order_by('dep_date')
 
-        # Sort by challan_no in ascending order
-        dispatches = sort_dispatches_by_challan_asc(dispatches)
-   
-        bill_date_str = request.POST.get("bill_date")
-        try:
-            bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else invoice.Bill_date
-        except ValueError:
-            bill_date = invoice.Bill_date
-            
-        if not bill_date:
-            bill_date = datetime.now().date()
-            
-        total_option = request.POST.get("total_option", "every_page")  # Default to every_page
-        
+    # Sort by challan_no in ascending order
+    dispatches = sort_dispatches_by_challan_asc(dispatches)
+
+    bill_date_str = request.POST.get("bill_date")
+    try:
+        bill_date = datetime.strptime(bill_date_str, "%Y-%m-%d").date() if bill_date_str else invoice.Bill_date
+    except ValueError:
+        bill_date = invoice.Bill_date
+
+    if not bill_date:
+        bill_date = datetime.now().date()
+
+    total_option = request.POST.get("total_option", "every_page")  # Default to every_page
+
     # --- PDF Generation ---
     buffer = BytesIO()
     # Optimized margins for full-page utilization while maintaining professional appearance
