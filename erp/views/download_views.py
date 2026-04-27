@@ -14,6 +14,7 @@ from reportlab.lib.units import mm
 from operator import attrgetter
 import math
 import re
+import json
 from xml.sax.saxutils import escape
 from typing import Optional
 from itertools import groupby
@@ -73,6 +74,71 @@ def sort_dispatches_by_challan_asc(dispatches):
     dispatch_list = list(dispatches) if hasattr(dispatches, '__iter__') and not isinstance(dispatches, list) else dispatches
     # Sort in ascending order by challan_no numeric value
     return sorted(dispatch_list, key=lambda d: get_numeric_value(d.challan_no))
+
+
+DEFAULT_INVOICE_FIELDS = [
+    "sr_no",
+    "dep_date",
+    "dc_field",
+    "truck_no",
+    "party_name",
+    "destination",
+    "product_name",
+    "weight",
+    "km",
+    "rate",
+    "loading_charge",
+    "unloading_charge_1",
+    "unloading_charge_2",
+    "amount",
+    "gc_note",
+]
+
+ALLOWED_INVOICE_FIELDS = set(
+    DEFAULT_INVOICE_FIELDS
+    + [
+        "depature_date",
+        "district",
+        "taluka",
+        "luggage",
+        "totalfreight",
+        "main_party",
+        "sub_party",
+        "amount",
+    ]
+)
+
+
+def _normalized_invoice_fields(contract) -> list[str]:
+    """
+    Normalize legacy/invalid invoice_fields values so PDF generation never crashes.
+    Production may contain old rows with NULL/string JSON.
+    """
+    raw_fields = getattr(contract, "invoice_fields", None)
+    fields = []
+
+    if isinstance(raw_fields, list):
+        fields = raw_fields
+    elif isinstance(raw_fields, str):
+        raw = raw_fields.strip()
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    fields = parsed
+            except Exception:
+                # Backward-compat fallback for comma separated values
+                fields = [x.strip() for x in raw.split(",") if x.strip()]
+
+    cleaned = []
+    seen = set()
+    for field in fields:
+        key = str(field).strip()
+        if key in ALLOWED_INVOICE_FIELDS and key not in seen:
+            cleaned.append(key)
+            seen.add(key)
+
+    return cleaned or list(DEFAULT_INVOICE_FIELDS)
 
 
 
@@ -488,7 +554,7 @@ def generate_invoice_pdf(request):
         footer_elements.append(KeepTogether(footer_table))
         return footer_elements
             
-    fields = contract.invoice_fields
+    fields = _normalized_invoice_fields(contract)
     # Target 12 rows per page so header + 12 rows + TOTAL + signatures fit on one page
     # (UI is locked to 12 so this stays consistent)
     chunk_size = 12
@@ -1360,7 +1426,7 @@ def download_generate_invoice_pdf(request):
         footer_elements.append(KeepTogether(footer_table))
         return footer_elements
 
-    fields = contract.invoice_fields
+    fields = _normalized_invoice_fields(contract)
     # Target 12 rows per page so header + 12 rows + TOTAL + signatures fit on one page
     # (UI is locked to 12 so this stays consistent)
     chunk_size = 12
