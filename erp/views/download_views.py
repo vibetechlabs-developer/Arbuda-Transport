@@ -15,6 +15,7 @@ from operator import attrgetter
 import math
 import re
 import json
+import logging
 from xml.sax.saxutils import escape
 from typing import Optional
 from itertools import groupby
@@ -23,6 +24,8 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from erp.utils.financial_year import get_current_financial_year, get_financial_year_start_end
 from django.db.models import Q
 from reportlab.platypus import KeepTogether
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_filename_part(value: object) -> str:
@@ -1233,6 +1236,15 @@ def generate_invoice_pdf(request):
 
 @session_required
 def download_generate_invoice_pdf(request):
+    try:
+        return _download_generate_invoice_pdf_impl(request)
+    except Exception:
+        logger.exception("Invoice PDF download failed", extra={"path": request.path})
+        messages.error(request, "Invoice PDF generate કરતી વખતે error આવ્યો. કૃપા કરીને ફરી પ્રયાસ કરો.")
+        return redirect("view-dispatch-invoice")
+
+
+def _download_generate_invoice_pdf_impl(request):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
         return redirect("view-dispatch-invoice")
