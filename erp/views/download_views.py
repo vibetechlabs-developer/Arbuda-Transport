@@ -15,6 +15,7 @@ from operator import attrgetter
 import math
 import re
 from xml.sax.saxutils import escape
+from typing import Optional
 from itertools import groupby
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
@@ -38,7 +39,7 @@ def _safe_filename_part(value: object) -> str:
     return s or "NA"
 
 
-def _invoice_pdf_filename(*, company_name: str, contract_no: str, bill_no: str, invoice_id: int | None = None) -> str:
+def _invoice_pdf_filename(*, company_name: str, contract_no: str, bill_no: str, invoice_id: Optional[int] = None) -> str:
     """
     Generate a stable, unique-ish filename for an invoice PDF.
 
