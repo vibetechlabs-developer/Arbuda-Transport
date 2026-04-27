@@ -594,7 +594,7 @@ def generate_invoice_pdf(request):
                 # Shrink font size linearly based on the longest word
                 new_size = max(4.5, 8.0 - (max_word_len - 9) * 0.45)
                 # Apply font tag with calculated size
-                return f"<font size='{new_size}' leading='{new_size + 1}'>{s}</font>"
+                return f"<font size='{new_size}'>{s}</font>"
             
             return s
 
@@ -1626,7 +1626,7 @@ def _download_generate_invoice_pdf_impl(request):
                 # Shrink font size linearly based on the longest word
                 new_size = max(4.5, 8.0 - (max_word_len - 9) * 0.45)
                 # Apply font tag with calculated size
-                return f"<font size='{new_size}' leading='{new_size + 1}'>{s}</font>"
+                return f"<font size='{new_size}'>{s}</font>"
                 
             return s
 
