@@ -2347,19 +2347,37 @@ def generate_summary_pdf(request):
                 'grand_total': bill_grand_total,
             })
 
-            for row_idx, d in enumerate(sorted_dispatches):
-                row_freight = float(d.totalfreight or 0)
-                row_unload = float(d.loading_charge or 0) + float(d.unloading_charge_1 or 0) + float(d.unloading_charge_2 or 0)
-                row_total = row_freight + row_unload
-                # Invoice PDF uses 12 entries per page; keep same page mapping here.
-                page_no = (row_idx // 12) + 1
+            # Build page-wise rows exactly like invoice pagination:
+            # one summary row per invoice PDF page (not per dispatch row).
+            page_chunks = []
+            if contract.rate_type == "Distric-Wise":
+                # District-wise invoice prints district blocks page by page.
+                district_dispatches = sorted(sorted_dispatches, key=attrgetter("district"))
+                for _, district_group in groupby(district_dispatches, key=attrgetter("district")):
+                    group_rows = list(district_group)
+                    for i in range(0, len(group_rows), 12):
+                        page_chunks.append(group_rows[i : i + 12])
+            else:
+                for i in range(0, len(sorted_dispatches), 12):
+                    page_chunks.append(sorted_dispatches[i : i + 12])
+
+            for page_idx, page_rows in enumerate(page_chunks, start=1):
+                page_mt = sum(float(d.weight or 0) for d in page_rows)
+                page_freight = sum(float(d.totalfreight or 0) for d in page_rows)
+                page_unload = sum(
+                    float(d.loading_charge or 0)
+                    + float(d.unloading_charge_1 or 0)
+                    + float(d.unloading_charge_2 or 0)
+                    for d in page_rows
+                )
+                page_total = page_freight + page_unload
                 page_wise_rows.append({
                     "bill_no": invoice.Bill_no,
-                    "page_no": page_no,
-                    "mt": float(d.weight or 0),
-                    "bill_amount": row_freight,
-                    "unload_charge": row_unload,
-                    "grand_total": row_total,
+                    "page_no": page_idx,
+                    "mt": page_mt,
+                    "bill_amount": page_freight,
+                    "unload_charge": page_unload,
+                    "grand_total": page_total,
                 })
             
             total_mt += bill_mt
