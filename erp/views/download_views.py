@@ -2303,10 +2303,8 @@ def generate_summary_pdf(request):
     page_wise_summary = request.POST.get("page_wise_summary") in ['on', 'true', 'True', '1']
     # Intro text now follows only contract master setting.
     show_summary_intro = bool(getattr(contract, "show_summary_intro", False))
-    show_destination_in_summary_intro = (
-        request.POST.get("show_destination_in_summary_intro") in ['on', 'true', 'True', '1']
-        or request.POST.get("show_product_in_summary_intro") in ['on', 'true', 'True', '1']
-    )
+    # Destination text in intro is now always enabled (toggle removed from UI).
+    show_destination_in_summary_intro = True
     
     # Collect bill data with totals
     bills_data = []
@@ -2364,10 +2362,16 @@ def generate_summary_pdf(request):
     if len(destination_scope_parts) > 3 and destination_scope_text:
         destination_scope_text = f"{destination_scope_text}..."
 
-    # Keep destination text exactly from data (no forced G-9 style conversion).
-    # This preserves values such as "GJ-09" as-is in summary intro.
+    # Keep destination text from data, but when bill number carries a zone code
+    # (e.g. GJ-09/049), prefer showing invoice-style zone text in intro:
+    # "Gujarat G-9".
+    zone_bill_no = str(bills_data[0].get("bill_no") or "") if bills_data else ""
+    zone_match = re.search(r"\bGJ\s*[-]?\s*0*(\d+)\b", zone_bill_no, re.IGNORECASE)
+    if zone_match:
+        destination_scope_text = f"Gujarat G-{int(zone_match.group(1))}"
+
     billing_state = (contract.billing_state or "").strip()
-    if billing_state and destination_scope_text:
+    if billing_state and destination_scope_text and not destination_scope_text.lower().startswith("gujarat g-"):
         destination_scope_text = f"{billing_state} {destination_scope_text}"
     elif billing_state and not destination_scope_text:
         destination_scope_text = billing_state
