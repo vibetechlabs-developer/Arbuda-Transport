@@ -2315,6 +2315,8 @@ def generate_summary_pdf(request):
     total_unloading2 = 0
     total_grand_total = 0
     destination_scope_parts = []
+    # For "page wise summary", keep per-dispatch rows so each invoice entry is visible.
+    page_wise_rows = []
     
     for invoice in invoices:
         dispatches = invoice.dispatch_list.all()
@@ -2325,7 +2327,9 @@ def generate_summary_pdf(request):
                 if scope_piece and scope_piece not in destination_scope_parts:
                     destination_scope_parts.append(scope_piece)
 
-            bill_mt = sum(float(d.weight) for d in dispatches if d.weight)
+            sorted_dispatches = sort_dispatches_by_challan_asc(dispatches)
+
+            bill_mt = sum(float(d.weight) for d in sorted_dispatches if d.weight)
             bill_amount = sum(float(d.totalfreight) for d in dispatches if d.totalfreight)
             bill_loading = sum(float(d.loading_charge) for d in dispatches if d.loading_charge)
             bill_unloading1 = sum(float(d.unloading_charge_1) for d in dispatches if d.unloading_charge_1)
@@ -2342,6 +2346,18 @@ def generate_summary_pdf(request):
                 'unloading2': bill_unloading2,
                 'grand_total': bill_grand_total,
             })
+
+            for d in sorted_dispatches:
+                row_freight = float(d.totalfreight or 0)
+                row_unload = float(d.loading_charge or 0) + float(d.unloading_charge_1 or 0) + float(d.unloading_charge_2 or 0)
+                row_total = row_freight + row_unload
+                page_wise_rows.append({
+                    "bill_no": invoice.Bill_no,
+                    "mt": float(d.weight or 0),
+                    "bill_amount": row_freight,
+                    "unload_charge": row_unload,
+                    "grand_total": row_total,
+                })
             
             total_mt += bill_mt
             total_bill_amount += bill_amount
@@ -2569,9 +2585,13 @@ def generate_summary_pdf(request):
         Paragraph("Total Amt.Rs", cell_header),
     ]]
 
-    for idx, bill in enumerate(bills_data, 1):
+    rows_for_table = page_wise_rows if page_wise_summary else bills_data
+
+    for idx, bill in enumerate(rows_for_table, 1):
         second_col = str(idx) if page_wise_summary else str(bill["bill_no"])
-        row_unload = float(bill["loading"] or 0) + float(bill["unloading1"] or 0) + float(bill["unloading2"] or 0)
+        row_unload = float(bill.get("unload_charge", 0)) if page_wise_summary else (
+            float(bill["loading"] or 0) + float(bill["unloading1"] or 0) + float(bill["unloading2"] or 0)
+        )
         table_data.append(
             [
                 Paragraph(str(idx), cell_center),
