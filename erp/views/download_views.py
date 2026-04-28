@@ -2364,25 +2364,13 @@ def generate_summary_pdf(request):
     if len(destination_scope_parts) > 3 and destination_scope_text:
         destination_scope_text = f"{destination_scope_text}..."
 
-    # Prefer zone code format requested by user: "Gujarat G-8" / "Gujarat G-9" etc.
-    # Try to extract G-zone from collected district/destination values.
-    g_zone_code = ""
-    for piece in destination_scope_parts:
-        if not piece:
-            continue
-        zone_match = re.search(r"\bG\s*[-]?\s*(\d+)\b", piece, re.IGNORECASE)
-        if zone_match:
-            g_zone_code = f"G-{zone_match.group(1)}"
-            break
-
-    if g_zone_code:
-        destination_scope_text = f"Gujarat {g_zone_code}"
-    else:
-        billing_state = (contract.billing_state or "").strip()
-        if billing_state and destination_scope_text:
-            destination_scope_text = f"{billing_state} {destination_scope_text}"
-        elif billing_state and not destination_scope_text:
-            destination_scope_text = billing_state
+    # Keep destination text exactly from data (no forced G-9 style conversion).
+    # This preserves values such as "GJ-09" as-is in summary intro.
+    billing_state = (contract.billing_state or "").strip()
+    if billing_state and destination_scope_text:
+        destination_scope_text = f"{billing_state} {destination_scope_text}"
+    elif billing_state and not destination_scope_text:
+        destination_scope_text = billing_state
     
     # PDF Generation (match requested "Bill Summary" format)
     buffer = BytesIO()
