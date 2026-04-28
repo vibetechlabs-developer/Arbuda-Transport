@@ -2347,12 +2347,15 @@ def generate_summary_pdf(request):
                 'grand_total': bill_grand_total,
             })
 
-            for d in sorted_dispatches:
+            for row_idx, d in enumerate(sorted_dispatches):
                 row_freight = float(d.totalfreight or 0)
                 row_unload = float(d.loading_charge or 0) + float(d.unloading_charge_1 or 0) + float(d.unloading_charge_2 or 0)
                 row_total = row_freight + row_unload
+                # Invoice PDF uses 12 entries per page; keep same page mapping here.
+                page_no = (row_idx // 12) + 1
                 page_wise_rows.append({
                     "bill_no": invoice.Bill_no,
+                    "page_no": page_no,
                     "mt": float(d.weight or 0),
                     "bill_amount": row_freight,
                     "unload_charge": row_unload,
@@ -2588,7 +2591,7 @@ def generate_summary_pdf(request):
     rows_for_table = page_wise_rows if page_wise_summary else bills_data
 
     for idx, bill in enumerate(rows_for_table, 1):
-        second_col = str(idx) if page_wise_summary else str(bill["bill_no"])
+        second_col = str(bill.get("page_no", idx)) if page_wise_summary else str(bill["bill_no"])
         row_unload = float(bill.get("unload_charge", 0)) if page_wise_summary else (
             float(bill["loading"] or 0) + float(bill["unloading1"] or 0) + float(bill["unloading2"] or 0)
         )
