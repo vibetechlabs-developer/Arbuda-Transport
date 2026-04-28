@@ -2272,10 +2272,14 @@ def generate_summary_pdf(request):
         return redirect("summary-view")
     
     # Get selected invoices
+    financial_year = request.session.get('financial_year', get_current_financial_year())
+    fy_start_date, fy_end_date = get_financial_year_start_end(financial_year)
     invoices = Invoice.objects.filter(
         id__in=bill_ids,
         contract_id=contract_id,
-        company_id=request.session['company_info']['company_id']
+        company_id=request.session['company_info']['company_id'],
+        Bill_date__gte=fy_start_date,
+        Bill_date__lte=fy_end_date,
     ).order_by('Bill_no')
     
     if not invoices.exists():
@@ -2297,6 +2301,12 @@ def generate_summary_pdf(request):
     show_from_product_row = request.POST.get("show_from_product_row") in ['on', 'true', 'True', '1']
     show_total_weight = request.POST.get("show_total_weight") in ['on', 'true', 'True', '1']
     page_wise_summary = request.POST.get("page_wise_summary") in ['on', 'true', 'True', '1']
+    # Intro text now follows only contract master setting.
+    show_summary_intro = bool(getattr(contract, "show_summary_intro", False))
+    show_destination_in_summary_intro = (
+        request.POST.get("show_destination_in_summary_intro") in ['on', 'true', 'True', '1']
+        or request.POST.get("show_product_in_summary_intro") in ['on', 'true', 'True', '1']
+    )
     
     # Collect bill data with totals
     bills_data = []
@@ -2306,11 +2316,17 @@ def generate_summary_pdf(request):
     total_unloading1 = 0
     total_unloading2 = 0
     total_grand_total = 0
+    destination_scope_parts = []
     
     for invoice in invoices:
         dispatches = invoice.dispatch_list.all()
         
         if dispatches.exists():
+            for d in dispatches:
+                scope_piece = (d.district or d.destination or "").strip()
+                if scope_piece and scope_piece not in destination_scope_parts:
+                    destination_scope_parts.append(scope_piece)
+
             bill_mt = sum(float(d.weight) for d in dispatches if d.weight)
             bill_amount = sum(float(d.totalfreight) for d in dispatches if d.totalfreight)
             bill_loading = sum(float(d.loading_charge) for d in dispatches if d.loading_charge)
@@ -2343,6 +2359,30 @@ def generate_summary_pdf(request):
         if dispatches.exists():
             product_name = dispatches.first().product_name
             break
+
+    destination_scope_text = ", ".join(destination_scope_parts[:3]).strip()
+    if len(destination_scope_parts) > 3 and destination_scope_text:
+        destination_scope_text = f"{destination_scope_text}..."
+
+    # Prefer zone code format requested by user: "Gujarat G-8" / "Gujarat G-9" etc.
+    # Try to extract G-zone from collected district/destination values.
+    g_zone_code = ""
+    for piece in destination_scope_parts:
+        if not piece:
+            continue
+        zone_match = re.search(r"\bG\s*[-]?\s*(\d+)\b", piece, re.IGNORECASE)
+        if zone_match:
+            g_zone_code = f"G-{zone_match.group(1)}"
+            break
+
+    if g_zone_code:
+        destination_scope_text = f"Gujarat {g_zone_code}"
+    else:
+        billing_state = (contract.billing_state or "").strip()
+        if billing_state and destination_scope_text:
+            destination_scope_text = f"{billing_state} {destination_scope_text}"
+        elif billing_state and not destination_scope_text:
+            destination_scope_text = billing_state
     
     # PDF Generation (match requested "Bill Summary" format)
     buffer = BytesIO()
@@ -2366,6 +2406,7 @@ def generate_summary_pdf(request):
     right = ParagraphStyle(name="Right", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
     right_bold = ParagraphStyle(name="RightBold", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)
     center_bold = ParagraphStyle(name="CenterBold", fontName="Helvetica-Bold", fontSize=10, alignment=1, leading=12)
+    center_bold_small = ParagraphStyle(name="CenterBoldSmall", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)
     cell_center = ParagraphStyle(name="CellCenter", fontName="Helvetica", fontSize=9, alignment=1, leading=11)
     cell_right = ParagraphStyle(name="CellRight", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
     cell_header = ParagraphStyle(name="CellHeader", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)
@@ -2373,6 +2414,9 @@ def generate_summary_pdf(request):
     company_name = (company.company_name or "").upper()
     pan_no = (company_profile.pan_number if company_profile and company_profile.pan_number else "") if company_profile else ""
     gstin_no = (company.gst_number or "") if hasattr(company, "gst_number") else ""
+    sac_no = (contract.sac_number or "").strip()
+    if not sac_no or sac_no.lower() in ("none", "null"):
+        sac_no = "N/A"
 
     # ---- Header box ----
     header_lines = []
@@ -2384,7 +2428,16 @@ def generate_summary_pdf(request):
         if addr:
             header_lines.append(Paragraph(addr, small_center))
 
-    pan_gst_line = "  ".join([p for p in [f"PAN NO.{pan_no}" if pan_no else "", f"GSTIN:{gstin_no}" if gstin_no else ""] if p])
+    pan_gst_line = "  ".join(
+        [
+            p
+            for p in [
+                f"PAN NO.{pan_no}" if pan_no else "",
+                f"GSTIN:{gstin_no}" if gstin_no else "",
+            ]
+            if p
+        ]
+    )
 
     header_cell = [
         Paragraph(company_name, title_center),
@@ -2408,13 +2461,26 @@ def generate_summary_pdf(request):
         )
     )
     elements.append(header_table)
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(f"SAC-{sac_no}", center_bold_small))
+    elements.append(Paragraph("INVOICE", center_bold_small))
     elements.append(Spacer(1, 8))
 
     # ---- To + Date row ----
     date_str = summary_date.strftime("%d-%m-%Y")
+    if len(bills_data) == 1:
+        summary_bill_no = str(bills_data[0].get("bill_no") or "")
+    elif len(bills_data) > 1:
+        first_bill = str(bills_data[0].get("bill_no") or "")
+        last_bill = str(bills_data[-1].get("bill_no") or "")
+        summary_bill_no = f"{first_bill} - {last_bill}" if first_bill and last_bill else "Multiple"
+    else:
+        summary_bill_no = ""
+    contact_designation = (contract.c_designation or "").strip()
+    to_person_line = contact_designation if contact_designation else "The State Manager"
     to_lines = [
         Paragraph("To,", normal),
-        Paragraph("The State Manager", normal_bold),
+        Paragraph(escape(to_person_line), normal_bold),
         Paragraph(f"{(contract.company_name or '').upper()}.", normal_bold),
     ]
     if contract.billing_address:
@@ -2428,7 +2494,13 @@ def generate_summary_pdf(request):
         to_lines.append(Paragraph(f"GST NO.{contract.gst_number}", normal))
 
     to_date_table = Table(
-        [[to_lines, [Paragraph(f"Date: {date_str}", right)]]],
+        [[
+            to_lines,
+            [
+                Paragraph(f"Bill No. : {escape(summary_bill_no)}", right) if summary_bill_no else Paragraph("", right),
+                Paragraph(f"Date : {date_str}", right),
+            ],
+        ]],
         colWidths=[available_w * 0.7, available_w * 0.3],
     )
     to_date_table.setStyle(
@@ -2446,18 +2518,24 @@ def generate_summary_pdf(request):
     elements.append(to_date_table)
     elements.append(Spacer(1, 6))
 
-    # Contract setting from master: show letter intro in summary
-    if getattr(contract, "show_summary_intro", False):
-        elements.append(Paragraph("Dear Sir,", normal_bold))
+    # Intro section visibility is controlled by contract default + summary toggle.
+    if show_summary_intro:
+        elements.append(Paragraph("<b>Sub:</b> Submission of our Transportation Bill Summary", normal))
         elements.append(Spacer(1, 6))
-        elements.append(Paragraph("<b>Sub:</b> Bill-wise summary.", normal))
-        elements.append(Spacer(1, 4))
+        elements.append(Paragraph("Dear Sir,", normal))
+        elements.append(Spacer(1, 6))
+        intro_destination_suffix = (
+            f" of {escape(destination_scope_text)}"
+            if (show_destination_in_summary_intro and destination_scope_text)
+            else ""
+        )
         elements.append(
             Paragraph(
-                "With reference to the above subject, please find below the details of bills for your records.",
+                f"Please find enclosed herewith the following bills of transportation from {escape(contract.from_center or '')}",
                 normal,
             )
         )
+        elements.append(Paragraph(f"to various destinations{intro_destination_suffix}.", normal))
         elements.append(Spacer(1, 8))
 
     if show_bill_summary_title:
@@ -2487,98 +2565,51 @@ def generate_summary_pdf(request):
         elements.append(from_prod_table)
         elements.append(Spacer(1, 6))
 
-    # ---- Determine which columns to show (hide if all values are zero) ----
-    show_loading = any(bill['loading'] > 0 for bill in bills_data)
-    show_unloading1 = any(bill['unloading1'] > 0 for bill in bills_data)
-    show_unloading2 = any(bill['unloading2'] > 0 for bill in bills_data)
-
-    # ---- Bills table (dynamically show/hide loading and unloading columns) ----
-    # Build header row dynamically
+    # ---- Bills table (sample-style compact summary format) ----
+    total_unload_charge = total_loading + total_unloading1 + total_unloading2
     bill_or_page_label = "Page No." if page_wise_summary else "Bill No."
-    table_header = [
-        Paragraph("Sr.", cell_header),
+    table_data = [[
+        Paragraph("Sr. No.", cell_header),
         Paragraph(bill_or_page_label, cell_header),
         Paragraph("M.T", cell_header),
-        Paragraph("Bill Amount Rs.", cell_header),
-    ]
-    
-    if show_loading:
-        table_header.append(Paragraph("Loading Rs.", cell_header))
-    if show_unloading1:
-        table_header.append(Paragraph("Unloading 1 Rs.", cell_header))
-    if show_unloading2:
-        table_header.append(Paragraph("Unloading 2 Rs.", cell_header))
-    
-    table_header.append(Paragraph("Grand Total Rs.", cell_header))
-    
-    table_data = [table_header]
-    
-    # Build data rows dynamically
+        Paragraph("Freight Amt.", cell_header),
+        Paragraph("Unload Charge", cell_header),
+        Paragraph("Total Amt.Rs", cell_header),
+    ]]
+
     for idx, bill in enumerate(bills_data, 1):
         second_col = str(idx) if page_wise_summary else str(bill["bill_no"])
-        row = [
-            Paragraph(str(idx), cell_center),
-            Paragraph(second_col, cell_center),
-            Paragraph(f"{bill['mt']:.3f}", cell_right),
-            Paragraph(f"{bill['bill_amount']:.2f}", cell_right),
+        row_unload = float(bill["loading"] or 0) + float(bill["unloading1"] or 0) + float(bill["unloading2"] or 0)
+        table_data.append(
+            [
+                Paragraph(str(idx), cell_center),
+                Paragraph(second_col, cell_center),
+                Paragraph(f"{bill['mt']:.3f}", cell_right),
+                Paragraph(f"{bill['bill_amount']:.2f}", cell_right),
+                Paragraph(f"{row_unload:.2f}", cell_right),
+                Paragraph(f"{bill['grand_total']:.2f}", cell_right),
+            ]
+        )
+
+    table_data.append(
+        [
+            Paragraph("Total", ParagraphStyle(name="TotalLeft", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)),
+            "",
+            Paragraph(f"{total_mt:.3f}", ParagraphStyle(name="TotalRight", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_bill_amount:.2f}", ParagraphStyle(name="TotalRight2", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_unload_charge:.2f}", ParagraphStyle(name="TotalRight3", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+            Paragraph(f"{total_grand_total:.2f}", ParagraphStyle(name="TotalRight4", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
         ]
-        
-        if show_loading:
-            row.append(Paragraph(f"{bill['loading']:.2f}", cell_right))
-        if show_unloading1:
-            row.append(Paragraph(f"{bill['unloading1']:.2f}", cell_right))
-        if show_unloading2:
-            row.append(Paragraph(f"{bill['unloading2']:.2f}", cell_right))
-        
-        row.append(Paragraph(f"{bill['grand_total']:.2f}", cell_right))
-        table_data.append(row)
+    )
 
-    # Total row
-    total_row = [
-        Paragraph("Total", ParagraphStyle(name="TotalLeft", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)),
-        "",
-        Paragraph(f"{total_mt:.3f}", ParagraphStyle(name="TotalRight", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
-        Paragraph(f"{total_bill_amount:.2f}", ParagraphStyle(name="TotalRight2", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+    col_widths = [
+        14 * mm,  # Sr
+        26 * mm,  # Page/Bill No
+        26 * mm,  # MT
+        34 * mm,  # Freight
+        34 * mm,  # Unload Charge
+        available_w - (14 * mm + 26 * mm + 26 * mm + 34 * mm + 34 * mm),  # Total
     ]
-    
-    if show_loading:
-        total_row.append(Paragraph(f"{total_loading:.2f}", ParagraphStyle(name="TotalRight3", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)))
-    if show_unloading1:
-        total_row.append(Paragraph(f"{total_unloading1:.2f}", ParagraphStyle(name="TotalRight4", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)))
-    if show_unloading2:
-        total_row.append(Paragraph(f"{total_unloading2:.2f}", ParagraphStyle(name="TotalRight5", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)))
-    
-    total_row.append(Paragraph(f"{total_grand_total:.2f}", ParagraphStyle(name="TotalRight6", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)))
-    table_data.append(total_row)
-
-    # Dynamically calculate column widths based on which columns are shown
-    # Fixed columns
-    sr_width = 9 * mm
-    bill_no_width = 35 * mm
-    fixed_width = sr_width + bill_no_width
-    
-    # Count variable columns (MT, Bill Amount, optional charges, Grand Total)
-    # Always shown: MT + Bill Amount + Grand Total = 3 columns
-    var_col_count = 3
-    var_col_count += int(show_loading) + int(show_unloading1) + int(show_unloading2)
-    
-    # Equal width for all variable columns
-    var_col_width = (available_w - fixed_width) / max(var_col_count, 1)
-    
-    col_widths = [sr_width, bill_no_width]
-    
-    # Add variable-width columns
-    col_widths.append(var_col_width)  # MT
-    col_widths.append(var_col_width)  # Bill Amount
-    
-    if show_loading:
-        col_widths.append(var_col_width)  # Loading
-    if show_unloading1:
-        col_widths.append(var_col_width)  # Unloading 1
-    if show_unloading2:
-        col_widths.append(var_col_width)  # Unloading 2
-    
-    col_widths.append(var_col_width)  # Grand Total
 
     # Ensure the table consumes the full available width (avoid any rounding/column-count drift)
     width_delta = available_w - sum(col_widths)
@@ -2605,28 +2636,18 @@ def generate_summary_pdf(request):
     elements.append(Spacer(1, 10))
 
     if show_total_weight:
-        elements.append(
-            Paragraph(
-                f"Total Weight (M.T): {total_mt:.3f}",
-                normal_bold,
-            )
-        )
-        elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(f"Total Weight (M.T): {total_mt:.3f}", normal_bold))
+        elements.append(Spacer(1, 6))
 
     # ---- Footer note + Signature ----
     client_company_name = contract.company_name or "the Company"
     footer_note = (getattr(contract, "summary_footer_note", None) or "").strip()
     if footer_note:
-        for line in footer_note.replace("\r\n", "\n").split("\n"):
-            line = line.strip()
-            if line:
-                elements.append(Paragraph(escape(line), normal))
-            else:
-                elements.append(Spacer(1, 4))
+        elements.append(Paragraph(f"<b>Remark :</b> {escape(footer_note)}", normal))
         elements.append(Spacer(1, 12))
     else:
-        elements.append(Paragraph(f"*GST Shall be paid by {client_company_name} under", normal))
-        elements.append(Paragraph("RCM", normal))
+        elements.append(Paragraph(f"<b>Remark :</b> GST shall be Payable by {client_company_name} under Reverse Charge Mechanism", normal))
         elements.append(Spacer(1, 14))
 
     sig_table = Table(

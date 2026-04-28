@@ -21,7 +21,7 @@ from transport.models import (
 )
 import re
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.db.models import Func, F, IntegerField, Q
 
 ## CONTRACT DETAILS FETCHING ##
@@ -1334,6 +1334,8 @@ def get_truck_numbers(request):
 def get_contract_bills(request):
     contract_id = request.GET.get('contract-id')
     company_id = request.session['company_info']['company_id']
+    last_days_raw = (request.GET.get("last_days") or "").strip()
+    to_date_raw = (request.GET.get("to_date") or "").strip()
     
     try:
         contract = T_Contract.objects.get(id=contract_id, company_id=company_id)
@@ -1344,7 +1346,33 @@ def get_contract_bills(request):
     invoices = Invoice.objects.filter(
         contract_id=contract_id,
         company_id=company_id
-    ).order_by('Bill_no')
+    )
+
+    # Always limit summary bills to selected financial year.
+    financial_year = request.session.get('financial_year', get_current_financial_year())
+    fy_start_date, fy_end_date = get_financial_year_start_end(financial_year)
+    invoices = invoices.filter(Bill_date__gte=fy_start_date, Bill_date__lte=fy_end_date)
+
+    # Summary screen default: keep data limited to last 28 days
+    # unless caller explicitly passes a different positive number.
+    try:
+        last_days = int(last_days_raw) if last_days_raw else 28
+    except (TypeError, ValueError):
+        last_days = 28
+
+    if last_days <= 0:
+        last_days = 28
+
+    try:
+        to_date = datetime.strptime(to_date_raw, "%Y-%m-%d").date() if to_date_raw else datetime.now().date()
+    except ValueError:
+        to_date = datetime.now().date()
+
+    from_date = to_date - timedelta(days=last_days - 1)
+    # Keep the last-days summary window, but never leak outside FY boundary.
+    effective_from_date = max(from_date, fy_start_date)
+    effective_to_date = min(to_date, fy_end_date)
+    invoices = invoices.filter(Bill_date__gte=effective_from_date, Bill_date__lte=effective_to_date).order_by('Bill_no')
     
     bills_data = []
     for invoice in invoices:
@@ -1425,6 +1453,7 @@ def get_contract_bills(request):
             'gst_number': contract.gst_number or "",
             'pan_number': contract.pan_number or "",
             'sac_number': contract.sac_number or "",
+            'c_designation': contract.c_designation or "",
             'default_page_wise_summary': bool(contract.default_page_wise_summary),
             'show_summary_intro': bool(contract.show_summary_intro),
             'summary_footer_note': contract.summary_footer_note or "",

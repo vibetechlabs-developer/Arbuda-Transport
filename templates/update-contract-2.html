@@ -1038,13 +1038,12 @@
             </div>
 
             <script>
-              let fields = "{{ contract.invoice_fields }}"
-              let f_fields = document.querySelectorAll('[name="field"]')
-              f_fields.forEach((field) => {
-                if (!fields.includes(field.value)) {
-                  field.removeAttribute('checked', true)
-                }
-              })
+              const selectedFieldsRaw = "{{ contract.invoice_fields|join:','|escapejs }}";
+              const selectedFields = new Set(selectedFieldsRaw ? selectedFieldsRaw.split(",") : []);
+              const invoiceFieldCheckboxes = document.querySelectorAll('[name="field"]');
+              invoiceFieldCheckboxes.forEach((field) => {
+                field.checked = selectedFields.has(field.value);
+              });
             </script>
 
             <div class="col-sm-6 mt-4">

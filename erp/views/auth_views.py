@@ -11,10 +11,19 @@ def Company_login(request):
     allcompany = Company_user.objects.all()
     alldata['allcompany'] = allcompany
     
-    # Generate financial year options for the dropdown
-    financial_years = generate_financial_year_options()
+    # Financial year selection rules:
+    # - System started from FY 2025-2026 (start year 2025)
+    # - Do not show or allow any future financial year
+    min_allowed_fy = 2025
+    max_allowed_fy = get_current_financial_year()
+
+    # Generate only allowed financial year options for the dropdown
+    financial_years = generate_financial_year_options(
+        start_year=min_allowed_fy,
+        end_year=max_allowed_fy,
+    )
     alldata['financial_years'] = financial_years
-    alldata['current_fy'] = get_current_financial_year()
+    alldata['current_fy'] = max_allowed_fy
     
     if request.method == 'POST':
         remail = request.POST["company_name"]
@@ -26,6 +35,10 @@ def Company_login(request):
             financial_year = int(selected_year) if selected_year else get_current_financial_year()
         except (ValueError, TypeError):
             financial_year = get_current_financial_year()
+
+        # Safety: block invalid/future financial year even if posted manually.
+        if financial_year < min_allowed_fy or financial_year > max_allowed_fy:
+            financial_year = max_allowed_fy
 
         try:
             company = Company_user.objects.get(company_name = remail)

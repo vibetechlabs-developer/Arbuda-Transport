@@ -63,6 +63,16 @@
                 oninput="this.classList.remove('invalid')" placeholder="Product name" required readonly />
             </div>
           </div>
+          <div class="row">
+            <div class="mb-3 col-sm-6">
+              <label for="sac_number" class="form-label">SAC Number</label>
+              <input type="text" class="form-control" id="sac_number" name="sac_number" readonly />
+            </div>
+            <div class="mb-3 col-sm-6">
+              <label for="c_designation" class="form-label">Contact Person Designation</label>
+              <input type="text" class="form-control" id="c_designation" name="c_designation" readonly />
+            </div>
+          </div>
           <h5 class="text-primary fw-semibold mb-3 mt-4">Select Bills</h5>
           <div class="row">
             <div class="mb-3 col-12 d-flex flex-wrap gap-3 align-items-center">
@@ -111,6 +121,18 @@
                 />
                 <label class="form-check-label" for="show_total_weight">
                   Show Total Weight Below Table
+                </label>
+              </div>
+              <div class="form-check m-0">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="show_destination_in_summary_intro"
+                  name="show_destination_in_summary_intro"
+                  checked
+                />
+                <label class="form-check-label" for="show_destination_in_summary_intro">
+                  Show Destination in Bill Summary Description
                 </label>
               </div>
             </div>
@@ -195,6 +217,7 @@
 
   let allBills = [];
   let contractData = null;
+  let lastLoadedContractId = "";
 
   function getContractValue() {
     const contractSelect = document.getElementById("contract_no");
@@ -217,7 +240,15 @@
       return;
     }
 
-    fetch(`/api/get-contract-bills?contract-id=${encodeURIComponent(contract_id)}`)
+    const summaryDateInput = document.getElementById("summary_date");
+    const summaryDateValue = summaryDateInput && summaryDateInput.value
+      ? summaryDateInput.value
+      : "";
+    const toDateQuery = summaryDateValue
+      ? `&to_date=${encodeURIComponent(summaryDateValue)}`
+      : "";
+
+    fetch(`/api/get-contract-bills?contract-id=${encodeURIComponent(contract_id)}&last_days=28${toDateQuery}`)
       .then(response => response.json())
       .then(data => {
         if (data.error) {
@@ -231,7 +262,12 @@
         // Set contract details
         document.getElementById("from_center").value = data.contract.from_center || "";
         document.getElementById("product_name").value = data.contract.product_name || "";
-        document.getElementById("page_wise_summary").checked = !!data.contract.default_page_wise_summary;
+        document.getElementById("sac_number").value = data.contract.sac_number || "";
+        document.getElementById("c_designation").value = data.contract.c_designation || "";
+        if (lastLoadedContractId !== contract_id) {
+          document.getElementById("page_wise_summary").checked = !!data.contract.default_page_wise_summary;
+          lastLoadedContractId = contract_id;
+        }
 
         renderBillsTable();
       })
@@ -241,13 +277,27 @@
       });
   }
 
+  document.getElementById("summary_date")?.addEventListener("change", function () {
+    if (getContractValue()) {
+      fetchBills();
+    }
+  });
+
   function exportSummaryCsv() {
     const contract_id = getContractValue();
     if (!contract_id) {
       alert("Please select a contract first.");
       return;
     }
-    window.location.href = `/api/get-contract-bills?contract-id=${encodeURIComponent(contract_id)}&format=csv`;
+    const summaryDateInput = document.getElementById("summary_date");
+    const summaryDateValue = summaryDateInput && summaryDateInput.value
+      ? summaryDateInput.value
+      : "";
+    const toDateQuery = summaryDateValue
+      ? `&to_date=${encodeURIComponent(summaryDateValue)}`
+      : "";
+
+    window.location.href = `/api/get-contract-bills?contract-id=${encodeURIComponent(contract_id)}&format=csv&last_days=28${toDateQuery}`;
   }
 
   function toExactStr(n) {
