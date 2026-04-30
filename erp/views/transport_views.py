@@ -76,6 +76,16 @@ def add_contract(request):
                 invoice_fields=request.POST.getlist("field"),
                 show_verified_by=bool(request.POST.get("show_verified_by")),
                 show_recommended_by=bool(request.POST.get("show_recommended_by")),
+                verified_by_name=(
+                    request.POST.get("verified_by_name") or None
+                    if request.POST.get("show_verified_by")
+                    else None
+                ),
+                recommended_by_name=(
+                    request.POST.get("recommended_by_name") or None
+                    if request.POST.get("show_recommended_by")
+                    else None
+                ),
                 # If footer company name is not explicitly provided, fall back to logged-in company profile name
                 footer_company_name=(
                     request.POST.get("footer_company_name")
@@ -307,6 +317,16 @@ def update_contract(request, ):
             # Invoice footer configuration
             contract.show_verified_by = bool(request.POST.get("show_verified_by"))
             contract.show_recommended_by = bool(request.POST.get("show_recommended_by"))
+            contract.verified_by_name = (
+                request.POST.get("verified_by_name") or None
+                if contract.show_verified_by
+                else None
+            )
+            contract.recommended_by_name = (
+                request.POST.get("recommended_by_name") or None
+                if contract.show_recommended_by
+                else None
+            )
             footer_name = request.POST.get("footer_company_name")
             # When footer name is left blank, default to logged-in main company name
             contract.footer_company_name = (

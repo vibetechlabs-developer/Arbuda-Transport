@@ -64,6 +64,8 @@ class T_Contract(models.Model):
     # Invoice footer configuration
     show_verified_by = models.BooleanField(default=False)
     show_recommended_by = models.BooleanField(default=False)
+    verified_by_name = models.CharField(max_length=255, blank=True, null=True)
+    recommended_by_name = models.CharField(max_length=255, blank=True, null=True)
     footer_company_name = models.CharField(max_length=255, blank=True, null=True)
     default_page_wise_summary = models.BooleanField(default=False)
     summary_footer_note = models.CharField(max_length=500, blank=True, null=True)

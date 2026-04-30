@@ -966,6 +966,17 @@
                   >
                   <label class="form-check-label" for="show_verified_by">Verified By</label>
                 </div>
+                <div class="mb-3 mt-2">
+                  <label for="verified_by_name" class="form-label">Verified By Name</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="verified_by_name"
+                    name="verified_by_name"
+                    placeholder="Enter verified by name"
+                    value="{{ contract.verified_by_name|default:'' }}"
+                  >
+                </div>
                 <div class="form-check mt-3 ">
                   <input
                     class="form-check-input"
@@ -975,6 +986,17 @@
                     {% if contract.show_recommended_by %}checked{% endif %}
                   >
                   <label class="form-check-label" for="show_recommended_by">Recommended By</label>
+                </div>
+                <div class="mb-3 mt-2">
+                  <label for="recommended_by_name" class="form-label">Recommended By Name</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="recommended_by_name"
+                    name="recommended_by_name"
+                    placeholder="Enter recommended by name"
+                    value="{{ contract.recommended_by_name|default:'' }}"
+                  >
                 </div>
               </div>
               <div class="col-sm-8">
@@ -1135,6 +1157,26 @@
         validateContractNo(this.value);
       });
     }
+
+    const showVerifiedBy = document.getElementById('show_verified_by');
+    const verifiedByName = document.getElementById('verified_by_name');
+    const showRecommendedBy = document.getElementById('show_recommended_by');
+    const recommendedByName = document.getElementById('recommended_by_name');
+
+    function toggleFooterNameInputs() {
+      if (showVerifiedBy && verifiedByName) {
+        verifiedByName.disabled = !showVerifiedBy.checked;
+        if (!showVerifiedBy.checked) verifiedByName.value = '';
+      }
+      if (showRecommendedBy && recommendedByName) {
+        recommendedByName.disabled = !showRecommendedBy.checked;
+        if (!showRecommendedBy.checked) recommendedByName.value = '';
+      }
+    }
+
+    if (showVerifiedBy) showVerifiedBy.addEventListener('change', toggleFooterNameInputs);
+    if (showRecommendedBy) showRecommendedBy.addEventListener('change', toggleFooterNameInputs);
+    toggleFooterNameInputs();
   });
 </script>
 {% endblock %}

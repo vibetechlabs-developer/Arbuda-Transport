@@ -484,6 +484,12 @@ def generate_invoice_pdf(request):
         the visual from the sample invoice.
         """
         footer_elements = []
+        footer_text_style = ParagraphStyle(
+            name="FooterText",
+            parent=to_style,
+            alignment=1,
+            leading=12,
+        )
 
         footer_name = (
             getattr(contract, "footer_company_name", None)
@@ -492,49 +498,59 @@ def generate_invoice_pdf(request):
 
         # Labels
         verified_label = (
-            Paragraph("Verified By", to_style)
+            Paragraph("<b>Verified By</b>", footer_text_style)
             if getattr(contract, "show_verified_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
         recommended_label = (
-            Paragraph("Recommended By", to_style)
+            Paragraph("<b>Recommended By</b>", footer_text_style)
             if getattr(contract, "show_recommended_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
-        company_label = Paragraph(f"For, {footer_name}", to_style)
+        company_label = Paragraph(f"<b>For, {footer_name}</b>", footer_text_style)
 
         # Signature lines (same width visually as in design)
         sign_line = "__________________"
+        verified_name_text = getattr(contract, "verified_by_name", "") or ""
+        recommended_name_text = getattr(contract, "recommended_by_name", "") or ""
         verified_sign = (
-            Paragraph(sign_line, to_style)
+            Paragraph(sign_line, footer_text_style)
             if getattr(contract, "show_verified_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
         recommended_sign = (
-            Paragraph(sign_line, to_style)
+            Paragraph(sign_line, footer_text_style)
             if getattr(contract, "show_recommended_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
-        company_sign = Paragraph(sign_line, to_style)
+        company_sign = Paragraph(sign_line, footer_text_style)
+        verified_name = (
+            Paragraph(verified_name_text, footer_text_style)
+            if getattr(contract, "show_verified_by", False)
+            else Paragraph("", footer_text_style)
+        )
+        recommended_name = (
+            Paragraph(recommended_name_text, footer_text_style)
+            if getattr(contract, "show_recommended_by", False)
+            else Paragraph("", footer_text_style)
+        )
 
         # 3 equal columns so spacing matches design precisely
         footer_data = [
             [verified_label, recommended_label, company_label],
             [verified_sign, recommended_sign, company_sign],
+            [verified_name, recommended_name, Paragraph("", footer_text_style)],
         ]
 
-        # Use a narrower total width than the full printable area so that
-        # left and right margins have some blank space (important for punching).
-        # Tune this factor (currently 0.85) if you want more/less side space.
-        footer_total_width = available_width * 0.85
+        # Keep full printable width so all three signature sections
+        # get perfectly equal horizontal space.
+        footer_total_width = available_width
         equal_width = footer_total_width / 3.0
         footer_table = Table(
             footer_data,
             colWidths=[equal_width, equal_width, equal_width],
             splitByRow=0,
-            # Slightly right‑biased so the visual margin on the right side is smaller
-            # (more space on the left, less on the right, matching your requirement).
-            hAlign="RIGHT",
+            hAlign="CENTER",
         )
 
         footer_table.setStyle(
@@ -550,8 +566,12 @@ def generate_invoice_pdf(request):
 
                     ("TOPPADDING", (0, 0), (2, 0), 10),   # space above labels
                     ("BOTTOMPADDING", (0, 0), (2, 0), 3),
-                    ("TOPPADDING", (0, 1), (2, 1), 3),    # space between label and line
-                    ("BOTTOMPADDING", (0, 1), (2, 1), 12),
+                    # Extra blank area above signature line for stamp/signature.
+                    ("TOPPADDING", (0, 1), (2, 1), 24),
+                    ("BOTTOMPADDING", (0, 1), (2, 1), 2),
+                    # Name appears below line with light spacing.
+                    ("TOPPADDING", (0, 2), (2, 2), 10),
+                    ("BOTTOMPADDING", (0, 2), (2, 2), 10),
                 ]
             )
         )
@@ -1384,6 +1404,12 @@ def _download_generate_invoice_pdf_impl(request):
         with three equal columns and signature lines underneath.
         """
         footer_elements = []
+        footer_text_style = ParagraphStyle(
+            name="FooterText",
+            parent=to_style,
+            alignment=1,
+            leading=12,
+        )
 
         footer_name = (
             getattr(contract, "footer_company_name", None)
@@ -1392,46 +1418,58 @@ def _download_generate_invoice_pdf_impl(request):
 
         # Labels
         verified_label = (
-            Paragraph("Verified By", to_style)
+            Paragraph("<b>Verified By</b>", footer_text_style)
             if getattr(contract, "show_verified_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
         recommended_label = (
-            Paragraph("Recommended By", to_style)
+            Paragraph("<b>Recommended By</b>", footer_text_style)
             if getattr(contract, "show_recommended_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
-        company_label = Paragraph(f"For, {footer_name}", to_style)
+        company_label = Paragraph(f"<b>For, {footer_name}</b>", footer_text_style)
 
         # Signature lines
         sign_line = "__________________"
+        verified_name_text = getattr(contract, "verified_by_name", "") or ""
+        recommended_name_text = getattr(contract, "recommended_by_name", "") or ""
         verified_sign = (
-            Paragraph(sign_line, to_style)
+            Paragraph(sign_line, footer_text_style)
             if getattr(contract, "show_verified_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
         recommended_sign = (
-            Paragraph(sign_line, to_style)
+            Paragraph(sign_line, footer_text_style)
             if getattr(contract, "show_recommended_by", False)
-            else Paragraph("", to_style)
+            else Paragraph("", footer_text_style)
         )
-        company_sign = Paragraph(sign_line, to_style)
+        company_sign = Paragraph(sign_line, footer_text_style)
+        verified_name = (
+            Paragraph(verified_name_text, footer_text_style)
+            if getattr(contract, "show_verified_by", False)
+            else Paragraph("", footer_text_style)
+        )
+        recommended_name = (
+            Paragraph(recommended_name_text, footer_text_style)
+            if getattr(contract, "show_recommended_by", False)
+            else Paragraph("", footer_text_style)
+        )
 
         footer_data = [
             [verified_label, recommended_label, company_label],
             [verified_sign, recommended_sign, company_sign],
+            [verified_name, recommended_name, Paragraph("", footer_text_style)],
         ]
 
-        # Match the same visual margins as the create-invoice PDF footer
-        # (narrower block centered on the page so both sides have equal space)
-        footer_total_width = available_width * 0.85
+        # Keep full printable width so all three signature sections
+        # get perfectly equal horizontal space.
+        footer_total_width = available_width
         equal_width = footer_total_width / 3.0
         footer_table = Table(
             footer_data,
             colWidths=[equal_width, equal_width, equal_width],
             splitByRow=0,
-            # Keep same right‑biased alignment as create‑invoice PDF
-            hAlign="RIGHT",
+            hAlign="CENTER",
         )
 
         footer_table.setStyle(
@@ -1443,8 +1481,10 @@ def _download_generate_invoice_pdf_impl(request):
                     ("RIGHTPADDING", (0, 0), (2, -1), 0),
                     ("TOPPADDING", (0, 0), (2, 0), 10),
                     ("BOTTOMPADDING", (0, 0), (2, 0), 3),
-                    ("TOPPADDING", (0, 1), (2, 1), 3),
-                    ("BOTTOMPADDING", (0, 1), (2, 1), 12),
+                    ("TOPPADDING", (0, 1), (2, 1), 24),
+                    ("BOTTOMPADDING", (0, 1), (2, 1), 2),
+                    ("TOPPADDING", (0, 2), (2, 2), 10),
+                    ("BOTTOMPADDING", (0, 2), (2, 2), 10),
                 ]
             )
         )
