@@ -128,7 +128,7 @@
               <div class="mb-3 col-sm-6">
                 <label for="km" class="form-label">KM</label>
                 <input type="text" class="form-control" id="km" name="km" placeholder="Enter km"
-                  oninput=" this.classList.remove('invalid') , fecthrate(this.value)" value="{{ dispatch.km }}" required />
+                  oninput=" this.classList.remove('invalid') , fecthrate(this.value); calculate_rent();" value="{{ dispatch.km }}" required />
               </div>
             </div>
 
@@ -175,7 +175,7 @@
                   </div>
                 </div>
                 <input type="number" class="form-control" id="rate" name="rate" placeholder="Enter rupees per ton"
-                  oninput=" this.classList.remove('invalid')" step="any" value="{{ dispatch.rate }}" />
+                  oninput=" this.classList.remove('invalid'); calculate_rent();" step="any" value="{{ dispatch.rate }}" />
               </div>
 
             </div>
@@ -397,14 +397,18 @@
           const baseFrom = sanitizeFromCenter(data.from);
           document.getElementById('from_center').value = baseFrom;
           document.getElementById('from_center').setAttribute('readonly', true);
-          document.getElementById('i_unloading_charge_1').value = data.unloading_charge_1;
-          document.getElementById('i_unloading_charge_2').value = data.unloading_charge_2;
-          document.getElementById('i_loading_charge').value = data.loading_charge;
+          // In update flow, preserve dispatch-specific per-ton rates if already derived.
+          if (!(parseFloat(document.getElementById('i_unloading_charge_1').value) > 0)) {
+            document.getElementById('i_unloading_charge_1').value = data.unloading_charge_1;
+          }
+          if (!(parseFloat(document.getElementById('i_unloading_charge_2').value) > 0)) {
+            document.getElementById('i_unloading_charge_2').value = data.unloading_charge_2;
+          }
+          if (!(parseFloat(document.getElementById('i_loading_charge').value) > 0)) {
+            document.getElementById('i_loading_charge').value = data.loading_charge;
+          }
         } else {
           document.getElementById('from_center').value = '';
-          document.getElementById('i_unloading_charge_1').value = 0;
-          document.getElementById('i_unloading_charge_2').value = 0;
-          document.getElementById('i_loading_charge').value = 0;
         }
         if (data.destinations) {
           updateDestinations(data.destinations);
@@ -481,11 +485,13 @@
           document.getElementById('rate').setAttribute('readonly', true);
           document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
           document.getElementById('i_rate_calculation').value = data.rate_calculation;
+          calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
           document.getElementById('rate_calculation').innerHTML = ``;
           document.getElementById('i_rate_calculation').value = "";
+          calculate_rent();
         }
       })
       .catch(err => {
@@ -503,10 +509,12 @@
           document.getElementById('rate').value = data.amount;
           document.getElementById('rate').setAttribute('readonly', true);
           document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
           document.getElementById('i_rate_calculation').value = "";
+          calculate_rent();
         }
       })
       .catch(err => {
@@ -527,9 +535,11 @@
           let income_slab = document.getElementById('income-slab')
           income_slab.classList.remove('d-none')
           document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
+          calculate_rent();
         }
         if (data.slab) {
           const tbody = document.getElementById("rate-table");
@@ -573,11 +583,13 @@
             document.getElementById('rate').setAttribute('readonly', true);
             document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
+            calculate_rent();
           } else {
             document.getElementById('rate').removeAttribute('readonly', true);
             document.getElementById('rate').value = '';
             document.getElementById('rate_calculation').innerHTML = ``;
             document.getElementById('i_rate_calculation').value = "";
+            calculate_rent();
           }
         })
         .catch(err => {
@@ -599,11 +611,13 @@
             document.getElementById('rate').setAttribute('readonly', true);
             document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
+            calculate_rent();
           } else {
             document.getElementById('rate').removeAttribute('readonly', true);
             document.getElementById('rate').value = '';
             document.getElementById('rate_calculation').innerHTML = ``;
             document.getElementById('i_rate_calculation').value = "";
+            calculate_rent();
           }
         })
         .catch(err => {
@@ -613,11 +627,10 @@
   }
 
   function calculate_rent() {
-    let weight = document.getElementById('weight').value
-    let rate = document.getElementById('rate').value
-    let rate_calculation = document.getElementById('i_rate_calculation') ? document.getElementById('i_rate_calculation').innerHTML : ''
+    let weight = parseFloat(document.getElementById('weight').value) || 0
+    let rate = parseFloat(document.getElementById('rate').value) || 0
     let totalfreight = document.getElementById('totalfreight')
-    let km = document.getElementById('km').value
+    let km = parseFloat(document.getElementById('km').value) || 0
     let unloading_charge_1 = document.getElementById("i_unloading_charge_1").value
     let unloading_charge_2 = document.getElementById("i_unloading_charge_2").value
     let loading_charge = document.getElementById("i_loading_charge").value
@@ -626,14 +639,9 @@
     let load_amount = document.getElementById("loading_charge")
     let grand_total = document.getElementById('grand_total')
 
-    if (rate_calculation == "MT/KM") {
-      totalfreight.value = (weight * rate * km).toFixed(2);
-      totalfreight.setAttribute("readonly", true)
-    }
-    else {
-      totalfreight.value = (weight * rate).toFixed(2);
-      totalfreight.setAttribute("readonly", true)
-    }
+    // Requirement: Freight Amount always = Ton * Rate * KM
+    totalfreight.value = (weight * rate * km).toFixed(2);
+    totalfreight.setAttribute("readonly", true)
     
     if (document.getElementById("unloadingYes_1").checked) {
       unload_amount_1.value = (unloading_charge_1 * weight).toFixed(2);
@@ -651,6 +659,38 @@
     }
 
     add_extra_cost();
+  }
+
+  function toExactAmount(val) {
+    const n = Number(val);
+    if (!Number.isFinite(n)) return "0";
+    const clean = Math.round(n * 1e6) / 1e6;
+    const s = clean.toString();
+    return s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") || "0";
+  }
+
+  function initChargeRatesFromDispatch() {
+    const weight = parseFloat(document.getElementById("weight").value) || 0;
+    if (weight <= 0) return;
+
+    if (document.getElementById("loadingYes").checked) {
+      const loadingAmount = parseFloat(document.getElementById("loading_charge").value) || 0;
+      if (loadingAmount > 0) {
+        document.getElementById("i_loading_charge").value = loadingAmount / weight;
+      }
+    }
+    if (document.getElementById("unloadingYes_1").checked) {
+      const unloading1Amount = parseFloat(document.getElementById("unloading_charge_1").value) || 0;
+      if (unloading1Amount > 0) {
+        document.getElementById("i_unloading_charge_1").value = unloading1Amount / weight;
+      }
+    }
+    if (document.getElementById("unloadingYes_2").checked) {
+      const unloading2Amount = parseFloat(document.getElementById("unloading_charge_2").value) || 0;
+      if (unloading2Amount > 0) {
+        document.getElementById("i_unloading_charge_2").value = unloading2Amount / weight;
+      }
+    }
   }
 
   function calculate_profite() {
@@ -787,8 +827,12 @@
     if (fromInput && fromInput.value) {
       fromInput.value = sanitizeFromCenter(fromInput.value);
     }
+    // Derive per-ton hidden rates from existing dispatch values before any fetch overwrites.
+    initChargeRatesFromDispatch();
     // Fetch contract details to populate hidden fields
     fecthContractDetails();
+    // Keep totals in sync on initial render as well.
+    calculate_rent();
   });
 </script>
 
