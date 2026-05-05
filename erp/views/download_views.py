@@ -2439,16 +2439,24 @@ def generate_summary_pdf(request):
     if len(destination_scope_parts) > 3 and destination_scope_text:
         destination_scope_text = f"{destination_scope_text}..."
 
-    # Keep destination text from data, but when bill number carries a zone code
-    # (e.g. GJ-09/049), prefer showing invoice-style zone text in intro:
-    # "Gujarat G-9".
-    zone_bill_no = str(bills_data[0].get("bill_no") or "") if bills_data else ""
-    zone_match = re.search(r"\bGJ\s*[-]?\s*0*(\d+)\b", zone_bill_no, re.IGNORECASE)
-    if zone_match:
-        destination_scope_text = f"Gujarat G-{int(zone_match.group(1))}"
+    # Keep destination text from data, but prefix it with exact bill codes from
+    # selected bills (e.g. MP-03, RJ-11) in the same order.
+    bill_state_codes = []
+    for b in bills_data:
+        bill_no_text = str(b.get("bill_no") or "")
+        bill_prefix_match = re.search(r"\b([A-Z]{2})\s*[-]?\s*0*(\d+)", bill_no_text, re.IGNORECASE)
+        if not bill_prefix_match:
+            continue
+        code = f"{bill_prefix_match.group(1).upper()}-{int(bill_prefix_match.group(2)):02d}"
+        if code not in bill_state_codes:
+            bill_state_codes.append(code)
+
+    bill_state_code = ", ".join(bill_state_codes)
 
     billing_state = (contract.billing_state or "").strip()
-    if billing_state and destination_scope_text and not destination_scope_text.lower().startswith("gujarat g-"):
+    if bill_state_code:
+        destination_scope_text = bill_state_code
+    elif billing_state and destination_scope_text and not destination_scope_text.lower().startswith("gujarat g-"):
         destination_scope_text = f"{billing_state} {destination_scope_text}"
     elif billing_state and not destination_scope_text:
         destination_scope_text = billing_state
