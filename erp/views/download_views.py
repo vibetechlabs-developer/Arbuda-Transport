@@ -2404,18 +2404,19 @@ def generate_summary_pdf(request):
             for page_idx, page_rows in enumerate(page_chunks, start=1):
                 page_mt = sum(float(d.weight or 0) for d in page_rows)
                 page_freight = sum(float(d.totalfreight or 0) for d in page_rows)
-                page_unload = sum(
-                    float(d.loading_charge or 0)
-                    + float(d.unloading_charge_1 or 0)
-                    + float(d.unloading_charge_2 or 0)
-                    for d in page_rows
-                )
+                page_loading = sum(float(d.loading_charge or 0) for d in page_rows)
+                page_unloading1 = sum(float(d.unloading_charge_1 or 0) for d in page_rows)
+                page_unloading2 = sum(float(d.unloading_charge_2 or 0) for d in page_rows)
+                page_unload = page_loading + page_unloading1 + page_unloading2
                 page_total = page_freight + page_unload
                 page_wise_rows.append({
                     "bill_no": invoice.Bill_no,
                     "page_no": page_idx,
                     "mt": page_mt,
                     "bill_amount": page_freight,
+                    "loading": page_loading,
+                    "unloading1": page_unloading1,
+                    "unloading2": page_unloading2,
                     "unload_charge": page_unload,
                     "grand_total": page_total,
                 })
@@ -2644,15 +2645,24 @@ def generate_summary_pdf(request):
 
     # ---- Bills table (sample-style compact summary format) ----
     total_unload_charge = total_loading + total_unloading1 + total_unloading2
+    include_loading_charge = abs(total_loading) > 0.000001
+    include_unloading1 = abs(total_unloading1) > 0.000001
+    include_unloading2 = abs(total_unloading2) > 0.000001
     bill_or_page_label = "Page No." if page_wise_summary else "Bill No."
-    table_data = [[
+    table_header = [
         Paragraph("Sr. No.", cell_header),
         Paragraph(bill_or_page_label, cell_header),
         Paragraph("M.T", cell_header),
         Paragraph("Freight Amt.", cell_header),
-        Paragraph("Unload Charge", cell_header),
-        Paragraph("Total Amt.Rs", cell_header),
-    ]]
+    ]
+    if include_loading_charge:
+        table_header.append(Paragraph("Loading Charge", cell_header))
+    if include_unloading1:
+        table_header.append(Paragraph("Unloading 1", cell_header))
+    if include_unloading2:
+        table_header.append(Paragraph("Unloading 2", cell_header))
+    table_header.append(Paragraph("Total Amt.Rs", cell_header))
+    table_data = [table_header]
 
     rows_for_table = page_wise_rows if page_wise_summary else bills_data
 
@@ -2661,36 +2671,68 @@ def generate_summary_pdf(request):
         row_unload = float(bill.get("unload_charge", 0)) if page_wise_summary else (
             float(bill["loading"] or 0) + float(bill["unloading1"] or 0) + float(bill["unloading2"] or 0)
         )
+        row_loading = float(bill.get("loading", 0) or 0)
+        row_unloading1 = float(bill.get("unloading1", 0) or 0)
+        row_unloading2 = float(bill.get("unloading2", 0) or 0)
         table_data.append(
             [
                 Paragraph(str(idx), cell_center),
                 Paragraph(second_col, cell_center),
                 Paragraph(f"{bill['mt']:.3f}", cell_right),
                 Paragraph(f"{bill['bill_amount']:.2f}", cell_right),
-                Paragraph(f"{row_unload:.2f}", cell_right),
-                Paragraph(f"{bill['grand_total']:.2f}", cell_right),
             ]
+            + ([Paragraph(f"{row_loading:.2f}", cell_right)] if include_loading_charge else [])
+            + ([Paragraph(f"{row_unloading1:.2f}", cell_right)] if include_unloading1 else [])
+            + ([Paragraph(f"{row_unloading2:.2f}", cell_right)] if include_unloading2 else [])
+            + [Paragraph(f"{bill['grand_total']:.2f}", cell_right)]
         )
 
-    table_data.append(
-        [
-            Paragraph("Total", ParagraphStyle(name="TotalLeft", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)),
-            "",
-            Paragraph(f"{total_mt:.3f}", ParagraphStyle(name="TotalRight", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
-            Paragraph(f"{total_bill_amount:.2f}", ParagraphStyle(name="TotalRight2", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
-            Paragraph(f"{total_unload_charge:.2f}", ParagraphStyle(name="TotalRight3", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
-            Paragraph(f"{total_grand_total:.2f}", ParagraphStyle(name="TotalRight4", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
-        ]
-    )
-
-    col_widths = [
-        14 * mm,  # Sr
-        26 * mm,  # Page/Bill No
-        26 * mm,  # MT
-        34 * mm,  # Freight
-        34 * mm,  # Unload Charge
-        available_w - (14 * mm + 26 * mm + 26 * mm + 34 * mm + 34 * mm),  # Total
+    total_row = [
+        Paragraph("Total", ParagraphStyle(name="TotalLeft", fontName="Helvetica-Bold", fontSize=9, alignment=1, leading=11)),
+        "",
+        Paragraph(f"{total_mt:.3f}", ParagraphStyle(name="TotalRight", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
+        Paragraph(f"{total_bill_amount:.2f}", ParagraphStyle(name="TotalRight2", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11)),
     ]
+    if include_loading_charge:
+        total_row.append(
+            Paragraph(
+                f"{total_loading:.2f}",
+                ParagraphStyle(name="TotalRight3", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11),
+            )
+        )
+    if include_unloading1:
+        total_row.append(
+            Paragraph(
+                f"{total_unloading1:.2f}",
+                ParagraphStyle(name="TotalRight4", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11),
+            )
+        )
+    if include_unloading2:
+        total_row.append(
+            Paragraph(
+                f"{total_unloading2:.2f}",
+                ParagraphStyle(name="TotalRight5", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11),
+            )
+        )
+    total_row.append(
+        Paragraph(
+            f"{total_grand_total:.2f}",
+            ParagraphStyle(name="TotalRight6", fontName="Helvetica-Bold", fontSize=9, alignment=2, leading=11),
+        )
+    )
+    table_data.append(total_row)
+
+    dynamic_col_ratios = [0.08, 0.16, 0.13, 0.19]  # Sr, Bill/Page, MT, Freight
+    if include_loading_charge:
+        dynamic_col_ratios.append(0.14)
+    if include_unloading1:
+        dynamic_col_ratios.append(0.14)
+    if include_unloading2:
+        dynamic_col_ratios.append(0.14)
+    dynamic_col_ratios.append(0.22)  # Total
+    ratio_sum = sum(dynamic_col_ratios) or 1.0
+    col_ratios = [r / ratio_sum for r in dynamic_col_ratios]
+    col_widths = [available_w * r for r in col_ratios]
 
     # Ensure the table consumes the full available width (avoid any rounding/column-count drift)
     width_delta = available_w - sum(col_widths)
