@@ -297,7 +297,7 @@ def generate_invoice_pdf(request):
                 gc_no = contract.gc_series_from
             gc_note = GC_Note.objects.create(
                 gc_no=gc_no,
-                gc_date=bill_date,
+                gc_date=d.dep_date,
                 consignor=contract.company_name,
                 consignee=d.party_name,
                 dispatch_from=contract.from_center,
@@ -2269,9 +2269,13 @@ def download_gc_pdf(request):
     pdf = buffer.getvalue()
     buffer.close()
 
-    # Return the response
+    # Return the response: inline for preview, attachment for explicit download.
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="gc_notes.pdf"'
+    download_flag = (request.POST.get("download") or "").strip()
+    if download_flag:
+        response['Content-Disposition'] = 'attachment; filename="gc_notes.pdf"'
+    else:
+        response['Content-Disposition'] = 'inline; filename="gc_notes.pdf"'
     response.write(pdf)
     return response
 
