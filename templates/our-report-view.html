@@ -220,14 +220,12 @@
   let allDispatches = []; // store fetched data globally
   let allfield;
 
-  // Initialize contract dropdown with TomSelect and store reference
+  // Keep contract dropdown as native <select>.
+  // TomSelect for contract can cause placeholder/render issues across browsers.
   const contractSelect = document.getElementById("contract_no");
   if (contractSelect) {
-    contractTomSelect = new TomSelect(contractSelect, {
-      onChange: function(value) {
-        // Call onContractChange when contract changes
-        onContractChange();
-      }
+    contractSelect.addEventListener("change", function () {
+      onContractChange();
     });
   }
 

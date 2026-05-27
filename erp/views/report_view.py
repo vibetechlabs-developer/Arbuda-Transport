@@ -325,6 +325,8 @@ def download_report(request):
         center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=7.5, alignment=1 ,leading=9)
         title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=11, alignment=1 ,leading=13) 
         to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=9, alignment=1 ,leading=11)
+        to_style_left = ParagraphStyle(name="ToLeft", fontName="Helvetica", fontSize=9, alignment=0, leading=11)
+        to_style_right = ParagraphStyle(name="ToRightMeta", fontName="Helvetica", fontSize=9, alignment=2, leading=11)
         to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9, alignment=1 ,leading=11)
         total_style = ParagraphStyle(
             name="TotalStyle",
@@ -413,6 +415,7 @@ def download_report(request):
         fields = contract.invoice_fields
         # Use 12 rows per page so layout matches invoice and other reports
         chunk_size = 12
+        _report_col_widths_cache = [None]
 
         # --- Build table for a page ---
         def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=0):
@@ -661,20 +664,21 @@ def download_report(request):
             table_width = available_width
             headers = data[0]
 
-            # Calculate column widths
-            col_widths = []
-            for col_name in headers:
-                width = special_widths.get(col_name)
-                if width is None:
-                    # Default width for unknown columns
-                    width = 14 * mm
-                col_widths.append(width)
-
-            # Scale widths to fit exactly into the available table width
-            fixed_total = sum(col_widths)
-            if fixed_total > 0:
-                scale_factor = table_width / fixed_total
-                col_widths = [w * scale_factor for w in col_widths]
+            # Calculate column widths (cached so TO block aligns with Sr No column)
+            if _report_col_widths_cache[0] is not None:
+                col_widths = list(_report_col_widths_cache[0])
+            else:
+                col_widths = []
+                for col_name in headers:
+                    width = special_widths.get(col_name)
+                    if width is None:
+                        width = 14 * mm
+                    col_widths.append(width)
+                fixed_total = sum(col_widths)
+                if fixed_total > 0:
+                    scale_factor = table_width / fixed_total
+                    col_widths = [w * scale_factor for w in col_widths]
+                _report_col_widths_cache[0] = col_widths
 
             # Format cells
             for i, row in enumerate(data):
@@ -770,9 +774,6 @@ def download_report(request):
 
             return table
 
-
-    
-        
         page_no = 1
 
         for i in range(0, len(dispatches), chunk_size):
@@ -794,29 +795,32 @@ def download_report(request):
                 date_range_text = f"Dispatch Report To <b>{f_to_date.strftime('%d-%m-%Y')}</b>"
             
             to_content = [
-                    Paragraph(f"Dispatch From : <b>{_escape_para_text(contract.from_center)}</b>", to_style),
-                    Paragraph(date_range_text, to_style) if date_range_text else Paragraph("", to_style),
+                    Paragraph(f"Dispatch From : <b>{_escape_para_text(contract.from_center)}</b>", to_style_left),
+                    Paragraph(date_range_text, to_style_left) if date_range_text else Paragraph("", to_style_left),
                 ]
             bill_no_content = [
-                    Paragraph(f"Report Date : {date.today().strftime('%d-%m-%Y')}", to_style),
-                    Paragraph(f"Dispacth Product : <b>{_escape_para_text(i_product_name)}</b>", to_style) if i_report_type == "product_wise" else Paragraph(f"", to_style), 
+                    Paragraph(f"Report Date : {date.today().strftime('%d-%m-%Y')}", to_style_right),
+                    Paragraph(f"Dispacth Product : <b>{_escape_para_text(i_product_name)}</b>", to_style_right) if i_report_type == "product_wise" else Paragraph(f"", to_style_right), 
                     # Paragraph(f"From : {contract.from_center}", to_style),
                     # Paragraph(f"District : {district}", to_style),
                     # Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
                 ]
             page_no += 1
 
-            # Match the "use" / client dispatch PDFs: split the available width
-            # between the left-hand details and right-hand summary block.
+            # Full-width row: left block flush with table/Sr No; report date on the right.
             to_table = Table(
                 [[to_content, bill_no_content]],
-                colWidths=[available_width * 0.82, available_width * 0.18],
+                colWidths=[available_width * 0.78, available_width * 0.22],
             )
             to_table.setStyle(TableStyle([
                 ('LINEBELOW',(0,0),(-1,0),0.5,colors.black),
                 ("VALIGN",(0,0),(-1,-1),"TOP"),
-                ("LEFTPADDING",(0,0),(-1,-1),0),
-                ("RIGHTPADDING",(0,0),(-1,-1),0)
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (0, -1), 2),
+                ("RIGHTPADDING", (0, 0), (0, -1), 8),
+                ("LEFTPADDING", (1, 0), (1, -1), 6),
+                ("RIGHTPADDING", (1, 0), (1, -1), 2),
             ]))
             elements.append(to_table)
             # No extra spacer here: keep PARTICULARS almost touching the TO block
@@ -1110,7 +1114,8 @@ def download_our_report(request):
         center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=7, alignment=1, leading=9)
         title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=11, alignment=1, leading=13)
         to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=8, alignment=1, leading=10)
-        to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=8, alignment=1, leading=10)
+        to_style_left = ParagraphStyle(name="ToLeft", fontName="Helvetica", fontSize=8, alignment=0, leading=10)
+        to_style_right = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=8, alignment=2, leading=10)
         # TOTAL row numbers must NEVER split into multiple lines.
         total_style = ParagraphStyle(
             name="TotalStyle",
@@ -1210,6 +1215,7 @@ def download_our_report(request):
         # Use strictly 12 rows per page as per explicit requirement.
         # We manually stretch the heights later to fulfill the page footprint.
         chunk_size = 12
+        _report_col_widths_cache = [None]
 
         # --- Build table for a page ---
         def build_table_page(dispatch_subset, add_total_row=True, is_last_page=False, all_dispatches=None, start_index=0):
@@ -1520,19 +1526,20 @@ def download_our_report(request):
             table_width = available_width
             headers = data[0]
 
-            col_widths = []
-            for col_name in headers:
-                width = special_widths.get(col_name)
-                if width is None:
-                    # Default width for unknown columns
-                    width = 14 * mm
-                col_widths.append(width)
-
-            # Scale widths if sum doesn't match table width
-            fixed_total = sum(col_widths)
-            if fixed_total > 0:
-                scale_factor = table_width / fixed_total
-                col_widths = [w * scale_factor for w in col_widths]
+            if _report_col_widths_cache[0] is not None:
+                col_widths = list(_report_col_widths_cache[0])
+            else:
+                col_widths = []
+                for col_name in headers:
+                    width = special_widths.get(col_name)
+                    if width is None:
+                        width = 14 * mm
+                    col_widths.append(width)
+                fixed_total = sum(col_widths)
+                if fixed_total > 0:
+                    scale_factor = table_width / fixed_total
+                    col_widths = [w * scale_factor for w in col_widths]
+                _report_col_widths_cache[0] = col_widths
 
             # Format cells
             for i, row in enumerate(data):
@@ -1647,28 +1654,32 @@ def download_our_report(request):
                 date_range_text = f"Dispatch Report To <b>{f_to_date.strftime('%d-%m-%Y')}</b>"
             
             to_content = [
-                    Paragraph(f"Dispatch From : <b>{_escape_para_text(contract.from_center)}</b>", to_style),
-                    Paragraph(date_range_text, to_style) if date_range_text else Paragraph("", to_style),
+                    Paragraph(f"Dispatch From : <b>{_escape_para_text(contract.from_center)}</b>", to_style_left),
+                    Paragraph(date_range_text, to_style_left) if date_range_text else Paragraph("", to_style_left),
                 ]
             bill_no_content = [
-                    Paragraph(f"Report Date : {date.today().strftime('%d-%m-%Y')}", to_style),
-                    Paragraph(f"Dispacth Product : <b>{_escape_para_text(i_product_name)}</b>", to_style) if i_report_type == "product_wise" else Paragraph(f"", to_style), 
+                    Paragraph(f"Report Date : {date.today().strftime('%d-%m-%Y')}", to_style_right),
+                    Paragraph(f"Dispacth Product : <b>{_escape_para_text(i_product_name)}</b>", to_style_right) if i_report_type == "product_wise" else Paragraph(f"", to_style_right), 
                     # Paragraph(f"From : {contract.from_center}", to_style),
                     # Paragraph(f"District : {district}", to_style),
                     # Paragraph(f"Page : {page_no} of {total_pages} ", to_style)
                 ]
             page_no += 1
 
-            # Match client report proportions but using full available width.
+            # Full-width row: left block flush with table/Sr No; report date on the right.
             to_table = Table(
                 [[to_content, bill_no_content]],
-                colWidths=[available_width * 0.82, available_width * 0.18],
+                colWidths=[available_width * 0.78, available_width * 0.22],
             )
             to_table.setStyle(TableStyle([
                 ('LINEBELOW',(0,0),(-1,0),0.5,colors.black),
                 ("VALIGN",(0,0),(-1,-1),"TOP"),
-                ("LEFTPADDING",(0,0),(-1,-1),0),
-                ("RIGHTPADDING",(0,0),(-1,-1),0)
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (0, -1), 0.5),
+                ("RIGHTPADDING", (0, 0), (0, -1), 8),
+                ("LEFTPADDING", (1, 0), (1, -1), 6),
+                ("RIGHTPADDING", (1, 0), (1, -1), 2),
             ]))
             elements.append(to_table)
             # Match spacing/layout of standard (use) report:
