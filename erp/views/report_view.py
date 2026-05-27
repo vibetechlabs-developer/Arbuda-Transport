@@ -46,15 +46,14 @@ def client_report_view(request):
         financial_year = request.session.get('financial_year', get_current_financial_year())
         start_date, end_date = get_financial_year_start_end(financial_year)
         
-        # Filter contracts that are active during the financial year
-        # A contract is active if it overlaps with the financial year period
-        # Contract overlaps if: (c_start_date <= end_date) AND (c_end_date >= start_date OR c_end_date is NULL)
+        # Filter contracts that are active during the financial year.
+        # Treat NULL `c_start_date` / `c_end_date` as "open ended" so dropdown
+        # doesn't become empty for companies having missing start/end dates.
         contracts = T_Contract.objects.filter(
             company_id_id=company_id
         ).filter(
-            Q(c_start_date__lte=end_date) & (
-                Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True)
-            )
+            (Q(c_start_date__lte=end_date) | Q(c_start_date__isnull=True))
+            & (Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True))
         ).order_by('-id')
         alldata['allcontracts'] = contracts
     except T_Contract.DoesNotExist:
@@ -83,7 +82,7 @@ def outstanding_report_view(request):
         contracts = (
             T_Contract.objects.filter(company_id_id=company_id)
             .filter(
-                Q(c_start_date__lte=end_date)
+                (Q(c_start_date__lte=end_date) | Q(c_start_date__isnull=True))
                 & (Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True))
             )
             .order_by("-id")
@@ -898,9 +897,8 @@ def internal_report(request):
         contracts = T_Contract.objects.filter(
             company_id_id=company_id
         ).filter(
-            Q(c_start_date__lte=end_date) & (
-                Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True)
-            )
+            (Q(c_start_date__lte=end_date) | Q(c_start_date__isnull=True))
+            & (Q(c_end_date__gte=start_date) | Q(c_end_date__isnull=True))
         ).order_by('-id')
         alldata["allcontracts"] = contracts
     except T_Contract.DoesNotExist:
