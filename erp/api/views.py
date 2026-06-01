@@ -18,11 +18,25 @@ from transport.models import (
     Rate_Cumulative,
     Rate_taluka,
     Rate_District,
+    RateSlabRevision,
+)
+from erp.utils.rate_revision_service import (
+    get_applicable_revision,
+    resolve_slab_value,
+    revisions_for_contract,
 )
 import re
 from decimal import Decimal
 from datetime import datetime, timedelta
 from django.db.models import Func, F, IntegerField, Q
+from django.utils import timezone as django_timezone
+
+
+def _format_local_recorded_at(dt):
+    """Format DB timestamp in project timezone (Asia/Kolkata)."""
+    if not dt:
+        return ""
+    return django_timezone.localtime(dt).strftime("%d-%m-%Y %H:%M")
 
 ## CONTRACT DETAILS FETCHING ##
 
@@ -615,6 +629,17 @@ def get_invoice(request):
 
 ## RATE DETAILS FETCHING ##
 
+
+def _parse_as_of_date(request):
+    dep_date = request.GET.get("dep_date") or request.GET.get("as_of_date")
+    if not dep_date:
+        return None
+    try:
+        return datetime.strptime(str(dep_date)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
 ## KM WISE RATE ##
 
 @session_required
@@ -627,9 +652,11 @@ def get_rate_details(request):
 
     try:
         km = float(km)
-        
+        company_id = request.session['company_info']['company_id']
+        as_of_date = _parse_as_of_date(request)
+
         rate = Rate.objects.filter(
-            company_id = request.session['company_info']['company_id'],
+            company_id=company_id,
             contract=dcontract_no,
             from_km__lte=km,
             to_km__gte=km
@@ -637,18 +664,34 @@ def get_rate_details(request):
         if not rate:
             return JsonResponse({"error": "No rate found for this km"}, status=404)
 
-        # return whichever is > 0
-        rate_value = rate.mt if rate.mt > 0 else rate.mt_per_km
-        rate_calculation = ""
-        if rate.mt > 0 :
+        if rate.mt > 0:
+            base_value = rate.mt
             rate_calculation = "MT"
         else:
+            base_value = rate.mt_per_km
             rate_calculation = "MT/KM"
-        how_calculation = f"From Km: {rate.from_km} | To Km: {rate.to_km} | MT: {rate.mt} | MT/KM: {rate.mt_per_km}"
+
+        rate_value = resolve_slab_value(
+            base_value,
+            company_id,
+            dcontract_no,
+            "kilometer_wise",
+            as_of_date,
+            from_km=rate.from_km,
+            to_km=rate.to_km,
+        )
+
+        how_calculation = (
+            f"From Km: {rate.from_km} | To Km: {rate.to_km} | "
+            f"MT: {rate.mt} | MT/KM: {rate.mt_per_km}"
+        )
+        if as_of_date:
+            how_calculation += f" | Applied for: {as_of_date.isoformat()}"
+
         data = {
             "rate": float(rate_value),
-            "rate_calculation": rate_calculation,   
-            "how_calculation": how_calculation
+            "rate_calculation": rate_calculation,
+            "how_calculation": how_calculation,
         }
         return JsonResponse(data)
 
@@ -659,40 +702,65 @@ def get_rate_details(request):
 
 @session_required
 def get_incometax_rate_details(request):
-    ton = request.GET.get("ton")
     km = request.GET.get("km")
     dcontract_no = request.GET.get("contract_no")
 
     try:
         km = Decimal(km)
-        slabs = Rate_IncomeTax.objects.filter(
-            company_id = request.session['company_info']['company_id'],
-            contract=dcontract_no,
-        ).values("from_km", "to_km", "mt", "mt_per_km").order_by('from_km')
+        company_id = request.session['company_info']['company_id']
+        as_of_date = _parse_as_of_date(request)
+        slabs = list(
+            Rate_IncomeTax.objects.filter(
+                company_id=company_id,
+                contract=dcontract_no,
+            ).values("from_km", "to_km", "mt", "mt_per_km").order_by('from_km')
+        )
 
         if not slabs:
             return JsonResponse({"error": "No rate found for this km"}, status=404)
+
         amount = 0
         for slab in slabs:
             from_km = Decimal(slab["from_km"])
             to_km = Decimal(slab["to_km"])
+            if slab["mt"] > 0:
+                slab_rate = resolve_slab_value(
+                    slab["mt"],
+                    company_id,
+                    dcontract_no,
+                    "incometax_wise",
+                    as_of_date,
+                    from_km=slab["from_km"],
+                    to_km=slab["to_km"],
+                )
+            else:
+                slab_rate = resolve_slab_value(
+                    slab["mt_per_km"],
+                    company_id,
+                    dcontract_no,
+                    "incometax_wise",
+                    as_of_date,
+                    from_km=slab["from_km"],
+                    to_km=slab["to_km"],
+                )
+
             if km >= to_km:
                 if slab["mt"] > 0:
-                    amount += Decimal(slab["mt"])
+                    amount += Decimal(slab_rate)
                 else:
-                    amount += (to_km  - from_km + 1 ) * Decimal(slab["mt_per_km"])
+                    amount += (to_km - from_km + 1) * Decimal(slab_rate)
             elif km >= from_km:
-                if slab["mt"] > 0: 
-                    amount +=  Decimal(slab["mt"]) 
+                if slab["mt"] > 0:
+                    amount += Decimal(slab_rate)
                 else:
-                    amount += (km - from_km + 1) *  Decimal(slab["mt_per_km"])
+                    amount += (km - from_km + 1) * Decimal(slab_rate)
                 break
 
-        data = { 
-                'amount' : float(amount),
-                'slab' : list(slabs)
-               }
-        
+        data = {
+            'amount': float(amount),
+            'slab': slabs,
+        }
+
         return JsonResponse(data)
 
     except Exception as e:
@@ -707,41 +775,85 @@ def get_cumrate_details(request):
     dcontract_no = request.GET.get("contract_no")
     try:
         km = Decimal(km)
-        slabs = Rate_Cumulative.objects.filter(
-            company_id = request.session['company_info']['company_id'],
-            contract=dcontract_no,
-        ).values("from_km", "to_km", "mt", "mt_per_km").order_by('from_km')
+        company_id = request.session['company_info']['company_id']
+        as_of_date = _parse_as_of_date(request)
+        slabs = list(
+            Rate_Cumulative.objects.filter(
+                company_id=company_id,
+                contract=dcontract_no,
+            ).values("from_km", "to_km", "mt", "mt_per_km").order_by('from_km')
+        )
 
         amount = 0
         for slab in slabs:
-            if slab["mt"] > 0:   
-                slab["st_point"] = slab["mt"]
-                slab["en_point"] = slab["mt"]
+            if slab["mt"] > 0:
+                eff_mt = resolve_slab_value(
+                    slab["mt"],
+                    company_id,
+                    dcontract_no,
+                    "cumulative_wise",
+                    as_of_date,
+                    from_km=slab["from_km"],
+                    to_km=slab["to_km"],
+                )
+                slab["st_point"] = float(eff_mt)
+                slab["en_point"] = float(eff_mt)
             else:
-                slab["st_point"] = round(slab["mt_per_km"] * slab["from_km"],2)
-                slab["en_point"] = round(slab["mt_per_km"] * slab["to_km"],2)
+                eff_mt_per_km = resolve_slab_value(
+                    slab["mt_per_km"],
+                    company_id,
+                    dcontract_no,
+                    "cumulative_wise",
+                    as_of_date,
+                    from_km=slab["from_km"],
+                    to_km=slab["to_km"],
+                )
+                slab["st_point"] = round(float(eff_mt_per_km) * slab["from_km"], 2)
+                slab["en_point"] = round(float(eff_mt_per_km) * slab["to_km"], 2)
 
         crr_slab_index = 1
 
         for crr_slab in slabs:
             if crr_slab["from_km"] <= km and crr_slab["to_km"] >= km:
-                if crr_slab["mt"] > 0 :
-                    crr_rate = round(crr_slab["mt"],2)
-                else :
-                    crr_rate = round(crr_slab["mt_per_km"] * km ,2)
+                if crr_slab["mt"] > 0:
+                    crr_rate = round(
+                        float(
+                            resolve_slab_value(
+                                crr_slab["mt"],
+                                company_id,
+                                dcontract_no,
+                                "cumulative_wise",
+                                as_of_date,
+                                from_km=crr_slab["from_km"],
+                                to_km=crr_slab["to_km"],
+                            )
+                        ),
+                        2,
+                    )
+                else:
+                    eff_mt_per_km = resolve_slab_value(
+                        crr_slab["mt_per_km"],
+                        company_id,
+                        dcontract_no,
+                        "cumulative_wise",
+                        as_of_date,
+                        from_km=crr_slab["from_km"],
+                        to_km=crr_slab["to_km"],
+                    )
+                    crr_rate = round(float(eff_mt_per_km) * float(km), 2)
 
-                for i in range(crr_slab_index , len(slabs)):
+                for i in range(crr_slab_index, len(slabs)):
                     nex_slab = slabs[i]
                     if crr_rate > nex_slab["st_point"]:
-                        crr_rate = round(nex_slab["st_point"],2)
+                        crr_rate = round(nex_slab["st_point"], 2)
                 amount = crr_rate
             crr_slab_index += 1
-        
-        data = { 
-                'amount' : float(amount),
-                'slab' : list(slabs)
-               }
-        
+
+        data = {
+            'amount': float(amount),
+            'slab': slabs,
+        }
+
         return JsonResponse(data)
 
     except Exception as e:
@@ -767,13 +879,27 @@ def get_taluka_rate_details(request):
         ).first()
         if not rate:
             return JsonResponse({"error": "No rate found for this km"}, status=404)
-       
+
+        company_id = request.session['company_info']['company_id']
+        as_of_date = _parse_as_of_date(request)
+        rate_value = resolve_slab_value(
+            rate.mt,
+            company_id,
+            dcontract_no,
+            "taluka_wise",
+            as_of_date,
+            district_name=rate.distric_name,
+            taluka_name=rate.taluka_name,
+        )
+
         rate_calculation = "MT"
-        how_calculation = f"Taluka: {rate.taluka_name} | District: {rate.distric_name} | MT: {rate.mt}"
+        how_calculation = (
+            f"Taluka: {rate.taluka_name} | District: {rate.distric_name} | MT: {rate.mt}"
+        )
         data = {
-            "rate": float(rate.mt),
-            "rate_calculation": rate_calculation,   
-            "how_calculation": how_calculation
+            "rate": float(rate_value),
+            "rate_calculation": rate_calculation,
+            "how_calculation": how_calculation,
         }
         return JsonResponse(data)
 
@@ -802,22 +928,134 @@ def get_district_rate_details(request):
         ).first()
         if not rate:
             return JsonResponse({"error": "No rate found for this km"}, status=404)
-        rate_value = rate.mt if rate.mt > 0 else rate.mt_per_km
-        if rate.mt > 0 :
+
+        company_id = request.session['company_info']['company_id']
+        as_of_date = _parse_as_of_date(request)
+        if rate.mt > 0:
+            base_value = rate.mt
             rate_calculation = "MT"
         else:
-            rate_calculation = "MT/KM"     
-        how_calculation = f" District: {rate.distric_name} | MT: {rate.mt} | MT/KM: {rate.mt_per_km}"
+            base_value = rate.mt_per_km
+            rate_calculation = "MT/KM"
+
+        rate_value = resolve_slab_value(
+            base_value,
+            company_id,
+            dcontract_no,
+            "district_wise",
+            as_of_date,
+            district_name=rate.distric_name,
+        )
+
+        how_calculation = (
+            f" District: {rate.distric_name} | MT: {rate.mt} | MT/KM: {rate.mt_per_km}"
+        )
         data = {
             "rate": float(rate_value),
-            "rate_calculation": rate_calculation,   
-            "how_calculation": how_calculation
+            "rate_calculation": rate_calculation,
+            "how_calculation": how_calculation,
         }
         return JsonResponse(data)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-    
+
+
+@session_required
+def get_slab_effective_rate(request):
+    """Current rate for a slab as of today (or dep_date) — for contract form Current Rate column."""
+    contract_id = request.GET.get("contract_id")
+    from_km = request.GET.get("from_km")
+    to_km = request.GET.get("to_km")
+    rate_category = request.GET.get("rate_category", "kilometer_wise")
+    base_value = request.GET.get("base_value")
+
+    if not contract_id:
+        return JsonResponse({"error": "contract_id required"}, status=400)
+
+    if rate_category not in ["taluka_wise", "district_wise"] and (from_km is None or to_km is None):
+        return JsonResponse({"error": "from_km and to_km required for slab rates"}, status=400)
+
+    company_id = request.session["company_info"]["company_id"]
+    as_of_date = _parse_as_of_date(request)
+    if not as_of_date:
+        from datetime import date as date_cls
+        as_of_date = date_cls.today()
+
+    slab_keys = {}
+    if rate_category == "taluka_wise":
+        district_name = request.GET.get("district_name")
+        taluka_name = request.GET.get("taluka_name")
+        slab_keys = {"district_name": district_name, "taluka_name": taluka_name}
+    elif rate_category == "district_wise":
+        district_name = request.GET.get("district_name")
+        slab_keys = {"district_name": district_name}
+    else:
+        slab_keys = {"from_km": int(from_km), "to_km": int(to_km)}
+
+    effective = resolve_slab_value(
+        base_value or 0,
+        company_id,
+        contract_id,
+        rate_category,
+        as_of_date,
+        **slab_keys,
+    )
+    rev = get_applicable_revision(
+        company_id, contract_id, rate_category, as_of_date, **slab_keys
+    )
+
+    payload = {
+        "success": True,
+        "effective_rate": float(effective),
+        "as_of_date": as_of_date.isoformat(),
+    }
+    if rev:
+        payload["active_revision"] = {
+            "effective_from": rev.effective_from.isoformat(),
+            "adjustment_type": rev.adjustment_type,
+            "adjustment_amount": str(rev.adjustment_amount),
+            "base_value": str(rev.base_value),
+            "updated_value": str(rev.updated_value),
+        }
+    return JsonResponse(payload)
+
+
+@session_required
+def get_rate_revision_history(request):
+    contract_id = request.GET.get("contract_id")
+    rate_category = request.GET.get("rate_category", "kilometer_wise")
+    from_km = request.GET.get("from_km")
+    to_km = request.GET.get("to_km")
+    district_name = request.GET.get("district_name")
+    taluka_name = request.GET.get("taluka_name")
+
+    if not contract_id:
+        return JsonResponse({"error": "contract_id required"}, status=400)
+
+    company_id = request.session['company_info']['company_id']
+    qs = revisions_for_contract(contract_id, company_id, rate_category)
+
+    if from_km is not None and to_km is not None:
+        qs = qs.filter(from_km=from_km, to_km=to_km)
+    if district_name:
+        qs = qs.filter(district_name=district_name)
+    if taluka_name:
+        qs = qs.filter(taluka_name=taluka_name)
+
+    rows = []
+    for rev in qs[:100]:
+        rows.append({
+            "effective_from": rev.effective_from.isoformat(),
+            "adjustment_type": rev.adjustment_type,
+            "adjustment_amount": str(rev.adjustment_amount),
+            "base_value": str(rev.base_value),
+            "updated_value": str(rev.updated_value),
+            "choice": rev.choice,
+            "created_at": _format_local_recorded_at(rev.created_at),
+        })
+
+    return JsonResponse({"success": True, "revisions": rows})
 
 
 ## RATE VIEW ##

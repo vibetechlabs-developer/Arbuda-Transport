@@ -1,0 +1,39 @@
+<td class="diesel-adj-cell">
+  <div class="diesel-adj-inline">
+    <select name="diesel_adj_type[]" class="form-select form-select-sm diesel-adj-type"
+      onchange="recalcRateRow(this.closest('tr'))" title="New adjustment only (leave None if unchanged)">
+      <option value="">None</option>
+      <option value="increase">+ Inc</option>
+      <option value="decrease">− Dec</option>
+    </select>
+    <input type="number" step="any" name="diesel_adj_amount[]"
+      class="form-control form-control-sm diesel-adj-amount" placeholder="Amount"
+      oninput="recalcRateRow(this.closest('tr'))" title="New adjustment amount">
+  </div>
+</td>
+<td>
+  <input type="date" name="diesel_effective_date[]"
+    class="form-control form-control-sm rate-effective-date diesel-effective-date"
+    onchange="recalcRateRow(this.closest('tr'))" title="Date for new adjustment">
+</td>
+<td>
+  <input type="text" class="form-control form-control-sm rate-updated-value" readonly tabindex="-1"
+    value="{% if effective_value %}{{ effective_value }}{% endif %}"
+    data-effective-rate="{% if effective_value %}{{ effective_value }}{% endif %}"
+    title="Current rate applicable today">
+  {% if rate.active_revision %}
+  <div class="rate-revision-active small mt-1">
+    <span class="text-muted">Active from {{ rate.active_revision.effective_from|date:"d-m-Y" }}:</span>
+    {% if rate.active_revision.adjustment_type == 'increase' %}+{% else %}−{% endif %}{{ rate.active_revision.adjustment_amount }}
+    <span class="text-muted">(was {{ rate.active_revision.base_value }})</span>
+  </div>
+  {% endif %}
+</td>
+<td class="text-center">
+  <button type="button" class="btn btn-outline-info btn-sm btn-rate-history"
+    data-rate-category="{{ rate_category }}"
+    {% if rate.from_km is not None %}data-from-km="{{ rate.from_km }}"{% endif %}
+    {% if rate.to_km is not None %}data-to-km="{{ rate.to_km }}"{% endif %}
+    {% if rate.distric_name %}data-district-name="{{ rate.distric_name }}"{% endif %}
+    {% if rate.taluka_name %}data-taluka-name="{{ rate.taluka_name }}"{% endif %}>View</button>
+</td>

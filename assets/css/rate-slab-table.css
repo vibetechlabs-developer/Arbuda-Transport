@@ -1,0 +1,167 @@
+/* Contract rate slab table — readable amounts & compact diesel row */
+
+.rate-slab-section .rate-slab-hint {
+  background: #f0f7ff;
+  border: 1px solid #c5ddfc;
+  border-radius: 0.375rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.8125rem;
+  color: #384551;
+  margin-bottom: 0.75rem;
+}
+
+.rate-slab-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #d9dee3;
+  border-radius: 0.5rem;
+  background: #fff;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 2px rgba(67, 89, 113, 0.06);
+}
+
+.rate-slab-table {
+  margin-bottom: 0 !important;
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1080px;
+}
+
+.rate-slab-table thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  white-space: nowrap;
+  padding: 0.65rem 0.5rem;
+}
+
+.rate-slab-table tbody td {
+  vertical-align: middle;
+  padding: 0.5rem 0.4rem;
+}
+
+.rate-slab-table .col-km { width: 88px; }
+.rate-slab-table .col-choice { width: 118px; }
+.rate-slab-table .col-value { width: 132px; }
+.rate-slab-table .col-diesel { width: 210px; }
+.rate-slab-table .col-effective { width: 148px; }
+.rate-slab-table .col-updated { width: 155px; }
+.rate-slab-table .col-history { width: 76px; text-align: center; }
+.rate-slab-table .col-action { width: 84px; text-align: center; }
+
+.rate-slab-table .form-control,
+.rate-slab-table .form-select {
+  font-size: 0.875rem;
+  min-height: 2.25rem;
+}
+
+.rate-slab-table .rate-km-input {
+  width: 100%;
+  min-width: 4.5rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.rate-slab-table .rate-value-input,
+.rate-slab-table .rate-updated-value {
+  width: 100%;
+  min-width: 6.5rem;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.rate-slab-table .rate-value-input {
+  background: #fff;
+  border-color: #d9dee3;
+}
+
+.rate-slab-table .rate-updated-value {
+  background: #e7f3ff;
+  border-color: #9ec5fe;
+  color: #084298;
+  cursor: default;
+}
+
+.rate-revision-active {
+  line-height: 1.25;
+  font-size: 0.7rem;
+  white-space: normal;
+}
+
+.rate-slab-table .rate-effective-date {
+  width: 100%;
+  min-width: 8.5rem;
+}
+
+.rate-choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.rate-choice-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rate-choice-option .form-check-input {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.diesel-adj-inline {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.diesel-adj-inline .diesel-adj-type {
+  flex: 0 0 6.75rem;
+  min-width: 6.75rem;
+  padding-left: 0.35rem;
+  padding-right: 1.5rem;
+}
+
+.diesel-adj-inline .diesel-adj-amount {
+  flex: 1 1 auto;
+  min-width: 5.5rem;
+  text-align: right;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-slab-table .btn-rate-history {
+  white-space: nowrap;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.rate-slab-table .col-action .btn-danger {
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .rate-slab-table-wrap::after {
+    content: "Scroll horizontally to see all columns →";
+    display: block;
+    font-size: 0.7rem;
+    color: #697a8d;
+    text-align: right;
+    padding: 0.25rem 0.5rem 0.35rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+  }
+}

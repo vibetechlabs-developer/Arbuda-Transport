@@ -293,70 +293,76 @@
             </div>
 
             <!-- Kilometer/Slab table -->
+            {% include 'partials/rate-slab-assets.html' %}
+            <input type="hidden" id="contract_id_for_rates" value="{{ contract.id }}">
             {% if rates %}
-            <div class="row" id="kmWiseTable" style="display: block;">
+            <div class="row rate-slab-section" id="kmWiseTable" style="display: block;">
               <div class="mb-3 col-sm-12">
                 <label class="form-label">Add Rate</label>
-                <table class="table table-bordered">
-                  <thead>
-                    <tr>
-                      <th>From Km</th>
-                      <th>To Km</th>
-                      <th>Choice</th>
-                      <th>Value</th>
-                      <th>Action</th>
-                    </tr>
+                <p class="rate-slab-hint">
+                  <strong>Base Value</strong> = contract rate. <strong>Diesel (+/−)</strong> and <strong>Effective From</strong> apply only on/after that date — older dispatches keep the previous rate.
+                </p>
+                <div class="rate-slab-table-wrap">
+                <table class="table table-bordered rate-slab-table mb-0">
+                  <thead class="table-light">
+                    {% include 'partials/rate-slab-thead.html' %}
                   </thead>
                   <tbody id="rate-table">
                     {% for rate in rates %}
-                    <tr id="slab_row_{{ forloop.counter }}">
-                      <td><input type="number" class="form-control" name="from_km[]" value="{{ rate.from_km }}"
+                    <tr id="slab_row_{{ forloop.counter }}" class="rate-slab-row" data-rate-category="kilometer_wise">
+                      <td><input type="number" class="form-control rate-km-input" name="from_km[]" value="{{ rate.from_km }}"
                           required></td>
-                      <td><input type="number" class="form-control" name="to_km[]" value="{{ rate.to_km }}" required>
+                      <td><input type="number" class="form-control rate-km-input" name="to_km[]" value="{{ rate.to_km }}" required>
                       </td>
                       {% if rate.mt > 0 %}
-                      <td>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
-                            onclick="updatePlaceholder(this)" checked>
-                          <label class="form-check-label">Fixed Rate</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
-                            value="mt_per_km" onclick="updatePlaceholder(this)">
-                          <label class="form-check-label">MT/KM</label>
+                      <td class="rate-choice-cell">
+                        <div class="rate-choice-group">
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                              onclick="updatePlaceholder(this)" checked>
+                            Fixed Rate
+                          </label>
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                              value="mt_per_km" onclick="updatePlaceholder(this)">
+                            MT/KM
+                          </label>
                         </div>
                       </td>
                       <td>
-                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt }}"
-                          placeholder="Enter MT" required step="any">
+                        <input type="number" class="form-control rate-value-input" name="value[]" value="{{ rate.mt }}"
+                          placeholder="0.0000" required step="any">
                       </td>
                       {% else %}
-                      <td>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
-                            onclick="updatePlaceholder(this)">
-                          <label class="form-check-label">Fixed Rate</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
-                            value="mt_per_km" onclick="updatePlaceholder(this)" checked>
-                          <label class="form-check-label">MT/KM</label>
+                      <td class="rate-choice-cell">
+                        <div class="rate-choice-group">
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                              onclick="updatePlaceholder(this)">
+                            Fixed Rate
+                          </label>
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                              value="mt_per_km" onclick="updatePlaceholder(this)" checked>
+                            MT/KM
+                          </label>
                         </div>
                       </td>
                       <td>
-                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt_per_km }}"
-                          placeholder="Enter MT per KM" required step="any">
+                        <input type="number" class="form-control rate-value-input" name="value[]" value="{{ rate.mt_per_km }}"
+                          placeholder="0.0000" required step="any">
                       </td>
                       {% endif %}
+                      {% include 'partials/rate-diesel-cells.html' with rate_category='kilometer_wise' effective_value=rate.effective_value %}
 
-                      <td>
+                      <td class="text-center">
                         <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">Delete</button>
                       </td>
                     </tr>
                     {% endfor %}
                   </tbody>
                 </table>
+                </div>
                 <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
               </div>
             </div>
@@ -372,28 +378,35 @@
                 <div id="district-container">
                   {% for district in taluka_district %}
                   <div class="card p-3 mb-3" id="district_{{ forloop.counter }}">
+                    <input type="hidden" name="district_index[]" value="{{ forloop.counter }}">
                     <div class="mb-2">
                       <label>District Name</label>
                       <input type="text" class="form-control" name="district_name[]" value="{{ district }}" required>
                     </div>
-                    <table class="table table-bordered">
+                    <div class="rate-slab-table-wrap">
+                    <table class="table table-bordered rate-slab-table mb-0">
                       <thead>
                         <tr>
-                          <th>Taluka Name</th>
-                          <th>Rate</th>
-                          <th>Action</th>
+                          <th class="col-value">Taluka Name</th>
+                          <th class="col-value">Rate</th>
+                          <th class="col-diesel">Diesel (+/−)</th>
+                          <th class="col-effective">Effective From</th>
+                          <th class="col-updated">Current Rate</th>
+                          <th class="col-history">History</th>
+                          <th class="col-action">Action</th>
                         </tr>
                       </thead>
                       <tbody id="taluka_table_{{ forloop.counter }}">
                         {% for taluka in taluka_rates %}
                         {% if taluka.distric_name == district %}
-                        <tr>
+                        <tr class="rate-slab-row" data-rate-category="taluka_wise">
                           <td><input type="text" class="form-control"
                               name="taluka_name_{{ forloop.parentloop.counter }}[]" value="{{ taluka.taluka_name }}"
                               required></td>
                           <td><input type="number" class="form-control"
                               name="taluka_rate_{{ forloop.parentloop.counter }}[]" value="{{ taluka.mt }}" required step="any">
                           </td>
+                          {% include 'partials/rate-diesel-cells.html' with rate_category='taluka_wise' effective_value=taluka.effective_value rate=taluka %}
                           <td><button type="button" class="btn btn-danger btn-sm"
                               onclick="removeRow(this)">Delete</button></td>
                         </tr>
@@ -401,6 +414,7 @@
                         {% endfor %}
                       </tbody>
                     </table>
+                    </div>
                     <div class="d-flex gap-2 mt-2">
                       <button type="button" class="btn btn-success" onclick="addTaluka('{{ forloop.counter }}')">+ Add
                         Taluka</button>
@@ -423,18 +437,23 @@
               <div class="row">
                 <div class="mb-3 col-sm-12">
                   <label class="form-label">District-Based Rates</label>
-                  <table class="table table-bordered" id="districtTable">
+                  <div class="rate-slab-table-wrap">
+                  <table class="table table-bordered rate-slab-table mb-0" id="districtTable">
                     <thead>
                       <tr>
-                        <th>District Name</th>
-                        <th>Choice</th>
-                        <th>Rate</th>
-                        <th>Action</th>
+                        <th class="col-value">District Name</th>
+                        <th class="col-choice">Choice</th>
+                        <th class="col-value">Rate</th>
+                        <th class="col-diesel">Diesel (+/−)</th>
+                        <th class="col-effective">Effective From</th>
+                        <th class="col-updated">Current Rate</th>
+                        <th class="col-history">History</th>
+                        <th class="col-action">Action</th>
                       </tr>
                     </thead>
                     <tbody id="district-table-body">
                       {% for dist in rate_dist %}
-                      <tr id="district_{{ forloop.counter }}">
+                      <tr id="district_{{ forloop.counter }}" class="rate-slab-row" data-rate-category="district_wise">
                         <td><input type="text" class="form-control" name="district_name[]" required
                             value="{{ dist.distric_name }}"></td>
                         {% if dist.mt > 0 %}
@@ -469,6 +488,7 @@
                         <td><input type="number" class="form-control" name="district_rate[]" placeholder="Enter MT"
                             required value="{{ dist.mt_per_km }}" step="any"></td>
                         {% endif %}
+                        {% include 'partials/rate-diesel-cells.html' with rate_category='district_wise' effective_value=dist.effective_value rate=dist %}
                         <td><button type="button" class="btn btn-danger btn-sm"
                             onclick="removeRow(this)">Delete</button>
                         </td>
@@ -476,6 +496,7 @@
                       {% endfor %}
                     </tbody>
                   </table>
+                  </div>
                   <button type="button" class="btn btn-success mt-2" onclick="addDistrictRow()">+ Add District</button>
                 </div>
               </div>
@@ -486,69 +507,71 @@
 
             <!-- income tax -->
             {% if rate_income %}
-            <div class="row" id="kmWiseTable" style="display: block;">
+            <div class="row rate-slab-section" id="kmWiseTable" style="display: block;">
               <div class="mb-3 col-sm-12">
                 <label class="form-label">Add Rate</label>
-                <table class="table table-bordered">
-                  <thead>
-                    <tr>
-                      <th>From Km</th>
-                      <th>To Km</th>
-                      <th>Choice</th>
-                      <th>Value</th>
-                      <th>Action</th>
-                    </tr>
+                <p class="rate-slab-hint">Diesel adjustment applies from <strong>Effective From</strong> date only.</p>
+                <div class="rate-slab-table-wrap">
+                <table class="table table-bordered rate-slab-table mb-0">
+                  <thead class="table-light">
+                    {% include 'partials/rate-slab-thead.html' %}
                   </thead>
                   <tbody id="rate-table">
                     {% for rate in rate_income %}
-                    <tr id="slab_row_{{ forloop.counter }}">
-                      <td><input type="number" class="form-control" name="from_km[]" value="{{ rate.from_km }}"
+                    <tr id="slab_row_{{ forloop.counter }}" class="rate-slab-row" data-rate-category="incometax_wise">
+                      <td><input type="number" class="form-control rate-km-input" name="from_km[]" value="{{ rate.from_km }}"
                           required></td>
-                      <td><input type="number" class="form-control" name="to_km[]" value="{{ rate.to_km }}" required>
+                      <td><input type="number" class="form-control rate-km-input" name="to_km[]" value="{{ rate.to_km }}" required>
                       </td>
                       {% if rate.mt > 0 %}
-                      <td>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
-                            onclick="updatePlaceholder(this)" checked>
-                          <label class="form-check-label">Fixed Rate</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
-                            value="mt_per_km" onclick="updatePlaceholder(this)">
-                          <label class="form-check-label">MT/KM</label>
+                      <td class="rate-choice-cell">
+                        <div class="rate-choice-group">
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                              onclick="updatePlaceholder(this)" checked>
+                            Fixed Rate
+                          </label>
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                              value="mt_per_km" onclick="updatePlaceholder(this)">
+                            MT/KM
+                          </label>
                         </div>
                       </td>
                       <td>
-                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt }}"
-                          placeholder="Enter MT" required step="any">
+                        <input type="number" class="form-control rate-value-input" name="value[]" value="{{ rate.mt }}"
+                          placeholder="0.0000" required step="any">
                       </td>
                       {% else %}
-                      <td>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
-                            onclick="updatePlaceholder(this)">
-                          <label class="form-check-label">Fixed Rate</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
-                            value="mt_per_km" onclick="updatePlaceholder(this)" checked>
-                          <label class="form-check-label">MT/KM</label>
+                      <td class="rate-choice-cell">
+                        <div class="rate-choice-group">
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                              onclick="updatePlaceholder(this)">
+                            Fixed Rate
+                          </label>
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                              value="mt_per_km" onclick="updatePlaceholder(this)" checked>
+                            MT/KM
+                          </label>
                         </div>
                       </td>
                       <td>
-                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt_per_km }}"
-                          placeholder="Enter MT per KM" required step="any">
+                        <input type="number" class="form-control rate-value-input" name="value[]" value="{{ rate.mt_per_km }}"
+                          placeholder="0.0000" required step="any">
                       </td>
                       {% endif %}
+                      {% include 'partials/rate-diesel-cells.html' with rate_category='incometax_wise' effective_value=rate.effective_value %}
 
-                      <td>
+                      <td class="text-center">
                         <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">Delete</button>
                       </td>
                     </tr>
                     {% endfor %}
                   </tbody>
                 </table>
+                </div>
                 <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
               </div>
             </div>
@@ -558,69 +581,71 @@
 
             <!-- cumulative/Slab table -->
             {% if rate_cumulative %}
-            <div class="row" id="kmWiseTable" style="display: block;">
+            <div class="row rate-slab-section" id="kmWiseTable" style="display: block;">
               <div class="mb-3 col-sm-12">
                 <label class="form-label">Add Rate</label>
-                <table class="table table-bordered">
-                  <thead>
-                    <tr>
-                      <th>From Km</th>
-                      <th>To Km</th>
-                      <th>Choice</th>
-                      <th>Value</th>
-                      <th>Action</th>
-                    </tr>
+                <p class="rate-slab-hint">Diesel adjustment applies from <strong>Effective From</strong> date only.</p>
+                <div class="rate-slab-table-wrap">
+                <table class="table table-bordered rate-slab-table mb-0">
+                  <thead class="table-light">
+                    {% include 'partials/rate-slab-thead.html' %}
                   </thead>
                   <tbody id="rate-table">
                     {% for rate in rate_cumulative %}
-                    <tr id="slab_row_{{ forloop.counter }}">
-                      <td><input type="number" class="form-control" name="from_km[]" value="{{ rate.from_km }}"
+                    <tr id="slab_row_{{ forloop.counter }}" class="rate-slab-row" data-rate-category="cumulative_wise">
+                      <td><input type="number" class="form-control rate-km-input" name="from_km[]" value="{{ rate.from_km }}"
                           required></td>
-                      <td><input type="number" class="form-control" name="to_km[]" value="{{ rate.to_km }}" required>
+                      <td><input type="number" class="form-control rate-km-input" name="to_km[]" value="{{ rate.to_km }}" required>
                       </td>
                       {% if rate.mt > 0 %}
-                      <td>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
-                            onclick="updatePlaceholder(this)" checked>
-                          <label class="form-check-label">Fixed Rate</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
-                            value="mt_per_km" onclick="updatePlaceholder(this)">
-                          <label class="form-check-label">MT/KM</label>
+                      <td class="rate-choice-cell">
+                        <div class="rate-choice-group">
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                              onclick="updatePlaceholder(this)" checked>
+                            Fixed Rate
+                          </label>
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                              value="mt_per_km" onclick="updatePlaceholder(this)">
+                            MT/KM
+                          </label>
                         </div>
                       </td>
                       <td>
-                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt }}"
-                          placeholder="Enter MT" required step="any">
+                        <input type="number" class="form-control rate-value-input" name="value[]" value="{{ rate.mt }}"
+                          placeholder="0.0000" required step="any">
                       </td>
                       {% else %}
-                      <td>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
-                            onclick="updatePlaceholder(this)">
-                          <label class="form-check-label">Fixed Rate</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
-                            value="mt_per_km" onclick="updatePlaceholder(this)" checked>
-                          <label class="form-check-label">MT/KM</label>
+                      <td class="rate-choice-cell">
+                        <div class="rate-choice-group">
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}" value="mt"
+                              onclick="updatePlaceholder(this)">
+                            Fixed Rate
+                          </label>
+                          <label class="rate-choice-option">
+                            <input class="form-check-input" type="radio" name="choice_{{forloop.counter}}"
+                              value="mt_per_km" onclick="updatePlaceholder(this)" checked>
+                            MT/KM
+                          </label>
                         </div>
                       </td>
                       <td>
-                        <input type="number" class="form-control" name="value[]" value="{{ rate.mt_per_km }}"
-                          placeholder="Enter MT per KM" required step="any">
+                        <input type="number" class="form-control rate-value-input" name="value[]" value="{{ rate.mt_per_km }}"
+                          placeholder="0.0000" required step="any">
                       </td>
                       {% endif %}
+                      {% include 'partials/rate-diesel-cells.html' with rate_category='cumulative_wise' effective_value=rate.effective_value %}
 
-                      <td>
+                      <td class="text-center">
                         <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">Delete</button>
                       </td>
                     </tr>
                     {% endfor %}
                   </tbody>
                 </table>
+                </div>
                 <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
               </div>
             </div>
@@ -631,21 +656,17 @@
 
             <!--  for js  -->
             <!-- Kilometer/Slab table -->
-            <div class="row" id="kmWiseTable" style="display:none;">
+            <div class="row rate-slab-section" id="kmWiseTable" style="display:none;">
               <div class="mb-3 col-sm-12">
                 <label class="form-label">Add Rate</label>
-                <table class="table table-bordered">
-                  <thead>
-                    <tr>
-                      <th>From Km</th>
-                      <th>To Km</th>
-                      <th>Choice</th>
-                      <th>Value</th>
-                      <th>Action</th>
-                    </tr>
+                <div class="rate-slab-table-wrap">
+                <table class="table table-bordered rate-slab-table mb-0">
+                  <thead class="table-light">
+                    {% include 'partials/rate-slab-thead.html' %}
                   </thead>
                   <tbody id="rate-table"></tbody>
                 </table>
+                </div>
                 <button type="button" class="btn btn-success mt-2" onclick="addRow()">+ Add Row</button>
               </div>
             </div>
@@ -655,17 +676,23 @@
               <div class="row">
                 <div class="mb-3 col-sm-12">
                   <label class="form-label">District-Based Rates</label>
-                  <table class="table table-bordered" id="districtTable">
+                  <div class="rate-slab-table-wrap">
+                  <table class="table table-bordered rate-slab-table mb-0" id="districtTable">
                     <thead>
                       <tr>
-                        <th>District Name</th>
-                        <th>Choice</th>
-                        <th>Rate</th>
-                        <th>Action</th>
+                        <th class="col-value">District Name</th>
+                        <th class="col-choice">Choice</th>
+                        <th class="col-value">Rate</th>
+                        <th class="col-diesel">Diesel (+/−)</th>
+                        <th class="col-effective">Effective From</th>
+                        <th class="col-updated">Current Rate</th>
+                        <th class="col-history">History</th>
+                        <th class="col-action">Action</th>
                       </tr>
                     </thead>
                     <tbody id="district-table-body"></tbody>
                   </table>
+                  </div>
                   <button type="button" class="btn btn-success mt-2" onclick="addDistrictRow()">+ Add
                     District</button>
                 </div>
@@ -1081,6 +1108,36 @@
   </div>
 </div>
 </div>
+<!-- Rate revision history modal -->
+<div class="modal fade" id="rateRevisionHistoryModal" tabindex="-1" aria-labelledby="rateRevisionHistoryLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rateRevisionHistoryLabel">Rate / Diesel revision history</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Effective From</th>
+              <th>Type</th>
+              <th class="text-end">Amount</th>
+              <th class="text-end">Rate Before</th>
+              <th class="text-end">Updated Rate</th>
+              <th>Recorded At</th>
+            </tr>
+          </thead>
+          <tbody id="rateRevisionHistoryBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/rate-diesel-adjustment.js' %}"></script>
 <script src="{% static 'js/rate-tabels.js' %} "></script>
 <script>
   // Real-time contract number validation

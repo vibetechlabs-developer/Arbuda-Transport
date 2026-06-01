@@ -9,6 +9,8 @@ urlpatterns = [
 
     # rate fecthing for dispatch
     path("get-rate-details", views.get_rate_details, name="get-rate-details"), # kilo-meter rate
+    path("get-rate-revision-history", views.get_rate_revision_history, name="get-rate-revision-history"),
+    path("get-slab-effective-rate", views.get_slab_effective_rate, name="get-slab-effective-rate"),
     path("get-incometax-rate-details", views.get_incometax_rate_details, name="get-incometax-rate-details"),
     path("get-taluka-rate-details", views.get_taluka_rate_details, name="get-taluka-rate-details"),
     path('get-district-rate-details', views.get_district_rate_details , name='get-district-rate-details'),

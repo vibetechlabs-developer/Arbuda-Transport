@@ -1070,6 +1070,7 @@
               setElementReadOnly('from_center', true);
             }
           });
+        window._contractRateType = data.rate_type || '';
         if (data.rate_type == "Taluka-Wise") {
           document.getElementById("km").removeAttribute("oninput", true)
           console.log("removed");
@@ -1145,9 +1146,32 @@
       });
   }
 
+  function getDepDateQuery() {
+    const depDate = document.getElementById('dep_date')?.value;
+    return depDate ? `&dep_date=${encodeURIComponent(depDate)}` : '';
+  }
+
+  function refreshRateForDispatchDate() {
+    const km = document.getElementById('km')?.value;
+    if (!km) return;
+    const rt = window._contractRateType;
+    if (rt === 'Kilometer-Wise') fecthrate(km);
+    else if (rt === 'Taluka-Wise') fecthTalukaRate();
+    else if (rt === 'Distric-Wise') fecthDistrictRate();
+    else if (rt === 'Incometax-Wise') fecthANDcalcualteincomerate();
+    else if (rt === 'Cumulative-Wise') fecthCumRate();
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const depDateInput = document.getElementById('dep_date');
+    if (depDateInput) {
+      depDateInput.addEventListener('change', refreshRateForDispatchDate);
+    }
+  });
+
   function fecthrate(km) {
     let contract_no = document.getElementById("contract_id").value
-    fetch(`/api/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}${getDepDateQuery()}`)
       .then(response => response.json())
       .then(data => {
         if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -1173,7 +1197,7 @@
   function fecthCumRate() {
     let contract_no = document.getElementById("contract_id").value
     let km = document.getElementById("km").value
-    fetch(`/api/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-cumrate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}${getDepDateQuery()}`)
       .then(response => response.json())
       .then(data => {
         if (data.amount) {
@@ -1200,7 +1224,7 @@
     let contract_no = document.getElementById("contract_id").value
     let ton = document.getElementById("weight").value
     let km = document.getElementById("km").value
-    fetch(`/api/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}`)
+    fetch(`/api/get-incometax-rate-details?km=${encodeURIComponent(km)}&contract_no=${encodeURIComponent(contract_no)}${getDepDateQuery()}`)
       .then(response => response.json())
       .then(data => {
         if (data.amount) {
@@ -1254,7 +1278,7 @@
     let taluka_name = document.getElementById("taluka").value
     let district = document.getElementById("district").value
     if (taluka_name.length > 0 && district.length > 0) {
-      fetch(`/api/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}`)
+      fetch(`/api/get-taluka-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}&taluka_name=${encodeURIComponent(taluka_name)}${getDepDateQuery()}`)
         .then(response => response.json())
         .then(data => {
           if (data.rate && data.rate_calculation && data.how_calculation) {
@@ -1282,7 +1306,7 @@
     let taluka_name = document.getElementById("taluka").value
     let district = document.getElementById("district").value
     if (district.length > 0) {
-      fetch(`/api/get-district-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}`)
+      fetch(`/api/get-district-rate-details?district=${encodeURIComponent(district)}&contract_no=${encodeURIComponent(contract_no)}${getDepDateQuery()}`)
         .then(response => response.json())
         .then(data => {
           if (data.rate && data.rate_calculation && data.how_calculation) {

@@ -249,7 +249,51 @@ class Rate_taluka(models.Model):  #kilo-meter wise
 
     def __str__(self):
         return f"{self.rate_type}: {self.distric_name} → {self.taluka_name} km | {self.mt} MT"
-    
+
+
+class RateSlabRevision(models.Model):
+    """Diesel / rate adjustments with effective-from date (historical, non-destructive)."""
+
+    RATE_CATEGORY_CHOICES = (
+        ("kilometer_wise", "Kilometer-Wise"),
+        ("incometax_wise", "Incometax-Wise"),
+        ("cumulative_wise", "Cumulative-Wise"),
+        ("district_wise", "District-Wise"),
+        ("taluka_wise", "Taluka-Wise"),
+    )
+    ADJUSTMENT_CHOICES = (
+        ("increase", "Increase"),
+        ("decrease", "Decrease"),
+    )
+
+    company_id = models.ForeignKey(Company_user, on_delete=models.CASCADE, default=None)
+    contract = models.ForeignKey(T_Contract, on_delete=models.CASCADE, related_name="rate_revisions")
+    rate_category = models.CharField(max_length=30, choices=RATE_CATEGORY_CHOICES)
+    from_km = models.BigIntegerField(null=True, blank=True)
+    to_km = models.BigIntegerField(null=True, blank=True)
+    district_name = models.CharField(max_length=50, blank=True, null=True)
+    taluka_name = models.CharField(max_length=50, blank=True, null=True)
+    choice = models.CharField(max_length=20, default="mt")
+    base_value = models.DecimalField(max_digits=12, decimal_places=4)
+    adjustment_type = models.CharField(max_length=10, choices=ADJUSTMENT_CHOICES)
+    adjustment_amount = models.DecimalField(max_digits=12, decimal_places=4)
+    updated_value = models.DecimalField(max_digits=12, decimal_places=4)
+    effective_from = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-effective_from", "-created_at"]
+        indexes = [
+            models.Index(fields=["contract", "rate_category", "from_km", "to_km"]),
+            models.Index(fields=["contract", "rate_category", "effective_from"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.rate_category} {self.from_km}-{self.to_km} "
+            f"{self.adjustment_type} {self.adjustment_amount} from {self.effective_from}"
+        )
+
 
 class Invoice(models.Model):
     dispatch_list = models.ManyToManyField(Dispatch, related_name="invoices")

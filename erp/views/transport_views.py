@@ -3,9 +3,16 @@ from django.contrib import messages
 from django.core.cache import cache
 from company.models import Company_user , Company_profile
 from transport.models import Rate , T_Contract ,Dispatch ,Destination ,Rate_taluka , Rate_District ,Rate_IncomeTax , Rate_Cumulative , Invoice , GC_Note
-from datetime import datetime
+from datetime import datetime, date
 from django.db import transaction, IntegrityError
 from erp.utils.decorators import session_required
+from erp.utils.rate_revision_service import (
+    get_applicable_revision,
+    process_km_wise_diesel_revisions,
+    recalculate_revision_chain_for_slab,
+    resolve_slab_value,
+    save_diesel_revision,
+)
 from erp.utils.financial_year import filter_by_financial_year, get_current_financial_year, get_financial_year_start_end
 from django.db.models import Func, Sum, Count, Max, Subquery, OuterRef, Q
 from django.http import HttpResponse
@@ -13,6 +20,114 @@ from django.http import HttpResponse
 from erp.utils.csv_export import csv_response
 
 
+def _attach_effective_km_rate_values(rates, company_id, contract_id, rate_category):
+    """Annotate each rate row with effective_value (today) and active revision for UI."""
+    today = date.today()
+    for rate in rates:
+        base = rate.mt if rate.mt > 0 else rate.mt_per_km
+        slab_keys = {"from_km": rate.from_km, "to_km": rate.to_km}
+        rate.effective_value = resolve_slab_value(
+            base,
+            company_id,
+            contract_id,
+            rate_category,
+            today,
+            **slab_keys,
+        )
+        rate.active_revision = get_applicable_revision(
+            company_id,
+            contract_id,
+            rate_category,
+            today,
+            **slab_keys,
+        )
+
+
+def _repair_revision_chains(rates, company_id, contract_id, rate_category):
+    """Recalculate stored revision chains so each step uses the previous updated rate."""
+    for rate in rates:
+        base = rate.mt if rate.mt > 0 else rate.mt_per_km
+        recalculate_revision_chain_for_slab(
+            company_id,
+            contract_id,
+            rate_category,
+            base,
+            from_km=rate.from_km,
+            to_km=rate.to_km,
+        )
+
+
+def _attach_effective_taluka_rate_values(rates, company_id, contract_id):
+    """Annotate each taluka rate row with effective_value (today) and active revision for UI."""
+    today = date.today()
+    for rate in rates:
+        base = rate.mt
+        slab_keys = {"district_name": rate.distric_name, "taluka_name": rate.taluka_name}
+        rate.effective_value = resolve_slab_value(
+            base,
+            company_id,
+            contract_id,
+            "taluka_wise",
+            today,
+            **slab_keys,
+        )
+        rate.active_revision = get_applicable_revision(
+            company_id,
+            contract_id,
+            "taluka_wise",
+            today,
+            **slab_keys,
+        )
+
+
+def _repair_taluka_revision_chains(rates, company_id, contract_id):
+    """Recalculate stored taluka revision chains."""
+    for rate in rates:
+        base = rate.mt
+        recalculate_revision_chain_for_slab(
+            company_id,
+            contract_id,
+            "taluka_wise",
+            base,
+            district_name=rate.distric_name,
+            taluka_name=rate.taluka_name,
+        )
+
+
+def _attach_effective_district_rate_values(rates, company_id, contract_id):
+    """Annotate each district rate row with effective_value (today) and active revision for UI."""
+    today = date.today()
+    for rate in rates:
+        base = rate.mt if rate.mt > 0 else rate.mt_per_km
+        slab_keys = {"district_name": rate.distric_name}
+        rate.effective_value = resolve_slab_value(
+            base,
+            company_id,
+            contract_id,
+            "district_wise",
+            today,
+            **slab_keys,
+        )
+        rate.active_revision = get_applicable_revision(
+            company_id,
+            contract_id,
+            "district_wise",
+            today,
+            **slab_keys,
+        )
+
+
+def _repair_district_revision_chains(rates, company_id, contract_id):
+    """Recalculate stored district revision chains."""
+    for rate in rates:
+        base = rate.mt if rate.mt > 0 else rate.mt_per_km
+        recalculate_revision_chain_for_slab(
+            company_id,
+            contract_id,
+            "district_wise",
+            base,
+            district_name=rate.distric_name,
+        )
 
 
 @session_required
@@ -122,15 +237,29 @@ def add_contract(request):
                         mt=mt_value,
                         mt_per_km=mt_per_km_value
                     )
+                process_km_wise_diesel_revisions(
+                    request,
+                    contract,
+                    i_comapany_id.id,
+                    "kilometer_wise",
+                    from_km_list,
+                    to_km_list,
+                    value_list,
+                )
                 messages.success(request, "Rate added successfully")
 
 
             elif rate_type == "Taluka-Wise":
                 district_names = request.POST.getlist("district_name[]")
+                district_indices = request.POST.getlist("district_index[]")
+                diesel_types = request.POST.getlist("diesel_adj_type[]")
+                diesel_amounts = request.POST.getlist("diesel_adj_amount[]")
+                diesel_dates = request.POST.getlist("diesel_effective_date[]")
 
-                for district_index, district_name in enumerate(district_names, start=1):
-                    taluka_names = request.POST.getlist(f"taluka_name_{district_index}[]")
-                    taluka_rates = request.POST.getlist(f"taluka_rate_{district_index}[]")
+                taluka_counter = 0
+                for district_name, dist_idx in zip(district_names, district_indices):
+                    taluka_names = request.POST.getlist(f"taluka_name_{dist_idx}[]")
+                    taluka_rates = request.POST.getlist(f"taluka_rate_{dist_idx}[]")
 
                     for t_name, t_rate in zip(taluka_names, taluka_rates):
                         Rate_taluka.objects.create(
@@ -141,12 +270,33 @@ def add_contract(request):
                             taluka_name=t_name,
                             mt=t_rate
                         )
-                    messages.success(request, "Rate added successfully")
+                        if taluka_counter < len(diesel_types):
+                            adj_type = (diesel_types[taluka_counter] or "").strip()
+                            if adj_type:
+                                adj_amount = diesel_amounts[taluka_counter] if taluka_counter < len(diesel_amounts) else None
+                                adj_date = diesel_dates[taluka_counter] if taluka_counter < len(diesel_dates) else None
+                                save_diesel_revision(
+                                    company_id=i_comapany_id.id,
+                                    contract=contract,
+                                    rate_category="taluka_wise",
+                                    effective_from=adj_date,
+                                    adjustment_type=adj_type,
+                                    adjustment_amount=adj_amount,
+                                    choice="mt",
+                                    base_value=t_rate,
+                                    district_name=district_name,
+                                    taluka_name=t_name,
+                                )
+                        taluka_counter += 1
+                messages.success(request, "Rate added successfully")
                     
 
             elif rate_type == "Distric-Wise":
                 district_names = request.POST.getlist("district_name[]")
                 values = request.POST.getlist("district_rate[]")
+                diesel_types = request.POST.getlist("diesel_adj_type[]")
+                diesel_amounts = request.POST.getlist("diesel_adj_amount[]")
+                diesel_dates = request.POST.getlist("diesel_effective_date[]")
 
                 for i, district in enumerate(district_names):
                     choice = request.POST.get(f"district_choice_{i+1}")  # radio for MT or MT/KM
@@ -166,6 +316,22 @@ def add_contract(request):
                         mt=mt_value,
                         mt_per_km=mt_per_km_value,
                     )
+                    if i < len(diesel_types):
+                        adj_type = (diesel_types[i] or "").strip()
+                        if adj_type:
+                            adj_amount = diesel_amounts[i] if i < len(diesel_amounts) else None
+                            adj_date = diesel_dates[i] if i < len(diesel_dates) else None
+                            save_diesel_revision(
+                                company_id=i_comapany_id.id,
+                                contract=contract,
+                                rate_category="district_wise",
+                                effective_from=adj_date,
+                                adjustment_type=adj_type,
+                                adjustment_amount=adj_amount,
+                                choice=choice or "mt",
+                                base_value=values[i],
+                                district_name=district,
+                            )
                 messages.success(request, "Rate added successfully")
             
             elif rate_type == "Incometax-Wise":
@@ -191,6 +357,15 @@ def add_contract(request):
                         mt=mt_value,
                         mt_per_km=mt_per_km_value
                     )
+                process_km_wise_diesel_revisions(
+                    request,
+                    contract,
+                    i_comapany_id.id,
+                    "incometax_wise",
+                    from_km_list,
+                    to_km_list,
+                    value_list,
+                )
                 messages.success(request, "Rate added successfully")
 
             elif rate_type == "Cumulative-Wise":
@@ -216,6 +391,15 @@ def add_contract(request):
                         mt=mt_value,
                         mt_per_km=mt_per_km_value
                     )
+                process_km_wise_diesel_revisions(
+                    request,
+                    contract,
+                    i_comapany_id.id,
+                    "cumulative_wise",
+                    from_km_list,
+                    to_km_list,
+                    value_list,
+                )
                 messages.success(request, "Rate added successfully")
 
 
@@ -246,24 +430,35 @@ def update_contract(request, ):
     alldata = {}
     contract = get_object_or_404(T_Contract, id=contract_id , company_id=request.session['company_info']['company_id'])
     alldata['contract'] = contract
+    company_id = request.session['company_info']['company_id']
     if contract.rate_type in ["Kilometer-Wise", "Slab-Wise"]:
-        rates = Rate.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']).order_by('from_km')
+        rates = list(Rate.objects.filter(contract=contract.id, company_id=company_id).order_by('from_km'))
+        _repair_revision_chains(rates, company_id, contract.id, "kilometer_wise")
+        _attach_effective_km_rate_values(rates, company_id, contract.id, "kilometer_wise")
         alldata['rates'] = rates
     elif contract.rate_type == "Taluka-Wise":
-        taluka_rates = Rate_taluka.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id'])
-        taluka_district = Rate_taluka.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']).values_list('distric_name', flat=True).distinct()
+        taluka_rates = list(Rate_taluka.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']))
+        _repair_taluka_revision_chains(taluka_rates, company_id, contract.id)
+        _attach_effective_taluka_rate_values(taluka_rates, company_id, contract.id)
+        taluka_district = list(Rate_taluka.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']).values_list('distric_name', flat=True).distinct())
         alldata['taluka_district'] = taluka_district
         alldata['taluka_rates'] = taluka_rates
     elif contract.rate_type == "Distric-Wise":
-        rate_dist = Rate_District.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']).order_by('id')
+        rate_dist = list(Rate_District.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']).order_by('id'))
+        _repair_district_revision_chains(rate_dist, company_id, contract.id)
+        _attach_effective_district_rate_values(rate_dist, company_id, contract.id)
         alldata['rate_dist'] = rate_dist
 
     elif contract.rate_type == "Incometax-Wise":
-        rate_income = Rate_IncomeTax.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']).order_by('id')
+        rate_income = list(Rate_IncomeTax.objects.filter(contract=contract.id, company_id=company_id).order_by('id'))
+        _repair_revision_chains(rate_income, company_id, contract.id, "incometax_wise")
+        _attach_effective_km_rate_values(rate_income, company_id, contract.id, "incometax_wise")
         alldata['rate_income'] = rate_income
 
     elif contract.rate_type == "Cumulative-Wise":
-        rate_cumulative = Rate_Cumulative.objects.filter(contract=contract.id , company_id=request.session['company_info']['company_id']).order_by('id')
+        rate_cumulative = list(Rate_Cumulative.objects.filter(contract=contract.id, company_id=company_id).order_by('id'))
+        _repair_revision_chains(rate_cumulative, company_id, contract.id, "cumulative_wise")
+        _attach_effective_km_rate_values(rate_cumulative, company_id, contract.id, "cumulative_wise")
         alldata['rate_cumulative'] = rate_cumulative
     
     if request.method == "POST":
@@ -370,14 +565,30 @@ def update_contract(request, ):
                         to_km=to_km_list[i],
                         mt=mt_value, 
                         mt_per_km=mt_per_km_value
-                    ) 
-       
+                    )
+                process_km_wise_diesel_revisions(
+                    request,
+                    contract,
+                    request.session['company_info']['company_id'],
+                    "kilometer_wise",
+                    from_km_list,
+                    to_km_list,
+                    value_list,
+                )
+                rates = list(Rate.objects.filter(contract=contract.id, company_id=request.session['company_info']['company_id']).order_by('from_km'))
+                _repair_revision_chains(rates, request.session['company_info']['company_id'], contract.id, "kilometer_wise")
+
             elif rate_type == "Taluka-Wise":
                 district_names = request.POST.getlist("district_name[]")
+                district_indices = request.POST.getlist("district_index[]")
+                diesel_types = request.POST.getlist("diesel_adj_type[]")
+                diesel_amounts = request.POST.getlist("diesel_adj_amount[]")
+                diesel_dates = request.POST.getlist("diesel_effective_date[]")
 
-                for district_index, district_name in enumerate(district_names, start=1):
-                    taluka_names = request.POST.getlist(f"taluka_name_{district_index}[]")
-                    taluka_rates = request.POST.getlist(f"taluka_rate_{district_index}[]")
+                taluka_counter = 0
+                for district_name, dist_idx in zip(district_names, district_indices):
+                    taluka_names = request.POST.getlist(f"taluka_name_{dist_idx}[]")
+                    taluka_rates = request.POST.getlist(f"taluka_rate_{dist_idx}[]")
 
                     for t_name, t_rate in zip(taluka_names, taluka_rates):
                         Rate_taluka.objects.create(
@@ -388,10 +599,33 @@ def update_contract(request, ):
                             taluka_name=t_name,
                             mt=t_rate
                         )
+                        if taluka_counter < len(diesel_types):
+                            adj_type = (diesel_types[taluka_counter] or "").strip()
+                            if adj_type:
+                                adj_amount = diesel_amounts[taluka_counter] if taluka_counter < len(diesel_amounts) else None
+                                adj_date = diesel_dates[taluka_counter] if taluka_counter < len(diesel_dates) else None
+                                save_diesel_revision(
+                                    company_id=request.session['company_info']['company_id'],
+                                    contract=contract,
+                                    rate_category="taluka_wise",
+                                    effective_from=adj_date,
+                                    adjustment_type=adj_type,
+                                    adjustment_amount=adj_amount,
+                                    choice="mt",
+                                    base_value=t_rate,
+                                    district_name=district_name,
+                                    taluka_name=t_name,
+                                )
+                        taluka_counter += 1
+                taluka_rates = list(Rate_taluka.objects.filter(contract=contract.id, company_id=request.session['company_info']['company_id']))
+                _repair_taluka_revision_chains(taluka_rates, request.session['company_info']['company_id'], contract.id)
 
             elif rate_type == "Distric-Wise":
                 district_names = request.POST.getlist("district_name[]")
                 values = request.POST.getlist("district_rate[]")
+                diesel_types = request.POST.getlist("diesel_adj_type[]")
+                diesel_amounts = request.POST.getlist("diesel_adj_amount[]")
+                diesel_dates = request.POST.getlist("diesel_effective_date[]")
 
                 for i, district in enumerate(district_names):
                     choice = request.POST.get(f"district_choice_{i+1}")  # radio for MT or MT/KM
@@ -411,6 +645,25 @@ def update_contract(request, ):
                         mt=mt_value,
                         mt_per_km=mt_per_km_value,
                     )
+                    if i < len(diesel_types):
+                        adj_type = (diesel_types[i] or "").strip()
+                        if adj_type:
+                            adj_amount = diesel_amounts[i] if i < len(diesel_amounts) else None
+                            adj_date = diesel_dates[i] if i < len(diesel_dates) else None
+                            save_diesel_revision(
+                                company_id=request.session['company_info']['company_id'],
+                                contract=contract,
+                                rate_category="district_wise",
+                                effective_from=adj_date,
+                                adjustment_type=adj_type,
+                                adjustment_amount=adj_amount,
+                                choice=choice or "mt",
+                                base_value=values[i],
+                                district_name=district,
+                            )
+                district_rates = list(Rate_District.objects.filter(contract=contract.id, company_id=request.session['company_info']['company_id']))
+                _repair_district_revision_chains(district_rates, request.session['company_info']['company_id'], contract.id)
+
             elif rate_type == "Incometax-Wise":
                 from_km_list = request.POST.getlist("from_km[]")
                 to_km_list = request.POST.getlist("to_km[]")
@@ -434,6 +687,18 @@ def update_contract(request, ):
                         mt=mt_value,
                         mt_per_km=mt_per_km_value
                     )
+                process_km_wise_diesel_revisions(
+                    request,
+                    contract,
+                    request.session['company_info']['company_id'],
+                    "incometax_wise",
+                    from_km_list,
+                    to_km_list,
+                    value_list,
+                )
+                rates = list(Rate_IncomeTax.objects.filter(contract=contract.id, company_id=request.session['company_info']['company_id']).order_by('id'))
+                _repair_revision_chains(rates, request.session['company_info']['company_id'], contract.id, "incometax_wise")
+
             elif rate_type == "Cumulative-Wise":
                 from_km_list = request.POST.getlist("from_km[]")
                 to_km_list = request.POST.getlist("to_km[]")
@@ -457,6 +722,17 @@ def update_contract(request, ):
                         mt=mt_value,
                         mt_per_km=mt_per_km_value
                     )
+                process_km_wise_diesel_revisions(
+                    request,
+                    contract,
+                    request.session['company_info']['company_id'],
+                    "cumulative_wise",
+                    from_km_list,
+                    to_km_list,
+                    value_list,
+                )
+                rates = list(Rate_Cumulative.objects.filter(contract=contract.id, company_id=request.session['company_info']['company_id']).order_by('id'))
+                _repair_revision_chains(rates, request.session['company_info']['company_id'], contract.id, "cumulative_wise")
 
             Destination.objects.filter(company_id=contract.company_id,
                 contract_id=contract_id,).update(
