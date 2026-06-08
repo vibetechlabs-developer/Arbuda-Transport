@@ -1,101 +1,90 @@
-"""Helpers for GC note number allocation."""
+"""Company-wide GC note number allocation (dispatch-date order within each invoice)."""
 
 from __future__ import annotations
 
-
-def parse_gc_series_start(contract) -> int:
-    """Return the configured starting GC number for a contract (0 if unset/invalid)."""
-    try:
-        return int(str(getattr(contract, "gc_series_from", "") or "0").strip() or 0)
-    except (TypeError, ValueError):
-        return 0
+from datetime import date
 
 
-def next_gc_no_for_contract(contract, *, exclude_bill_id=None) -> int:
+def sort_dispatches_for_gc_notes(dispatches):
+    """Order dispatches by dispatch date, then challan, then id."""
+
+    def sort_key(d):
+        dep = d.dep_date if getattr(d, "dep_date", None) else date.min
+        challan = str(getattr(d, "challan_no", "") or "")
+        return (dep, challan, d.id)
+
+    return sorted(dispatches, key=sort_key)
+
+
+def next_gc_no_for_company(company_id, *, exclude_bill_id=None) -> int:
     """
-    Next GC number for a contract.
+    Next available GC number for **new** notes on this transport company.
 
-    Never returns below ``gc_series_from``. Uses the highest existing ``gc_no``
-    (not latest insert id) so numbering stays sequential and respects the
-    configured series start when it is raised (e.g. 4220 -> 4250).
+    Existing GC notes are never changed. Uses the highest ``gc_no`` already
+    stored for the company (one sequence across all contracts).
     """
     from transport.models import GC_Note
 
-    series_start = parse_gc_series_start(contract)
-    qs = GC_Note.objects.filter(contract_id=contract.id)
+    qs = GC_Note.objects.filter(company_id_id=company_id)
     if exclude_bill_id is not None:
         qs = qs.exclude(bill_id_id=exclude_bill_id)
 
     last = qs.order_by("-gc_no").first()
     if last:
-        return max(series_start, int(last.gc_no) + 1)
-    return series_start if series_start > 0 else 1
+        return int(last.gc_no) + 1
+    return 1
 
 
-def gc_numbers_below_series_start(contract, gc_numbers: dict) -> bool:
-    """True when every stored GC number is below the contract series start."""
-    if not gc_numbers:
-        return False
-    series_start = parse_gc_series_start(contract)
-    if series_start <= 0:
-        return False
-    return all(int(v) < series_start for v in gc_numbers.values())
-
-
-def renumber_invoice_gc_notes_below_series_start(contract, company_id) -> None:
+def create_gc_notes_for_dispatches(
+    company_id,
+    contract,
+    invoice,
+    dispatches,
+    bill_no,
+    bill_date,
+    *,
+    preserved_gc_by_dispatch=None,
+):
     """
-    For each invoice on this contract, if every GC note number is below
-    ``gc_series_from``, renumber that bill's GC notes from the series start.
-    Called after the contract GC start is saved (e.g. 4220 -> 4250).
+    Create GC notes for dispatches on an invoice.
+
+    - One running sequence per transport company (all contracts share it).
+    - Within this invoice, dispatches are numbered in dispatch-date order.
+    - ``preserved_gc_by_dispatch`` keeps existing numbers when updating an
+      invoice (grandfather rule — old GC notes are not renumbered).
     """
-    from transport.models import Dispatch, GC_Note, Invoice
+    from transport.models import GC_Note
 
-    if not getattr(contract, "gc_note_required", False):
-        return
-    if parse_gc_series_start(contract) <= 0:
-        return
+    preserved = preserved_gc_by_dispatch or {}
+    ordered = sort_dispatches_for_gc_notes(dispatches)
+    next_new = next_gc_no_for_company(company_id)
+    if preserved:
+        next_new = max(next_new, max(preserved.values()) + 1)
 
-    invoices = Invoice.objects.filter(
-        contract_id=contract,
-        company_id=company_id,
-    ).prefetch_related("dispatch_list")
+    for d in ordered:
+        if d.id in preserved:
+            gc_no = preserved[d.id]
+        else:
+            gc_no = next_new
+            next_new += 1
 
-    for invoice in invoices:
-        dispatches = list(invoice.dispatch_list.all().order_by("dep_date", "id"))
-        if not dispatches:
-            continue
-
-        existing_gc_by_dispatch = {
-            gc.dispatch_id_id: int(gc.gc_no)
-            for gc in GC_Note.objects.filter(bill_id=invoice)
-            if gc.dispatch_id_id
-        }
-        if not gc_numbers_below_series_start(contract, existing_gc_by_dispatch):
-            continue
-
-        bill_date = invoice.Bill_date
-        GC_Note.objects.filter(bill_id=invoice).delete()
-
-        next_no = next_gc_no_for_contract(contract, exclude_bill_id=invoice.id)
-        for d in dispatches:
-            gc_note = GC_Note.objects.create(
-                gc_no=next_no,
-                gc_date=(d.dep_date or bill_date),
-                consignor=contract.company_name,
-                consignee=d.party_name,
-                dispatch_from=contract.from_center,
-                dc_field=d.challan_no,
-                destination=d.destination,
-                product_name=d.product_name,
-                weight=d.weight,
-                truck_no=d.truck_no,
-                district=d.district,
-                bill_no=invoice.Bill_no,
-                bill_id=invoice,
-                dispatch_id=d,
-                contract_id=contract,
-                company_id_id=company_id,
-            )
-            d.gc_note_no = gc_note.gc_no
-            d.save(update_fields=["gc_note_no"])
-            next_no += 1
+        gc_note = GC_Note.objects.create(
+            gc_no=gc_no,
+            gc_date=(d.dep_date or bill_date),
+            consignor=contract.company_name,
+            consignee=d.party_name,
+            dispatch_from=contract.from_center,
+            dc_field=d.challan_no,
+            destination=d.destination,
+            product_name=d.product_name,
+            weight=d.weight,
+            truck_no=d.truck_no,
+            district=d.district,
+            bill_no=bill_no,
+            bill_id=invoice,
+            dispatch_id=d,
+            contract_id=contract,
+            company_id_id=company_id,
+        )
+        d.gc_note_no = gc_note.gc_no
+        d.save(update_fields=["gc_note_no"])

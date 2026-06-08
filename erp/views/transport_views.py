@@ -6,11 +6,7 @@ from transport.models import Rate , T_Contract ,Dispatch ,Destination ,Rate_talu
 from datetime import datetime, date
 from django.db import transaction, IntegrityError
 from erp.utils.decorators import session_required
-from erp.utils.gc_note import (
-    gc_numbers_below_series_start,
-    next_gc_no_for_contract,
-    renumber_invoice_gc_notes_below_series_start,
-)
+from erp.utils.gc_note import create_gc_notes_for_dispatches
 from erp.utils.rate_revision_service import (
     get_applicable_revision,
     process_km_wise_diesel_revisions,
@@ -538,12 +534,6 @@ def update_contract(request, ):
 
             # Save the contract first
             contract.save()
-
-            if contract.gc_note_required:
-                renumber_invoice_gc_notes_below_series_start(
-                    contract,
-                    request.session['company_info']['company_id'],
-                )
 
             # Clear old rates (so we can replace with new ones)
             Rate.objects.filter(contract=contract , company_id = request.session['company_info']['company_id']).delete()
@@ -1589,7 +1579,7 @@ def update_dispatch_Invoice(request):
                 d.gc_note_no = None
                 d.save()
 
-            # --- GC Notes: preserve numbers on metadata-only updates; respect gc_series_from ---
+            # --- GC Notes: never renumber existing rows; only recreate when dispatch list changes ---
             if contract.gc_note_required:
                 new_dispatch_list = list(new_dispatches)
                 existing_gc_by_dispatch = {
@@ -1600,55 +1590,23 @@ def update_dispatch_Invoice(request):
                 current_dispatch_ids = {d.id for d in current_dispatches}
                 new_dispatch_ids = {d.id for d in new_dispatch_list}
                 dispatch_list_changed = current_dispatch_ids != new_dispatch_ids
-                needs_renumber = gc_numbers_below_series_start(
-                    contract, existing_gc_by_dispatch
-                )
 
-                if dispatch_list_changed or needs_renumber:
+                if dispatch_list_changed:
+                    preserved = {
+                        did: gc_no
+                        for did, gc_no in existing_gc_by_dispatch.items()
+                        if did in new_dispatch_ids
+                    }
                     GC_Note.objects.filter(bill_id=invoice).delete()
-
-                    next_no = None
-                    if needs_renumber:
-                        preserved = {}
-                    else:
-                        preserved = {
-                            did: gc_no
-                            for did, gc_no in existing_gc_by_dispatch.items()
-                            if did in new_dispatch_ids
-                        }
-
-                    for d in new_dispatch_list:
-                        if d.id in preserved:
-                            gc_no = preserved[d.id]
-                        else:
-                            if next_no is None:
-                                next_no = next_gc_no_for_contract(
-                                    contract, exclude_bill_id=invoice.id
-                                )
-                            gc_no = next_no
-                            next_no += 1
-
-                        gc_note = GC_Note.objects.create(
-                            gc_no=gc_no,
-                            # GC Note date should match the dispatch (dep_date), not the invoice bill_date.
-                            gc_date=(d.dep_date or bill_date),
-                            consignor=contract.company_name,
-                            consignee=d.party_name,
-                            dispatch_from=contract.from_center,
-                            dc_field=d.challan_no,
-                            destination=d.destination,
-                            product_name=d.product_name,
-                            weight=d.weight,
-                            truck_no=d.truck_no,
-                            district=d.district,
-                            bill_no=invoice.Bill_no,
-                            bill_id=invoice,
-                            dispatch_id=d,
-                            contract_id=contract,
-                            company_id=company,
-                        )
-                        d.gc_note_no = gc_note.gc_no
-                        d.save()
+                    create_gc_notes_for_dispatches(
+                        company.id,
+                        contract,
+                        invoice,
+                        new_dispatch_list,
+                        invoice.Bill_no,
+                        bill_date,
+                        preserved_gc_by_dispatch=preserved,
+                    )
                 else:
                     for gc in GC_Note.objects.filter(bill_id=invoice).select_related("dispatch_id"):
                         d = gc.dispatch_id
