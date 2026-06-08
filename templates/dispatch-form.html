@@ -182,7 +182,7 @@
                   </div>
                 </div>
                 <input type="number" class="form-control" id="rate" name="rate" placeholder="Enter rupees per ton"
-                  autofocus oninput=" this.classList.remove('invalid')" />
+                  autofocus oninput="this.classList.remove('invalid'); calculate_rent();" />
               </div>
 
             </div>
@@ -193,6 +193,7 @@
               <input type="hidden" class="form-control" id="i_unloading_charge_2" name="i_unloading_charge_2"
                 value="0" />
               <input type="hidden" class="form-control" id="i_loading_charge" name="i_loading_charge" value="0" />
+              <input type="hidden" id="i_rate_calculation" value="" />
               <!-- end calculation -->
 
               <div class="mb-3 col-sm-6">
@@ -684,6 +685,8 @@
           clearForNewDispatch();
           // Keep from_center locked (it's contract-defined)
           setElementReadOnly('from_center', true);
+          syncLabourChargeRadiosFromRates();
+          refreshPaymentCalculations();
         } else {
           dispatchMode = 'autofill';
           setDispatchStatic(true);
@@ -916,6 +919,9 @@
     if (data.advance_paid) document.getElementById('advance_paid').value = data.advance_paid;
     if (data.panding_amount) document.getElementById('panding_amount').value = data.panding_amount;
     if (data.net_profit) document.getElementById('net_profit').value = data.net_profit;
+
+    syncLabourChargeRadiosFromRates();
+    if (typeof add_extra_cost === 'function') add_extra_cost();
   }
 
   function autoFillFromLastDispatch(includeProductAndChallan) {
@@ -950,6 +956,7 @@
             const today = new Date().toISOString().split('T')[0];
             depDateInput.value = today;
           }
+          syncLabourChargeRadiosFromRates();
         }
       })
       .catch(err => {
@@ -1009,6 +1016,10 @@
           document.getElementById('i_unloading_charge_1').value = data.unloading_charge_1;
           document.getElementById('i_unloading_charge_2').value = data.unloading_charge_2;
           document.getElementById('i_loading_charge').value = data.loading_charge;
+          if (shouldKeepNewMode) {
+            syncLabourChargeRadiosFromRates();
+            refreshPaymentCalculations();
+          }
         } else {
           document.getElementById('from_center').value = '';
           document.getElementById('i_unloading_charge_1').value = 0;
@@ -1134,6 +1145,7 @@
           else if (data.rate_type == "Cumulative-Wise") {
             fecthCumRate()
           }
+          refreshPaymentCalculations();
         } else {
           // Clear so user can manually enter for a brand new destination
           document.getElementById('district').value = '';
@@ -1178,13 +1190,15 @@
 
           document.getElementById('rate').value = data.rate;
           document.getElementById('rate').setAttribute('readonly', true);
-          document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+          document.getElementById('rate_calculation').innerHTML = ` in (${data.rate_calculation} | ${data.how_calculation})`;
           document.getElementById('i_rate_calculation').value = data.rate_calculation;
+          refreshPaymentCalculations();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
           document.getElementById('rate_calculation').innerHTML = ``;
           document.getElementById('i_rate_calculation').value = "";
+          refreshPaymentCalculations();
         }
 
       })
@@ -1203,13 +1217,16 @@
         if (data.amount) {
           document.getElementById('rate').value = data.amount;
           document.getElementById('rate').setAttribute('readonly', true);
-          document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          document.getElementById('rate_calculation').innerHTML = ` MT`;
+          document.getElementById('i_rate_calculation').value = 'MT';
+          refreshPaymentCalculations();
 
 
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
           document.getElementById('i_rate_calculation').value = "";
+          refreshPaymentCalculations();
 
         }
 
@@ -1232,10 +1249,14 @@
           document.getElementById('rate').setAttribute('readonly', true);
           let income_slab = document.getElementById('income-slab')
           income_slab.classList.remove('d-none')
-          document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          document.getElementById('rate_calculation').innerHTML = ` MT`;
+          document.getElementById('i_rate_calculation').value = 'MT';
+          refreshPaymentCalculations();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
+          document.getElementById('i_rate_calculation').value = '';
+          refreshPaymentCalculations();
         }
         if (data.slab) {
           const tbody = document.getElementById("rate-table");
@@ -1285,13 +1306,15 @@
 
             document.getElementById('rate').value = data.rate;
             document.getElementById('rate').setAttribute('readonly', true);
-            document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+            document.getElementById('rate_calculation').innerHTML = ` in (${data.rate_calculation} | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
+            refreshPaymentCalculations();
           } else {
             document.getElementById('rate').removeAttribute('readonly', true);
             document.getElementById('rate').value = '';
             document.getElementById('rate_calculation').innerHTML = ``;
             document.getElementById('i_rate_calculation').value = "";
+            refreshPaymentCalculations();
           }
 
         })
@@ -1313,13 +1336,15 @@
 
             document.getElementById('rate').value = data.rate;
             document.getElementById('rate').setAttribute('readonly', true);
-            document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+            document.getElementById('rate_calculation').innerHTML = ` in (${data.rate_calculation} | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
+            refreshPaymentCalculations();
           } else {
             document.getElementById('rate').removeAttribute('readonly', true);
             document.getElementById('rate').value = '';
             document.getElementById('rate_calculation').innerHTML = ``;
             document.getElementById('i_rate_calculation').value = "";
+            refreshPaymentCalculations();
           }
 
         })
@@ -1368,10 +1393,47 @@
     return s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
   }
 
+  function getRateCalculationType() {
+    const el = document.getElementById('i_rate_calculation');
+    if (!el) return '';
+    if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+      return String(el.value || '').trim();
+    }
+    return String(el.textContent || el.innerHTML || '').trim();
+  }
+
+  function refreshPaymentCalculations() {
+    const weight = parseFloat(document.getElementById('weight')?.value) || 0;
+    if (weight > 0 && typeof calculate_rent === 'function') {
+      calculate_rent();
+    }
+  }
+
+  // Turn on loading/unloading radios when contract rates or saved amounts exist.
+  function syncLabourChargeRadiosFromRates() {
+    function syncCharge(rateFieldId, amountFieldId, yesRadioId, toggleFn) {
+      const rateVal = parseFloat(document.getElementById(rateFieldId)?.value) || 0;
+      const amountVal = parseFloat(document.getElementById(amountFieldId)?.value) || 0;
+      const yesRadio = document.getElementById(yesRadioId);
+      const noRadioId = yesRadioId.replace('Yes', 'No');
+      const noRadio = document.getElementById(noRadioId);
+      if (!yesRadio) return;
+      if (rateVal > 0 || amountVal > 0) {
+        yesRadio.checked = true;
+      } else if (noRadio) {
+        noRadio.checked = true;
+      }
+      if (typeof toggleFn === 'function') toggleFn();
+    }
+    syncCharge('i_loading_charge', 'loading_charge', 'loadingYes', toggleloadingInput);
+    syncCharge('i_unloading_charge_1', 'unloading_charge_1', 'unloadingYes_1', toggleunloadingInput_1);
+    syncCharge('i_unloading_charge_2', 'unloading_charge_2', 'unloadingYes_2', toggleunloadingInput_2);
+  }
+
   function calculate_rent() {
     let weight = parseFloat(document.getElementById('weight').value) || 0
     let rate = parseFloat(document.getElementById('rate').value) || 0
-    let rate_calculation = document.getElementById('i_rate_calculation').innerHTML
+    let rate_calculation = getRateCalculationType()
     let totalfreight = document.getElementById('totalfreight')
     let km = parseFloat(document.getElementById('km').value) || 0
     let unloading_charge_1 = parseFloat(document.getElementById("i_unloading_charge_1").value) || 0
@@ -1380,7 +1442,6 @@
     let unload_amount_1 = document.getElementById("unloading_charge_1")
     let unload_amount_2 = document.getElementById("unloading_charge_2")
     let load_amount = document.getElementById("loading_charge")
-    let grand_total = document.getElementById('grand_total')
 
     let freightAmount;
     if (rate_calculation == "MT/KM") {
@@ -1400,9 +1461,11 @@
     load_amount.value = (loading_charge * weight).toFixed(2);
     load_amount.setAttribute('readonly', true)
 
-
-    grand_total.value = toExactAmount(parseFloat(totalfreight.value));
-    grand_total.setAttribute("readonly", true)
+    if (dispatchMode === 'new') {
+      syncLabourChargeRadiosFromRates();
+    }
+    add_extra_cost();
+    document.getElementById('grand_total').setAttribute("readonly", true);
 
   }
   function calculate_profite() {

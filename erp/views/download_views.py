@@ -1,4 +1,5 @@
 from erp.utils.decorators import session_required
+from erp.utils.gc_note import next_gc_no_for_contract
 from transport.models import T_Contract, Company_user, Dispatch, Invoice, GC_Note
 from company.models import Company_user , Company_profile
 from django.shortcuts import render ,redirect ,get_object_or_404
@@ -289,12 +290,10 @@ def generate_invoice_pdf(request):
 
     if contract.gc_note_required:
 
+        next_no = next_gc_no_for_contract(contract)
         for d in dispatches:
-            if GC_Note.objects.filter(contract_id=contract.id).exists():
-                last_gc = GC_Note.objects.filter(contract_id=contract.id).latest('id')
-                gc_no = last_gc.gc_no + 1
-            else:
-                gc_no = contract.gc_series_from
+            gc_no = next_no
+            next_no += 1
             gc_note = GC_Note.objects.create(
                 gc_no=gc_no,
                 gc_date=d.dep_date,

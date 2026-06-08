@@ -536,7 +536,10 @@ function filterTable() {
           return;
         }
         // Always render table, even if destinations is empty array
-        allDispatchesninv = data.destinations || [];
+        const inInvoiceIds = new Set((allDispatches || []).map(d => String(d.id)));
+        allDispatchesninv = (data.destinations || []).filter(
+          d => !inInvoiceIds.has(String(d.id)) && !d.inv_status
+        );
         allfieldninv = data.fields || [];
         renderninvTable(allDispatchesninv, allfieldninv);
       })

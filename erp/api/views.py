@@ -344,11 +344,14 @@ def get_ninv_dispacth(request):                  # ninv means not in invoice dis
     try:
         invoice = Invoice.objects.get(id=dbill_id , company_id = request.session['company_info']['company_id'])
         contract = T_Contract.objects.get(id=invoice.contract_id.id)
+        current_invoice_dispatch_ids = invoice.dispatch_list.values_list('id', flat=True)
         dispatch = (
             Dispatch.objects.filter(
                 contract_id=invoice.contract_id.id,
                 company_id=request.session['company_info']['company_id'],
+                inv_status=False,
             )
+            .exclude(id__in=current_invoice_dispatch_ids)
             .filter(
                 Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
                 | (
