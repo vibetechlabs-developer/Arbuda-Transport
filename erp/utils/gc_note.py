@@ -40,3 +40,62 @@ def gc_numbers_below_series_start(contract, gc_numbers: dict) -> bool:
     if series_start <= 0:
         return False
     return all(int(v) < series_start for v in gc_numbers.values())
+
+
+def renumber_invoice_gc_notes_below_series_start(contract, company_id) -> None:
+    """
+    For each invoice on this contract, if every GC note number is below
+    ``gc_series_from``, renumber that bill's GC notes from the series start.
+    Called after the contract GC start is saved (e.g. 4220 -> 4250).
+    """
+    from transport.models import Dispatch, GC_Note, Invoice
+
+    if not getattr(contract, "gc_note_required", False):
+        return
+    if parse_gc_series_start(contract) <= 0:
+        return
+
+    invoices = Invoice.objects.filter(
+        contract_id=contract,
+        company_id=company_id,
+    ).prefetch_related("dispatch_list")
+
+    for invoice in invoices:
+        dispatches = list(invoice.dispatch_list.all().order_by("dep_date", "id"))
+        if not dispatches:
+            continue
+
+        existing_gc_by_dispatch = {
+            gc.dispatch_id_id: int(gc.gc_no)
+            for gc in GC_Note.objects.filter(bill_id=invoice)
+            if gc.dispatch_id_id
+        }
+        if not gc_numbers_below_series_start(contract, existing_gc_by_dispatch):
+            continue
+
+        bill_date = invoice.Bill_date
+        GC_Note.objects.filter(bill_id=invoice).delete()
+
+        next_no = next_gc_no_for_contract(contract, exclude_bill_id=invoice.id)
+        for d in dispatches:
+            gc_note = GC_Note.objects.create(
+                gc_no=next_no,
+                gc_date=(d.dep_date or bill_date),
+                consignor=contract.company_name,
+                consignee=d.party_name,
+                dispatch_from=contract.from_center,
+                dc_field=d.challan_no,
+                destination=d.destination,
+                product_name=d.product_name,
+                weight=d.weight,
+                truck_no=d.truck_no,
+                district=d.district,
+                bill_no=invoice.Bill_no,
+                bill_id=invoice,
+                dispatch_id=d,
+                contract_id=contract,
+                company_id_id=company_id,
+            )
+            d.gc_note_no = gc_note.gc_no
+            d.save(update_fields=["gc_note_no"])
+            next_no += 1

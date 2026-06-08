@@ -9,6 +9,7 @@ from erp.utils.decorators import session_required
 from erp.utils.gc_note import (
     gc_numbers_below_series_start,
     next_gc_no_for_contract,
+    renumber_invoice_gc_notes_below_series_start,
 )
 from erp.utils.rate_revision_service import (
     get_applicable_revision,
@@ -537,6 +538,12 @@ def update_contract(request, ):
 
             # Save the contract first
             contract.save()
+
+            if contract.gc_note_required:
+                renumber_invoice_gc_notes_below_series_start(
+                    contract,
+                    request.session['company_info']['company_id'],
+                )
 
             # Clear old rates (so we can replace with new ones)
             Rate.objects.filter(contract=contract , company_id = request.session['company_info']['company_id']).delete()
@@ -1593,16 +1600,22 @@ def update_dispatch_Invoice(request):
                 current_dispatch_ids = {d.id for d in current_dispatches}
                 new_dispatch_ids = {d.id for d in new_dispatch_list}
                 dispatch_list_changed = current_dispatch_ids != new_dispatch_ids
-                needs_renumber = (
-                    not dispatch_list_changed
-                    and gc_numbers_below_series_start(contract, existing_gc_by_dispatch)
+                needs_renumber = gc_numbers_below_series_start(
+                    contract, existing_gc_by_dispatch
                 )
 
                 if dispatch_list_changed or needs_renumber:
                     GC_Note.objects.filter(bill_id=invoice).delete()
 
                     next_no = None
-                    preserved = {} if needs_renumber else existing_gc_by_dispatch
+                    if needs_renumber:
+                        preserved = {}
+                    else:
+                        preserved = {
+                            did: gc_no
+                            for did, gc_no in existing_gc_by_dispatch.items()
+                            if did in new_dispatch_ids
+                        }
 
                     for d in new_dispatch_list:
                         if d.id in preserved:
