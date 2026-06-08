@@ -1,0 +1,286 @@
+{% extends 'masterpage.html' %}
+{% load static %}
+{% block title %}<title>ARBUDA | Security Settings</title>{% endblock %}
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y app-page">
+  <h4 class="fw-bold mb-3">Security Settings</h4>
+
+  {% if auto_generated_passwords %}
+  <div class="alert alert-success">
+    <strong>PDF passwords generated (copy now — shown once):</strong><br>
+    Inside office: <code>{{ auto_generated_passwords.inside }}</code><br>
+    Outside office: <code>{{ auto_generated_passwords.outside }}</code>
+  </div>
+  {% endif %}
+
+  {% if location_summary.enabled and not location_summary.at_office %}
+  <div class="alert alert-warning">You are currently <strong>outside</strong> the office IP whitelist.</div>
+  {% endif %}
+
+  <div class="row">
+    <div class="col-12 col-xl-6 mb-4">
+      <div class="card h-100 app-card">
+        <div class="card-header"><h5 class="mb-0">Super Admin login</h5></div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="owner_credentials">
+            <div class="mb-3">
+              <label class="form-label">Super Admin ID</label>
+              <input type="text" name="owner_login_id" class="form-control" required
+                value="{{ company.owner_login_id }}" pattern="[a-zA-Z0-9._-]+" autocomplete="username">
+              <div class="form-text">Used at login with company name (Login as: Super Admin).</div>
+            </div>
+            <div class="mb-3 form-password-toggle">
+              <label class="form-label">Super Admin login password</label>
+              <div class="input-group input-group-merge">
+                <input type="password" name="owner_password" class="form-control" autocomplete="new-password"
+                  placeholder="Leave blank to keep current login password">
+                <span class="input-group-text cursor-pointer" title="Show password"><i class="bx bx-hide"></i></span>
+              </div>
+              <div class="form-text">This is <strong>not</strong> the same as the legacy company registration password stored at signup; only this password works for Super Admin login.</div>
+            </div>
+            <div class="mb-3 form-password-toggle">
+              <label class="form-label">Confirm login password</label>
+              <div class="input-group input-group-merge">
+                <input type="password" name="owner_password_confirm" class="form-control" autocomplete="new-password">
+                <span class="input-group-text cursor-pointer" title="Show password"><i class="bx bx-hide"></i></span>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Super Admin login</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6 mb-4">
+      <div class="card h-100 app-card">
+        <div class="card-header"><h5 class="mb-0">Office hours &amp; IP policy</h5></div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="settings">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="ip_whitelist_enabled" id="ip_on" {% if settings.ip_whitelist_enabled %}checked{% endif %}>
+              <label class="form-check-label" for="ip_on">Enforce office location (IP whitelist) for employees</label>
+            </div>
+            <p class="text-muted small mb-3">
+              When enabled, employees outside listed IPs must request Super Admin approval (same flow as after-hours).
+            </p>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="office_hours_enabled" id="hrs_on" {% if settings.office_hours_enabled %}checked{% endif %}>
+              <label class="form-check-label" for="hrs_on">Enforce office hours for employees</label>
+            </div>
+            {% if office_hours_summary %}
+            <div class="alert alert-{% if office_hours_summary.preview_requires_permission %}warning{% else %}success{% endif %} py-2 small">
+              {% if not office_hours_summary.enabled %}
+              Office hours are <strong>off</strong> — employees can preview PDFs any time (no permission needed).
+              {% elif office_hours_summary.within %}
+              <strong>Now:</strong> Inside office hours ({{ office_hours_summary.start }} – {{ office_hours_summary.end }}). Preview works without permission.
+              {% else %}
+              <strong>Now:</strong> Outside office hours ({{ office_hours_summary.start }} – {{ office_hours_summary.end }}). Employees need your approval to preview PDFs.
+              {% endif %}
+            </div>
+            {% endif %}
+            <div class="row mb-3">
+              <div class="col-6">
+                <label class="form-label">Start</label>
+                <input type="time" name="office_start" class="form-control" value="{{ settings.office_start|time:'H:i' }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label">End</label>
+                <input type="time" name="office_end" class="form-control" value="{{ settings.office_end|time:'H:i' }}">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Timezone</label>
+              <input type="text" name="timezone" class="form-control" value="{{ settings.timezone }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Working days (0=Mon … 6=Sun, comma-separated)</label>
+              <input type="text" name="working_days" class="form-control" value="{{ settings.working_days }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">After-hours preview grant (minutes)</label>
+              <input type="number" name="after_hours_grant_minutes" class="form-control" min="15" max="480"
+                value="{{ settings.after_hours_grant_minutes|default:120 }}">
+              <div class="form-text">How long an employee may preview PDFs after you approve an outside-hours request.</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save settings</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6 mb-4">
+      <div class="card h-100 app-card">
+        <div class="card-header"><h5 class="mb-0">Allowed office IPs</h5></div>
+        <div class="card-body">
+          <div class="mb-3 small">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span>IP seen by server from this browser: <code>{{ current_ip|default:"—" }}</code></span>
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_current_ip">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Add this IP</button>
+              </form>
+            </div>
+            {% if current_ip == "127.0.0.1" or current_ip == "::1" %}
+            <p class="text-muted mb-0 mt-2">
+              You opened the site as <strong>127.0.0.1</strong> (localhost on this PC), so that is what we show—not the Wi‑Fi address from <em>ipconfig</em> (e.g. <code>192.168.1.2</code>).
+              Type your Wi‑Fi or office IP in the form below (you already added <code>192.168.1.2</code> for LAN).
+              For employees on <strong>mobile data</strong>, add your office <strong>public</strong> IP (from office Wi‑Fi, search “what is my ip”)—not <code>192.168.x.x</code>.
+            </p>
+            {% else %}
+            <p class="text-muted mb-0 mt-2">
+              This is the address your browser sent to the server. Wi‑Fi <code>192.168.x.x</code> from <em>ipconfig</em> only matches if you open the ERP using that address (e.g. <code>http://192.168.1.2:8000</code>), not <code>127.0.0.1</code>.
+            </p>
+            {% endif %}
+          </div>
+          <form method="post" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_ip">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-sm-5">
+                <label class="form-label small mb-1">IP address</label>
+                <input type="text" name="ip_address" class="form-control" placeholder="e.g. {{ current_ip }}" required>
+              </div>
+              <div class="col-12 col-sm-4">
+                <label class="form-label small mb-1">Label</label>
+                <input type="text" name="label" class="form-control" placeholder="Office Wi‑Fi">
+              </div>
+              <div class="col-12 col-sm-3">
+                <button type="submit" class="btn btn-outline-primary w-100">Add IP</button>
+              </div>
+            </div>
+          </form>
+          <ul class="list-group list-group-flush">
+            {% for ip in allowed_ips %}
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0 security-ip-list-item">
+              <span>
+                <code>{{ ip.ip_address }}</code>
+                {% if ip.label %}<span class="text-muted">— {{ ip.label }}</span>{% endif %}
+                {% if not ip.is_active %}<span class="badge bg-secondary ms-1">Off</span>{% endif %}
+              </span>
+              <span class="ip-actions">
+                <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="toggle_ip"><input type="hidden" name="ip_id" value="{{ ip.id }}"><button class="btn btn-sm btn-link">Toggle</button></form>
+                <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="delete_ip"><input type="hidden" name="ip_id" value="{{ ip.id }}"><button class="btn btn-sm btn-link text-danger">Remove</button></form>
+              </span>
+            </li>
+            {% empty %}
+            <li class="list-group-item text-muted px-0">No IPs configured. Whitelist enforcement will block all employee logins until at least one IP is added.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6 mb-4">
+      <div class="card h-100 app-card">
+        <div class="card-header"><h5 class="mb-0">PDF access passwords</h5></div>
+        <div class="card-body">
+          <p class="text-muted small">
+            Two passwords are created automatically when security is first set up (inside ≠ outside).
+            Every PDF is <strong>encrypted</strong> — the viewer asks for a password when opening the file.
+            Super Admin can view saved passwords (“Show saved password”), change them below, or regenerate both.
+          </p>
+          <form method="post" class="mb-3 border rounded p-3 bg-light">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="pdf_file_policy">
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" name="pdf_files_always_use_outside_password" id="pdf_always_out"
+                {% if settings.pdf_files_always_use_outside_password %}checked{% endif %}>
+              <label class="form-check-label" for="pdf_always_out">
+                <strong>Always use outside password in PDF files</strong> (recommended)
+              </label>
+            </div>
+            <p class="text-muted small mb-2 mb-0">
+              When on, every downloaded PDF — even at the office — is locked with the <strong>outside</strong> password,
+              so files sent on WhatsApp and opened at home stay protected. The <strong>inside</strong> password is still
+              used only inside the ERP on the office network. When off, the password inside the file matches where it
+              was downloaded (office = inside, away = outside).
+            </p>
+            <button type="submit" class="btn btn-sm btn-outline-primary mt-2">Save PDF file policy</button>
+          </form>
+          <p class="mb-3">
+            <span class="badge bg-label-{% if pdf_pw_status.inside_set %}success{% else %}secondary{% endif %}">Inside password: {% if pdf_pw_status.inside_set %}active{% else %}not set{% endif %}</span>
+            <span class="badge bg-label-{% if pdf_pw_status.outside_set %}success{% else %}secondary{% endif %} ms-1">Outside password: {% if pdf_pw_status.outside_set %}active{% else %}not set{% endif %}</span>
+          </p>
+          <form method="post" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="regenerate_pdf_passwords">
+            <button type="submit" class="btn btn-outline-warning btn-sm"
+              onclick="return confirm('Generate new inside and outside PDF passwords? Old PDF files will need the new passwords to open.');">
+              Regenerate both PDF passwords automatically
+            </button>
+          </form>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="pdf_passwords">
+            <div class="mb-3 pdf-pw-block" data-zone="inside" data-reveal-url="{% url 'reveal-pdf-password' %}?zone=inside"
+              data-has-password="{% if pdf_pw_status.inside_set %}1{% else %}0{% endif %}">
+              <label class="form-label">Inside office network password</label>
+              <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                <button type="button" class="btn btn-sm btn-outline-primary pdf-pw-reveal-btn" {% if not pdf_pw_status.inside_set %}disabled{% endif %}>
+                  <i class="bx bx-show me-1"></i> Show saved password
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary pdf-pw-copy-btn d-none">
+                  <i class="bx bx-copy me-1"></i> Copy
+                </button>
+                <button type="button" class="btn btn-sm btn-link text-muted pdf-pw-hide-btn d-none">Hide</button>
+              </div>
+              <div class="alert alert-info py-2 small pdf-pw-revealed d-none mb-2" role="status">
+                <strong>Current inside password:</strong>
+                <code class="pdf-pw-value user-select-all fs-6 ms-1"></code>
+              </div>
+              <div class="alert alert-danger py-2 small pdf-pw-reveal-error d-none mb-2" role="alert"></div>
+              <label class="form-label small text-muted mb-1">Set a new password (optional)</label>
+              <div class="input-group input-group-merge form-password-toggle">
+                <input type="password" name="pdf_password_inside" id="pdf_password_inside" class="form-control"
+                  autocomplete="new-password" placeholder="New password (min 4 chars)">
+                <span class="input-group-text cursor-pointer" title="Show while typing"><i class="bx bx-hide"></i></span>
+              </div>
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="clear_pdf_password_inside" id="clr_in">
+                <label class="form-check-label" for="clr_in">Clear inside password</label>
+              </div>
+            </div>
+            <div class="mb-3 pdf-pw-block" data-zone="outside" data-reveal-url="{% url 'reveal-pdf-password' %}?zone=outside"
+              data-has-password="{% if pdf_pw_status.outside_set %}1{% else %}0{% endif %}">
+              <label class="form-label">Outside office network password</label>
+              <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                <button type="button" class="btn btn-sm btn-outline-primary pdf-pw-reveal-btn" {% if not pdf_pw_status.outside_set %}disabled{% endif %}>
+                  <i class="bx bx-show me-1"></i> Show saved password
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary pdf-pw-copy-btn d-none">
+                  <i class="bx bx-copy me-1"></i> Copy
+                </button>
+                <button type="button" class="btn btn-link btn-sm text-muted pdf-pw-hide-btn d-none">Hide</button>
+              </div>
+              <div class="alert alert-info py-2 small pdf-pw-revealed d-none mb-2" role="status">
+                <strong>Current outside password:</strong>
+                <code class="pdf-pw-value user-select-all fs-6 ms-1"></code>
+              </div>
+              <div class="alert alert-danger py-2 small pdf-pw-reveal-error d-none mb-2" role="alert"></div>
+              <label class="form-label small text-muted mb-1">Set a new password (optional)</label>
+              <div class="input-group input-group-merge form-password-toggle">
+                <input type="password" name="pdf_password_outside" id="pdf_password_outside" class="form-control"
+                  autocomplete="new-password" placeholder="New password (min 4 chars)">
+                <span class="input-group-text cursor-pointer" title="Show while typing"><i class="bx bx-hide"></i></span>
+              </div>
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="clear_pdf_password_outside" id="clr_out">
+                <label class="form-check-label" for="clr_out">Clear outside password</label>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Update PDF passwords</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block footer_scripts %}
+<script src="{% static 'js/security-settings-pdf.js' %}"></script>
+{% endblock %}

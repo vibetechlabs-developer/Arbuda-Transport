@@ -1,0 +1,57 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Preview Permission</title>{% endblock %}
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+  <h4 class="fw-bold mb-3">Access permission request</h4>
+
+  {% if pending.restriction_kind == "outside_location" or location_access.requires_permission %}
+  <div class="alert alert-warning">
+    <strong>Outside office network.</strong>
+    You must ask Super Admin for approval before using modules or PDFs from this location.
+    PDF files opened outside the office use the <strong>outside office password</strong> (different from inside).
+  </div>
+  {% endif %}
+
+  {% if office_hours and office_hours.enabled and office_hours.preview_requires_permission %}
+  <div class="alert alert-warning">
+  Office hours are <strong>{{ office_hours.start }} to {{ office_hours.end }}</strong> ({{ office_hours.timezone }}).
+  Outside this window you need Super Admin approval for the same access.
+  </div>
+  {% elif office_hours and office_hours.enabled and office_hours.within %}
+  <div class="alert alert-info">
+    You are inside office hours ({{ office_hours.start }} – {{ office_hours.end }}).
+  </div>
+  {% endif %}
+
+  {% if pending %}
+  <div class="card mb-4">
+    <div class="card-body">
+      <p class="mb-2"><strong>Blocked action:</strong> {{ pending.document_label }}</p>
+      <p class="text-muted small mb-0">
+        Submit a reason below. Your Super Admin is notified in the top bar (bell icon) under
+        <em>Preview approvals</em>.
+      </p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="document_type" value="{{ pending.document_type|default:'pdf' }}">
+        <input type="hidden" name="document_label" value="{{ pending.document_label|default:'Access request' }}">
+        <input type="hidden" name="target_url_name" value="{{ pending.target_url_name|default:'' }}">
+        <input type="hidden" name="restriction_kind" value="{{ pending.restriction_kind|default:'office_hours' }}">
+        <div class="mb-3">
+          <label class="form-label">Reason (required)</label>
+          <textarea name="reason" class="form-control" rows="3" required
+            placeholder="Why do you need access now?"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send request to Super Admin</button>
+        <a href="{% url 'preview-permission-my' %}" class="btn btn-outline-secondary ms-2">My requests</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

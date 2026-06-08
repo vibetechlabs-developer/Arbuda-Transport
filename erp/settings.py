@@ -73,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'erp.middleware.employee_security.EmployeeSecurityMiddleware',
 ]
 
 ROOT_URLCONF = 'erp.urls'

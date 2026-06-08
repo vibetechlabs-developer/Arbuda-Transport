@@ -14,18 +14,15 @@
   }
 </style>
 
-<div class="container-xxl">
-  <div class="header d-flex justify-content-between align-items-center mt-2">
-    <h4 class="fw-bold py-3 mb-0"><span class="text-muted fw-light"></span>Create Report For US</h4>
-    <button type="submit" form="internalReportForm" name="export_type" value="csv" class="btn btn-outline-secondary">
+<div class="app-page report-page">
+  <div class="app-page-header">
+    <h4 class="fw-bold">Create Report For US</h4>
+    <button type="submit" form="internalReportForm" name="export_type" value="csv" class="btn btn-outline-secondary btn-sm">
       Export CSV
     </button>
   </div>
-  <div class="authentication-wrapper authentication-basic container-p-y pt-0">
-    <div class="authentication-inner w-100" style="max-width: 100%;">
-      <!-- Register Card -->
-      <div class="card">
-        <div class="card-body">
+  <div class="card app-card">
+    <div class="card-body">
           <form id="internalReportForm" class="mb-3" method="POST" action="download-our-report">
             {% csrf_token %}
             <h5 class="text-primary fw-semibold mb-3">Report Details</h5>
@@ -165,9 +162,8 @@
             </div>
 
             <h5 class="text-primary fw-semibold mb-3 mt-3">Report Preview</h5>
-            <div class="row">
-              <div class="table-responsive mb-3">
-                <table id="dispatchTable" class="table table-bordered ">
+            <div class="report-preview-table-wrap">
+                <table id="dispatchTable" class="table table-bordered mb-0">
                   <thead>
                     <tr id="tableHeader" style="word-wrap: none;"></tr>
                   </thead>
@@ -176,39 +172,31 @@
                     <tr id="tableFooterRow"></tr>
                   </tfoot>
                 </table>
-              </div>
             </div>
-            <!-- Action buttons: show both on all screen sizes -->
-            <div class="col-sm-8 d-flex gap-2 mt-1">
+            <div class="report-action-bar mt-2">
               <!-- Preview button: opens PDF in new tab (inline viewer with browser download button) -->
               <button type="submit"
                       name="export_type"
                       value="pdf"
-                      class="btn btn-outline-primary flex-fill"
+                      class="btn btn-outline-primary"
                       formtarget="_blank">
                 Preview PDF
               </button>
-
-              <!-- Explicit download button: same PDF but forces attachment -->
               <button type="submit"
                       name="export_type"
                       value="pdf"
-                      class="btn btn-primary flex-fill"
+                      class="btn btn-primary"
                       onclick="this.form.insertAdjacentHTML('beforeend','<input type=&quot;hidden&quot; name=&quot;download&quot; value=&quot;1&quot; />')">
                 Download PDF
               </button>
-
-              <!-- CSV export unchanged -->
               <button type="submit"
                       name="export_type"
                       value="csv"
-                      class="btn btn-outline-secondary flex-fill">
+                      class="btn btn-outline-secondary d-md-none">
                 Export CSV
               </button>
             </div>
           </form>
-        </div>
-      </div>
     </div>
   </div>
 </div>

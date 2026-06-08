@@ -1,4 +1,5 @@
-from erp.utils.decorators import session_required
+from erp.utils.decorators import owner_required, session_required
+from erp.utils.security import require_pdf_access
 from erp.utils.financial_year import get_current_financial_year, get_financial_year_start_end
 from transport.models import T_Contract, Company_user, Dispatch, Invoice, GC_Note, Destination
 from company.models import Company_user , Company_profile
@@ -12,7 +13,8 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from datetime import datetime , date
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle ,PageBreak , HRFlowable, KeepTogether
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle ,PageBreak , HRFlowable, KeepTogether
+from erp.utils.pdf_protection import create_pdf_document, notify_pdf_password_hint
 from reportlab.lib.units import mm
 from operator import attrgetter
 from itertools import groupby
@@ -96,6 +98,7 @@ def outstanding_report_view(request):
 
 
 @session_required
+@require_pdf_access
 def download_report(request):
     if request.method == "POST":     
         i_contract_id = request.POST.get("contract_no")
@@ -303,8 +306,9 @@ def download_report(request):
         buffer = BytesIO()
         # Use ultra‑tight margins for this external dispatch report so the
         # header and table span virtually the entire physical page width.
-        doc = SimpleDocTemplate(
+        doc = create_pdf_document(
             buffer,
+            request,
             pagesize=landscape(A4),
             rightMargin=4 * mm,
             leftMargin=4 * mm,
@@ -854,6 +858,7 @@ def download_report(request):
             filename = f"{contract.company_name}-Dispacth-Report.pdf"
             # Inline preview by default; only download when ?download=1 or hidden input is sent
             download_flag = request.POST.get("download") or request.GET.get("download")
+            notify_pdf_password_hint(request)
             response = FileResponse(
                 buffer,
                 as_attachment=bool(download_flag),
@@ -882,10 +887,11 @@ def width_for_chars(num_chars, font_size=6, factor=0.6):
 
 
 
+@session_required
+@owner_required
 def internal_report(request):
-
     """
-    Internal report view (Create Report For US).
+    Internal report view (Create Report For US). Super Admin only.
     This should behave the same as the client report view as far as
     populating the contract dropdown is concerned.
     """
@@ -913,6 +919,8 @@ def internal_report(request):
 
 
 @session_required
+@owner_required
+@require_pdf_access
 def download_our_report(request):
     """
     Download PDF report for internal use (our report).
@@ -1092,8 +1100,9 @@ def download_our_report(request):
 
         # --- PDF Generation ---
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
+        doc = create_pdf_document(
             buffer,
+            request,
             pagesize=landscape(A4),
             rightMargin=2 * mm,
             leftMargin=2 * mm,
@@ -1709,6 +1718,7 @@ def download_our_report(request):
             # Match client report behaviour:
             # preview inline by default, download only when ?download=1 or hidden input is sent
             download_flag = request.POST.get("download") or request.GET.get("download")
+            notify_pdf_password_hint(request)
             response = FileResponse(
                 buffer,
                 as_attachment=bool(download_flag),
@@ -1730,6 +1740,7 @@ def download_our_report(request):
 ##########################################
 
 @session_required
+@require_pdf_access
 def download_distance_master_pdf(request):
     """Generate PDF for all distance master data"""
     try:
@@ -1786,7 +1797,15 @@ def download_distance_master_pdf(request):
         
         # --- PDF Generation ---
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=2*mm, leftMargin=2*mm, topMargin=3*mm, bottomMargin=5*mm)
+        doc = create_pdf_document(
+            buffer,
+            request,
+            pagesize=landscape(A4),
+            rightMargin=2 * mm,
+            leftMargin=2 * mm,
+            topMargin=3 * mm,
+            bottomMargin=5 * mm,
+        )
         styles = getSampleStyleSheet()
         elements = []
         
@@ -1960,6 +1979,7 @@ def download_distance_master_pdf(request):
                 filename = f"{request.session['company_info']['company_name']}-Distance-Master-{contract_name_safe}-{contract_no_safe}-{contract.rate_type}.pdf"
             else:
                 filename = f"{request.session['company_info']['company_name']}-Distance-Master-Report.pdf"
+            notify_pdf_password_hint(request)
             response = FileResponse(buffer, as_attachment=True, filename=filename, content_type='application/pdf')
             return response
         except Exception as e:

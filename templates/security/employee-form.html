@@ -1,0 +1,102 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | {% if is_edit %}Edit{% else %}Add{% endif %} Employee</title>{% endblock %}
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+  <h4 class="fw-bold mb-4">{% if is_edit %}Edit employee{% else %}Add employee{% endif %}</h4>
+
+  <div class="card col-lg-8">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {% if not is_edit %}
+        <div class="mb-3">
+          <label class="form-label">Employee ID (login username)</label>
+          <input type="text" name="username" class="form-control" required pattern="[a-zA-Z0-9._-]+"
+            placeholder="e.g. rajesh" autocomplete="off">
+          <div class="form-text">Lowercase letters, numbers, dot, underscore, hyphen only.</div>
+        </div>
+        {% else %}
+        <div class="mb-3">
+          <label class="form-label">Employee ID</label>
+          <input type="text" class="form-control" value="{{ employee.username }}" disabled>
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label">Display name</label>
+          <input type="text" name="display_name" class="form-control" required
+            value="{{ employee.display_name|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-control" {% if not is_edit %}required{% endif %}
+            autocomplete="new-password" placeholder="{% if is_edit %}Leave blank to keep current{% else %}Min 4 characters{% endif %}">
+        </div>
+
+        <h6 class="mb-3">Module permissions</h6>
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_dashboard" id="p_dash"
+                {% if not is_edit or employee.perm_dashboard %}checked{% endif %}>
+              <label class="form-check-label" for="p_dash">Dashboard</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_contract" id="p_contract"
+                {% if employee.perm_contract %}checked{% endif %}>
+              <label class="form-check-label" for="p_contract">Contract</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_dispatch" id="p_dispatch"
+                {% if not is_edit or employee.perm_dispatch %}checked{% endif %}>
+              <label class="form-check-label" for="p_dispatch">Dispatch</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_invoice_view" id="p_inv_view"
+                {% if not is_edit or employee.perm_invoice_view %}checked{% endif %}>
+              <label class="form-check-label" for="p_inv_view">Invoice view &amp; download</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_invoice_create" id="p_inv_create"
+                {% if employee.perm_invoice_create %}checked{% endif %}>
+              <label class="form-check-label" for="p_inv_create">Create invoice</label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_invoice_update" id="p_inv_up"
+                {% if employee.perm_invoice_update %}checked{% endif %}>
+              <label class="form-check-label" for="p_inv_up">Update invoice</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_gc_note" id="p_gc"
+                {% if not is_edit or employee.perm_gc_note %}checked{% endif %}>
+              <label class="form-check-label" for="p_gc">GC note</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_reports" id="p_reports"
+                {% if employee.perm_reports %}checked{% endif %}>
+              <label class="form-check-label" for="p_reports">Client &amp; outstanding reports</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_masters" id="p_masters"
+                {% if employee.perm_masters %}checked{% endif %}>
+              <label class="form-check-label" for="p_masters">Masters</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="perm_summary" id="p_summary"
+                {% if employee.perm_summary %}checked{% endif %}>
+              <label class="form-check-label" for="p_summary">Summary</label>
+            </div>
+          </div>
+        </div>
+        <p class="text-muted small">Report <strong>For US</strong> is Super Admin only and cannot be granted to employees.</p>
+
+        <button type="submit" class="btn btn-primary">{% if is_edit %}Save changes{% else %}Create employee{% endif %}</button>
+        <a href="{% url 'employee-manage' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

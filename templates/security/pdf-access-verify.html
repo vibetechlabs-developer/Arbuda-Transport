@@ -1,0 +1,23 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | PDF Access Password</title>{% endblock %}
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+  <h4 class="fw-bold mb-3">PDF access password</h4>
+  <div class="alert alert-info">
+    You are on the <strong>{{ zone_label }}</strong> connection. Enter the PDF password set by your Super Admin for this location.
+  </div>
+  <div class="card col-md-6">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">PDF password ({{ zone }})</label>
+          <input type="password" name="pdf_password" class="form-control" required autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary">Unlock PDF access</button>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -133,14 +133,33 @@
             <form id="formAuthentication" class="mb-3" method="POST">
               {% csrf_token %}
               <div class="mb-3">
+                <label class="form-label">Login as</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="login_as" id="login_owner" value="owner" checked>
+                    <label class="form-check-label" for="login_owner">Super Admin</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="login_as" id="login_employee" value="employee">
+                    <label class="form-check-label" for="login_employee">Employee</label>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3">
                 <label for="company_name" class="form-label">Select Company Name</label>
                 <select name="company_name" id="company_name" class="form-select form-control" required>
-                  <option value="Select Status">Select Company</option>
+                  <option value="">Select Company</option>
                   {% for company in allcompany %}
                   <option value="{{company.company_name}}">{{company.company_name}}</option>
                   {% endfor %}
                 </select>
 
+              </div>
+              <div class="mb-3">
+                <label for="login_id" class="form-label" id="login_id_label">Super Admin ID</label>
+                <input type="text" name="login_id" id="login_id" class="form-control" autocomplete="username"
+                  placeholder="Default: admin">
+                <div class="form-text" id="login_id_help">Super Admin ID is set under Security Settings after first login.</div>
               </div>
               <div class="mb-3 form-password-toggle">
                 <div class="d-flex justify-content-between">
@@ -208,6 +227,26 @@
 
   <!-- Place this tag in your head or just before your close body tag. -->
   <script async defer src="https://buttons.github.io/buttons.js"></script>
+  <script>
+    (function () {
+      const ownerRadio = document.getElementById("login_owner");
+      const empRadio = document.getElementById("login_employee");
+      const idLabel = document.getElementById("login_id_label");
+      const idHelp = document.getElementById("login_id_help");
+      const idInput = document.getElementById("login_id");
+      function sync() {
+        const emp = empRadio && empRadio.checked;
+        if (idLabel) idLabel.textContent = emp ? "Employee ID" : "Super Admin ID";
+        if (idHelp) idHelp.textContent = emp
+          ? "Your username created by Super Admin."
+          : "Super Admin ID is set under Security Settings after first login.";
+        if (idInput) idInput.required = !!emp;
+      }
+      ownerRadio && ownerRadio.addEventListener("change", sync);
+      empRadio && empRadio.addEventListener("change", sync);
+      sync();
+    })();
+  </script>
 </body>
 
 </html>

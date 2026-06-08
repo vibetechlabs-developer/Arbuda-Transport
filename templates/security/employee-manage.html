@@ -1,0 +1,67 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Employees</title>{% endblock %}
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h4 class="fw-bold mb-0">Employees</h4>
+    <a href="{% url 'employee-create' %}" class="btn btn-primary">Add employee</a>
+  </div>
+  <p class="text-muted">Employees log in with company name, their username, and password. Assign module permissions below.</p>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Display name</th>
+            <th>Status</th>
+            <th>Permissions</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for emp in employees %}
+          <tr>
+            <td><code>{{ emp.username }}</code></td>
+            <td>{{ emp.display_name }}</td>
+            <td>
+              {% if emp.is_active %}
+              <span class="badge bg-label-success">Active</span>
+              {% else %}
+              <span class="badge bg-label-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">
+              {% if emp.perm_dashboard %}Dashboard{% endif %}
+              {% if emp.perm_dispatch %}{% if emp.perm_dashboard %}, {% endif %}Dispatch{% endif %}
+              {% if emp.perm_contract %}, Contract{% endif %}
+              {% if emp.perm_invoice_view %}, Invoice view{% endif %}
+              {% if emp.perm_invoice_create %}, Invoice create{% endif %}
+              {% if emp.perm_gc_note %}, GC note{% endif %}
+              {% if emp.perm_reports %}, Reports{% endif %}
+              {% if emp.perm_masters %}, Masters{% endif %}
+              {% if emp.perm_summary %}, Summary{% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'employee-edit' emp.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'employee-deactivate' emp.id %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="is_active" value="{% if emp.is_active %}0{% else %}1{% endif %}">
+                <button type="submit" class="btn btn-sm btn-outline-{% if emp.is_active %}warning{% else %}success{% endif %}">
+                  {% if emp.is_active %}Deactivate{% else %}Activate{% endif %}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-4">No employees yet. Click <strong>Add employee</strong> to create one.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

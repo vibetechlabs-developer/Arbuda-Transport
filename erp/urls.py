@@ -19,6 +19,23 @@ urlpatterns = [
     path('company-logout', auth_views.Company_logout , name='company-logout'),
     path('company-profile', company_views.Company_profile_view , name='company-profile'),
 
+    # Security & employees
+    path('security/settings', security_views.security_settings, name='security-settings'),
+    path('security/reveal-pdf-password', security_views.reveal_pdf_password, name='reveal-pdf-password'),
+    path('security/audit-log', security_views.security_audit_log, name='security-audit-log'),
+    path('security/office-hours-status', security_views.security_office_hours_status, name='security-office-hours-status'),
+    path('security/admin-notifications', security_views.security_admin_notifications, name='security-admin-notifications'),
+    path('security/audit-beacon', security_views.security_audit_beacon, name='security-audit-beacon'),
+    path('security/pdf-access-verify', security_views.pdf_access_verify, name='pdf-access-verify'),
+    path('security/employees', employee_views.employee_manage, name='employee-manage'),
+    path('security/employees/create', employee_views.employee_create, name='employee-create'),
+    path('security/employees/<int:employee_id>/edit', employee_views.employee_edit, name='employee-edit'),
+    path('security/employees/<int:employee_id>/toggle', employee_views.employee_deactivate, name='employee-deactivate'),
+    path('security/preview-permission/request', preview_permission_views.preview_permission_request, name='preview-permission-request'),
+    path('security/preview-permission/my', preview_permission_views.preview_permission_my, name='preview-permission-my'),
+    path('security/preview-permission/run/<int:request_id>', preview_permission_views.preview_permission_run, name='preview-permission-run'),
+    path('security/preview-permission/manage', preview_permission_views.preview_permission_manage, name='preview-permission-manage'),
+
     # contract 
     path('new-contract-view' , transport_views.new_contract_view_2, name='new-contract-view'),
     path('new-contract-form' , transport_views.add_contract, name='new-contract-form'),

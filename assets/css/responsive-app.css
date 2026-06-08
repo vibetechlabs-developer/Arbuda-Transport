@@ -1,0 +1,176 @@
+/* Arbuda ERP — responsive layout helpers */
+
+.content-wrapper,
+.layout-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.app-page {
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem 1rem 2rem;
+}
+
+@media (min-width: 768px) {
+  .app-page {
+    padding: 1.25rem 1.5rem 2rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .app-page {
+    padding: 1.5rem 2rem 2.5rem;
+  }
+}
+
+.app-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.app-page-header h4 {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  line-height: 1.35;
+}
+
+.app-card {
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(67, 89, 113, 0.08);
+}
+
+.app-card .card-body {
+  padding: 1rem 1.15rem;
+}
+
+@media (min-width: 768px) {
+  .app-card .card-body {
+    padding: 1.25rem 1.5rem;
+  }
+}
+
+/* Report pages: remove narrow auth wrapper */
+.report-page .authentication-wrapper,
+.report-page .authentication-inner {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.report-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.report-action-bar .btn {
+  flex: 1 1 auto;
+  min-width: min(100%, 140px);
+}
+
+@media (max-width: 575.98px) {
+  .report-action-bar .btn {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+}
+
+.report-preview-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+.report-preview-table-wrap table {
+  min-width: 640px;
+  font-size: 0.8125rem;
+}
+
+/* Navbar */
+#layout-navbar .navbar-nav-right {
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+}
+
+#layout-navbar .company-title-nav {
+  max-width: min(42vw, 220px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(0.85rem, 2vw, 1.1rem);
+}
+
+@media (max-width: 575.98px) {
+  #layout-navbar .company-title-nav {
+    display: none;
+  }
+}
+
+.admin-notify-dropdown {
+  min-width: min(92vw, 360px) !important;
+  max-width: min(92vw, 400px) !important;
+}
+
+@media (min-width: 576px) {
+  .admin-notify-dropdown {
+    min-width: 320px !important;
+    max-width: 380px !important;
+  }
+}
+
+#admin-approval-list .dropdown-item {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Security settings */
+.security-ip-list-item {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.security-ip-list-item .ip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* Preview approval cards */
+.approval-card-actions {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 576px) {
+  .approval-card-actions {
+    max-width: 220px;
+  }
+}
+
+/* Employee / office banners */
+#office-hours-banner {
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+/* Dashboard stat cards */
+.dashboard-stats .col-sm-3 {
+  margin-bottom: 0.75rem;
+}
+
+/* Tom Select full width on mobile */
+.report-page .ts-wrapper,
+.report-page .ts-control {
+  width: 100% !important;
+  max-width: 100%;
+}

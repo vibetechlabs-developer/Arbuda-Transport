@@ -1,4 +1,5 @@
 from erp.utils.decorators import session_required
+from erp.utils.security import require_pdf_access
 from transport.models import T_Contract, Company_user, Dispatch, Invoice, GC_Note
 from company.models import Company_user , Company_profile
 from django.shortcuts import render ,redirect ,get_object_or_404
@@ -9,7 +10,8 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle ,PageBreak , HRFlowable, KeepTogether
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle ,PageBreak , HRFlowable, KeepTogether
+from erp.utils.pdf_protection import create_pdf_document, notify_pdf_password_hint
 from reportlab.lib.units import mm
 from operator import attrgetter
 import math
@@ -148,6 +150,7 @@ def _normalized_invoice_fields(contract) -> list[str]:
 
 
 @session_required
+@require_pdf_access
 def generate_invoice_pdf(request):
     if request.method != "POST":
         return redirect("create-dispatch-invoice")
@@ -321,8 +324,9 @@ def generate_invoice_pdf(request):
     # Optimized margins for full-page utilization while maintaining professional appearance.
     # Use the same margins as the download view so the preview and download PDFs
     # paginate identically (header + 12 rows + TOTAL + footer on a single page).
-    doc = SimpleDocTemplate(
+    doc = create_pdf_document(
         buffer,
+        request,
         pagesize=landscape(A4),
         # Tighter side/top margins so 12 rows + TOTAL + signatures reliably fit on one page
         rightMargin=6 * mm,
@@ -1247,6 +1251,7 @@ def generate_invoice_pdf(request):
     # download view instead of relying on this one.
     from django.http import HttpResponse
 
+    notify_pdf_password_hint(request)
     response = HttpResponse(buffer, content_type="application/pdf")
     # Use inline disposition so browsers open the PDF viewer instead of saving the file.
     response["Content-Disposition"] = f'inline; filename="{filename}"'
@@ -1257,6 +1262,7 @@ def generate_invoice_pdf(request):
 ################################
 
 @session_required
+@require_pdf_access
 def download_generate_invoice_pdf(request):
     try:
         return _download_generate_invoice_pdf_impl(request)
@@ -1343,8 +1349,9 @@ def _download_generate_invoice_pdf_impl(request):
     # --- PDF Generation ---
     buffer = BytesIO()
     # Optimized margins for full-page utilization while maintaining professional appearance
-    doc = SimpleDocTemplate(
+    doc = create_pdf_document(
         buffer,
+        request,
         pagesize=landscape(A4),
         # Tighter margins so header + 12 rows + TOTAL + signatures fit on one page
         rightMargin=6 * mm,
@@ -2153,6 +2160,7 @@ def _download_generate_invoice_pdf_impl(request):
     )
     # Decide whether to preview inline or force download based on the "download" flag
     download_flag = (request.POST.get("download") or "").strip()
+    notify_pdf_password_hint(request)
     if download_flag:
         # Explicit download button → send as file attachment
         return FileResponse(buffer, as_attachment=True, filename=filename)
@@ -2171,6 +2179,7 @@ def _download_generate_invoice_pdf_impl(request):
 
 
 @session_required
+@require_pdf_access
 def download_gc_pdf(request):
     if request.method == "POST":
         selected_gc_ids = request.POST.getlist('dispatch_ids')
@@ -2185,7 +2194,9 @@ def download_gc_pdf(request):
 
     # Create the PDF document
     pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
-    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=20)
+    doc = create_pdf_document(
+        buffer, request, pagesize=A4, leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=20
+    )
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="CenterBold", alignment=1, fontSize=12, leading=14, spaceAfter=6, spaceBefore=3))
     styles.add(ParagraphStyle(name="Center", alignment=1, fontSize=9))
@@ -2270,6 +2281,7 @@ def download_gc_pdf(request):
     buffer.close()
 
     # Return the response: inline for preview, attachment for explicit download.
+    notify_pdf_password_hint(request)
     response = HttpResponse(content_type='application/pdf')
     download_flag = (request.POST.get("download") or "").strip()
     if download_flag:
@@ -2292,6 +2304,7 @@ def width_for_chars(num_chars, font_size=6, factor=0.6):
     return total_width_pt / 2.835
 
 @session_required
+@require_pdf_access
 def generate_summary_pdf(request):
     if request.method != "POST":
         return redirect("summary-view")
@@ -2468,8 +2481,9 @@ def generate_summary_pdf(request):
     
     # PDF Generation (match requested "Bill Summary" format)
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
+    doc = create_pdf_document(
         buffer,
+        request,
         pagesize=A4,
         # Use tighter margins so the summary uses more page width (less left/right whitespace).
         rightMargin=3 * mm,
@@ -2808,6 +2822,7 @@ def generate_summary_pdf(request):
     filename = f"{contract.company_name}_{summary_date.strftime('%Y%m%d')}_Summary.pdf"
     # Inline preview by default; only download when ?download=1 or hidden input is sent
     download_flag = request.POST.get("download") or request.GET.get("download")
+    notify_pdf_password_hint(request)
     response = FileResponse(
         buffer,
         as_attachment=bool(download_flag),

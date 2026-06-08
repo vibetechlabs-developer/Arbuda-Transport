@@ -1,0 +1,76 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Preview Approvals</title>{% endblock %}
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+  <h4 class="fw-bold mb-2">Preview &amp; access approvals</h4>
+  <p class="text-muted">
+    Employees request access when they are <strong>outside office hours</strong> or
+    <strong>outside the office network</strong>. After approval they can use allowed modules and PDFs.
+    Outside-location PDFs use a <strong>different file password</strong> than inside (Security → Settings).
+  </p>
+
+  {% if pending %}
+  <div class="alert alert-warning d-flex align-items-center gap-2">
+    <i class="bx bx-bell fs-4"></i>
+    <span><strong>{{ pending|length }}</strong> pending request(s) need your action.</span>
+  </div>
+  {% endif %}
+
+  <h5 class="mb-3">Pending requests</h5>
+  {% for r in pending %}
+  <div class="card mb-3 border-start border-4 border-{% if r.restriction_kind == 'outside_location' %}warning{% else %}info{% endif %}">
+    <div class="card-body">
+      <div class="d-flex justify-content-between flex-wrap gap-2">
+        <div>
+          <strong>{{ r.employee.display_name }}</strong> ({{ r.employee.username }})<br>
+          <span class="badge bg-label-{% if r.restriction_kind == 'outside_location' %}warning{% else %}info{% endif %}">
+            {{ r.get_restriction_kind_display }}
+          </span>
+          <span class="text-muted small">{{ r.requested_at|date:"d M Y H:i" }} — {{ r.document_label }}</span>
+          <p class="mt-2 mb-0">{{ r.reason }}</p>
+        </div>
+        <div class="d-flex flex-column gap-2 approval-card-actions">
+          <form method="post" class="d-flex flex-column gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="request_id" value="{{ r.id }}">
+            <input type="text" name="reviewer_note" class="form-control form-control-sm" placeholder="Note (optional)">
+            <button type="submit" name="action" value="approve" class="btn btn-success btn-sm">Approve access</button>
+            <button type="submit" name="action" value="deny" class="btn btn-outline-danger btn-sm">Deny</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted mb-4">No pending requests.</p>
+  {% endfor %}
+
+  <h5 class="mb-3 mt-4">Recent decisions</h5>
+  <div class="table-responsive card">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Type</th>
+          <th>Document</th>
+          <th>Status</th>
+          <th>Reviewed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          <td>{{ r.employee.username }}</td>
+          <td><span class="badge bg-label-secondary">{{ r.get_restriction_kind_display }}</span></td>
+          <td>{{ r.document_label }}</td>
+          <td>{{ r.get_status_display }}</td>
+          <td class="small">{{ r.reviewed_at|date:"d M H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted text-center">No history yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

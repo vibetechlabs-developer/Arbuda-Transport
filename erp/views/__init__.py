@@ -4,3 +4,6 @@ from .company_views import *
 from .transport_views import *
 from .dashboard_views import *
 from .report_view import *
+from .security_views import *
+from .employee_views import *
+from .preview_permission_views import *

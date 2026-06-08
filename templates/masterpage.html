@@ -44,6 +44,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
 
   <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <link rel="stylesheet" href="{% static 'css/responsive-app.css' %}">
 
   <!-- Page CSS -->
 
@@ -65,7 +66,7 @@
   </style>
 </head>
 
-<body>
+<body data-user-role="{{ user_role|default:'owner' }}">
   {% if messages %}
   {% for message in messages %}
   <div
@@ -225,11 +226,13 @@
                   <div data-i18n="Basic" class="ms-4">For Client</div>
                 </a>
               </li>
+              {% if is_super_admin %}
               <li class="menu-item {% if request.path == '/internal-report' %}active{% endif %}">
                 <a href="/internal-report" class="menu-link">
-                  <div data-i18n="Distance Master" class="ms-4">For US</div>
+                  <div data-i18n="Distance Master" class="ms-4">For US (Super Admin)</div>
                 </a>
               </li>
+              {% endif %}
               <li class="menu-item {% if request.path == '/outstanding-report-view' %}active{% endif %}">
                 <a href="/outstanding-report-view" class="menu-link">
                   <div data-i18n="Outstanding Report" class="ms-4">Outstanding</div>
@@ -267,6 +270,48 @@
               <div data-i18n="Summary">Summary</div>
             </a>
           </li>
+          {% if is_super_admin %}
+          <li class="menu-item">
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+              <i class="menu-icon tf-icons bx bx-shield"></i>
+              <div data-i18n="Security">Security</div>
+            </a>
+            <ul class="menu-sub" style="list-style-type: none;">
+              <li class="menu-item {% if '/security/settings' in request.path %}active{% endif %}">
+                <a href="{% url 'security-settings' %}" class="menu-link">
+                  <div class="ms-4">Settings &amp; PDF passwords</div>
+                </a>
+              </li>
+              <li class="menu-item {% if '/security/employees' in request.path %}active{% endif %}">
+                <a href="{% url 'employee-manage' %}" class="menu-link">
+                  <div class="ms-4">Employees</div>
+                </a>
+              </li>
+              <li class="menu-item {% if '/preview-permission/manage' in request.path %}active{% endif %}">
+                <a href="{% url 'preview-permission-manage' %}" class="menu-link">
+                  <div class="ms-4 d-flex align-items-center gap-2">
+                    Preview approvals
+                    {% if pending_approval_count %}
+                    <span class="badge bg-danger rounded-pill">{{ pending_approval_count }}</span>
+                    {% endif %}
+                  </div>
+                </a>
+              </li>
+              <li class="menu-item {% if '/security/audit-log' in request.path %}active{% endif %}">
+                <a href="{% url 'security-audit-log' %}" class="menu-link">
+                  <div class="ms-4">Audit log</div>
+                </a>
+              </li>
+            </ul>
+          </li>
+          {% elif is_employee_user %}
+          <li class="menu-item {% if '/preview-permission' in request.path %}active{% endif %}">
+            <a href="{% url 'preview-permission-my' %}" class="menu-link">
+              <i class="menu-icon tf-icons bx bx-key"></i>
+              <div data-i18n="My preview requests">My preview requests</div>
+            </a>
+          </li>
+          {% endif %}
         </ul>
       </aside>
 
@@ -285,11 +330,45 @@
             <div class="navbar-nav align-items-center">
               <div class="nav-item d-flex align-items-center gap-2">
                 <i class="bx bx-warehouse fs-4 lh-0"></i>
-                <div data-i18n="Boxicons" class="fs-5">{{ company_info.company_name }}</div>
+                <div data-i18n="Boxicons" class="fs-5 company-title-nav">
+                  {% if employee_info %}{{ employee_info.display_name }}{% else %}{{ company_info.company_name }}{% endif %}
+                </div>
               </div>
             </div>
 
             <ul class="navbar-nav flex-row align-items-center ms-auto">
+
+              {% if is_super_admin %}
+              <li class="nav-item dropdown" id="admin-approval-notify-wrap">
+                <a class="nav-link dropdown-toggle hide-arrow position-relative" href="javascript:void(0);"
+                  data-bs-toggle="dropdown" aria-label="Approval notifications">
+                  <i class="bx bx-bell bx-sm"></i>
+                  <span class="badge rounded-pill bg-danger badge-notifications position-absolute top-0 start-100 translate-middle"
+                    id="admin-approval-badge" {% if pending_approval_count == 0 %}style="display:none"{% endif %}>
+                    {{ pending_approval_count }}
+                  </span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end admin-notify-dropdown p-0">
+                  <li class="dropdown-header border-bottom py-2 px-3 fw-semibold">
+                    Preview approval requests
+                  </li>
+                  <li id="admin-approval-list">
+                    {% for r in pending_preview_requests %}
+                    <a class="dropdown-item border-bottom py-2" href="{% url 'preview-permission-manage' %}">
+                      <div class="fw-semibold">{{ r.employee.display_name }}</div>
+                      <small class="text-muted d-block">{{ r.get_restriction_kind_display }} · {{ r.requested_at|date:"d M H:i" }}</small>
+                      <small class="d-block text-truncate">{{ r.reason|truncatechars:80 }}</small>
+                    </a>
+                    {% empty %}
+                    <span class="dropdown-item text-muted small py-3">No pending requests</span>
+                    {% endfor %}
+                  </li>
+                  <li class="dropdown-footer text-center py-2 border-top">
+                    <a href="{% url 'preview-permission-manage' %}" class="btn btn-sm btn-primary">Open approvals</a>
+                  </li>
+                </ul>
+              </li>
+              {% endif %}
 
               <!-- User -->
               <li class="nav-item navbar-dropdown dropdown-user dropdown">
@@ -308,7 +387,10 @@
                           </div>
                         </div>
                         <div class="grow">
-                          <span class="fw-semibold d-block">{{ company_info.company_name }}</span>
+                          <span class="fw-semibold d-block">
+                            {% if employee_info %}{{ employee_info.display_name }}{% else %}{{ company_info.company_name }}{% endif %}
+                          </span>
+                          <small class="text-muted">{% if is_super_admin %}Super Admin{% elif is_employee_user %}Employee{% endif %}</small>
                         </div>
                       </div>
                     </a>
@@ -316,12 +398,14 @@
                   <li>
                     <div class="dropdown-divider"></div>
                   </li>
+                  {% if is_super_admin %}
                   <li>
                     <a class="dropdown-item" href="company-profile">
                       <i class="bx bx-user me-2"></i>
-                      <span class="align-middle">My Profile</span>
+                      <span class="align-middle">Company Profile</span>
                     </a>
                   </li>
+                  {% endif %}
                   <li>
                     <a class="dropdown-item" href="company-logout">
                       <i class="bx bx-power-off me-2"></i>
@@ -378,6 +462,10 @@
   <!-- Place this tag in your head or just before your close body tag. -->
   <script src="{% static 'js/auth.js' %}"></script>
   <script src="{% static 'js/one_world.js'}%"></script>
+  <script src="{% static 'js/employee-security.js' %}"></script>
+  {% if is_super_admin %}
+  <script src="{% static 'js/admin-security-notifications.js' %}"></script>
+  {% endif %}
 
   <script>
     let timeout;
@@ -423,6 +511,7 @@
     });
   </script>
 
+  {% block footer_scripts %}{% endblock %}
 
 </body>
 

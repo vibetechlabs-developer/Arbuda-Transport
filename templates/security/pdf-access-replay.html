@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Opening PDF…</title>
+</head>
+<body>
+  <p>Opening document…</p>
+  <form id="replay" method="post" action="{{ target_path }}">
+    {% csrf_token %}
+    {% for key, value in payload.items %}
+      {% if value|length > 1 and value.0 %}
+        {% for v in value %}
+        <input type="hidden" name="{{ key }}" value="{{ v }}">
+        {% endfor %}
+      {% else %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endif %}
+    {% endfor %}
+  </form>
+  <script>document.getElementById('replay').submit();</script>
+</body>
+</html>

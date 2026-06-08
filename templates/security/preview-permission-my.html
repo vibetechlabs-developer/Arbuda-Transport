@@ -1,0 +1,68 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | My Preview Requests</title>{% endblock %}
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+  <h4 class="fw-bold mb-4">My preview requests</h4>
+  <p class="text-muted">Requests for PDF access outside office hours or outside the office network.</p>
+
+  {% if active_grant %}
+  <div class="alert alert-success">
+    <strong>Access active:</strong> {{ active_grant.get_restriction_kind_display }} — approved until
+    {{ active_grant.grant_expires_at|date:"d M Y, h:i A" }}.
+    You may open your permitted menus and preview PDFs until then.
+    {% if active_grant.target_url_name %}
+    Or click <strong>Open preview</strong> in the table below for the approved document.
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Requested</th>
+            <th>Type</th>
+            <th>Document</th>
+            <th>Status</th>
+            <th>Expires</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in requests %}
+          <tr>
+            <td class="small">{{ r.requested_at|date:"d M Y H:i" }}</td>
+            <td><span class="badge bg-label-secondary">{{ r.get_restriction_kind_display }}</span></td>
+            <td>{{ r.document_label|default:r.document_type }}</td>
+            <td>
+              {% if r.status == 'approved' %}
+              <span class="badge bg-label-success">Approved</span>
+              {% elif r.status == 'denied' %}
+              <span class="badge bg-label-danger">Denied</span>
+              {% else %}
+              <span class="badge bg-label-warning">Pending</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              {% if r.grant_expires_at %}
+                {% if r.grant_is_active %}{{ r.grant_expires_at|date:"d M H:i" }}{% else %}<span class="text-muted">Expired</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if r.status == 'approved' and r.grant_is_active and r.target_url_name %}
+              <a href="{% url 'preview-permission-run' r.id %}" class="btn btn-sm btn-primary">Open preview</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-4">No requests yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <a href="{% url 'preview-permission-request' %}" class="btn btn-outline-primary mt-3">New permission request</a>
+</div>
+{% endblock %}
