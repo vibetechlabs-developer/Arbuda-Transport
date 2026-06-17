@@ -274,13 +274,11 @@ def get_dispacth(request):
                 Dispatch.objects.filter(
                     contract_id=dcontract_id,
                     company_id=request.session['company_info']['company_id'],
+                    inv_status=False,
                 )
                 .filter(
                     Q(dep_date__gte=fy_start_date, dep_date__lte=fy_end_date)
-                    | (
-                        Q(dep_date__lt=fy_start_date)
-                        & Q(inv_status=False)
-                    )
+                    | Q(dep_date__lt=fy_start_date)
                 )
                 .distinct()
             )
