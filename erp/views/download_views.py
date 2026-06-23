@@ -833,8 +833,8 @@ def generate_invoice_pdf(request):
                     # Show km as integer (no decimal point)
                     row.append(_int(getattr(d, field, None)))
                 elif field == "rate":
-                    # Keep rate with 2 fixed decimals
-                    row.append(_num(getattr(d, field, None), decimals=2))
+                    # Keep rate with 4 fixed decimals
+                    row.append(_num(getattr(d, field, None), decimals=4))
                 else:
                     # Avoid 'None' showing in PDF
                     v = getattr(d, field, "")
@@ -1742,8 +1742,8 @@ def _download_generate_invoice_pdf_impl(request):
                     # Show km as integer (no decimal point)
                     row.append(_int(getattr(d, field, None)))
                 elif field == "rate":
-                    # Keep rate with 2 fixed decimals
-                    row.append(_num(getattr(d, field, None), decimals=2))
+                    # Keep rate with 4 fixed decimals
+                    row.append(_num(getattr(d, field, None), decimals=4))
                 else:
                     v = getattr(d, field, "")
                     row.append(_sanitize_cell_text(v))

@@ -611,6 +611,8 @@
           rawValue = dest[field]?.toString() || "";
           if (field === "weight" && rawValue) {
             rawValue = parseFloat(rawValue || 0).toFixed(3);
+          } else if (field === "rate" && rawValue) {
+            rawValue = parseFloat(rawValue || 0).toFixed(4);
           }
           td.textContent = rawValue;
         }

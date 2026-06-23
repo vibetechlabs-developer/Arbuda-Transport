@@ -525,6 +525,9 @@ function formatExactAmount(value) {
           td.textContent = rawValue;
         } else {
           rawValue = dest[field]?.toString() || "";
+          if (field === "rate" && rawValue) {
+            rawValue = parseFloat(rawValue || 0).toFixed(4);
+          }
           td.innerHTML = highlightText(rawValue, currentSearch);
         }
         // Avoid totalling dc_field, km, rate, and weight so they do not appear in the footer summary

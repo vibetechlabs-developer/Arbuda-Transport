@@ -292,6 +292,8 @@ def download_report(request):
                         row.append(getattr(d, "main_party", "") or "")
                     elif field == "sub_party":
                         row.append(getattr(d, "sub_party", "") or "")
+                    elif field == "rate":
+                        row.append(f"{float(d.rate or 0):.4f}")
                     else:
                         row.append(getattr(d, field, ""))
 
@@ -513,6 +515,15 @@ def download_report(request):
                 except Exception:
                     return "0.00"
 
+            def _num4(val):
+                """Generic 4‑decimal formatter (for Rate)."""
+                try:
+                    if val in (None, "", "None", "null", "NULL", "-"):
+                        return "0.0000"
+                    return f"{float(val):.4f}"
+                except Exception:
+                    return "0.0000"
+
             def _int(val):
                 """Format numeric values as integer (no decimal point)."""
                 try:
@@ -563,8 +574,8 @@ def download_report(request):
                     elif field == "sub_party":
                         row.append(getattr(d, "sub_party", "") or "")
                     elif field == "rate":
-                        # Rate with exactly 2 decimals
-                        row.append(_num2(d.rate))
+                        # Rate with exactly 4 decimals
+                        row.append(_num4(d.rate))
                     else:
                         row.append(getattr(d, field, ""))
                 data.append(row)                
@@ -1083,6 +1094,8 @@ def download_our_report(request):
                         row.append(getattr(d, "main_party", "") or "")
                     elif field == "sub_party":
                         row.append(getattr(d, "sub_party", "") or "")
+                    elif field == "rate":
+                        row.append(f"{float(d.rate or 0):.4f}")
                     else:
                         row.append(getattr(d, field, ""))
 
@@ -1329,6 +1342,14 @@ def download_our_report(request):
                 except Exception:
                     return "0.00"
 
+            def _num4(val):
+                try:
+                    if val in (None, "", "None", "null", "NULL", "-"):
+                        return "0.0000"
+                    return f"{float(val):.4f}"
+                except Exception:
+                    return "0.0000"
+
             def _int(val):
                 """Format numeric values as integer (no decimal point)."""
                 try:
@@ -1390,7 +1411,7 @@ def download_our_report(request):
                     elif field == "weight":
                         row.append(f"{float(d.weight or 0):.3f}")
                     elif field == "rate":
-                        row.append(_num2(d.rate))
+                        row.append(_num4(d.rate))
                     elif field == "km":
                         # Show km as integer (no decimal point)
                         row.append(_int(d.km))
@@ -1409,17 +1430,11 @@ def download_our_report(request):
                 data.append(row)                
 
             # Determine total row logic
-            add_total = False
+            # For this report, show a TOTAL row only on the last page.
+            # The TOTAL reflects all dispatches across all pages.
+            add_total = is_last_page
             total_row = []
-
-            if contract.rate_type == "Distric-Wise" and add_total_row:
-                # District-wise: show totals per page
-                add_total = True
-                dispatches_to_sum = dispatch_subset
-            elif contract.rate_type != "Distric-Wise" and is_last_page:
-                # Other rate types: show grand total on last page
-                add_total = True
-                dispatches_to_sum = all_dispatches
+            dispatches_to_sum = all_dispatches if is_last_page else []
 
             if add_total:
                 total_weight = (
@@ -1687,7 +1702,7 @@ def download_our_report(request):
             # ReportLab Paragraph doesn't reliably support the <center> tag;
             # alignment is already handled by center_style.
             elements.append(Paragraph("<b>PARTICULARS</b>", center_style))
-            add_total_row = contract.rate_type == "Distric-Wise"
+            add_total_row = True
             
             # Build table only (no Verified / Recommended / For footer as per latest requirement)
             table = build_table_page(
