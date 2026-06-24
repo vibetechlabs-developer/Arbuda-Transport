@@ -2039,6 +2039,7 @@ def _download_generate_invoice_pdf_impl(request):
                 elements.append(Spacer(1, 4))
                 elements.append(Paragraph("<center><font size='10.5'><b>PARTICULARS</b></font></center>", center_style))
                 elements.append(Spacer(1, 3))
+                show_total = (total_option == "every_page")
                 elements.append(
                     build_table_page(
                         dispatch_chunk,
