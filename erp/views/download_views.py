@@ -306,12 +306,10 @@ def generate_invoice_pdf(request):
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        # Tighter side/top margins so 12 rows + TOTAL + signatures reliably fit on one page
+        # Balanced margins for professional presentation and page-fitting
         rightMargin=6 * mm,
         leftMargin=6 * mm,
         topMargin=6 * mm,
-        # Match download_generate_invoice_pdf: smaller bottom margin prevents
-        # ReportLab from pushing the table + footer to a second (mostly blank) page.
         bottomMargin=6 * mm,
     )
     styles = getSampleStyleSheet()
@@ -326,19 +324,19 @@ def generate_invoice_pdf(request):
     center_style = ParagraphStyle(
         name="Center",
         fontName="Helvetica",
-        fontSize=12,
+        fontSize=9,
         alignment=1,
-        leading=12,
+        leading=11,
         spaceBefore=0,
         spaceAfter=0,
     )
     center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=10, alignment=1, leading=12)
-    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=16, alignment=1, leading=18)
-    # Slightly larger font for bill details on the right so they are easier to read.
-    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=10, alignment=0, leading=12)
-    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=11, alignment=2, leading=13)
-    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=10, alignment=2, leading=12)
-    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=9, alignment=0, leading=10)
+    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=12, alignment=1, leading=14)
+    # Compact fonts for billing info
+    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=8.5, alignment=0, leading=10.0)
+    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9.0, alignment=2, leading=10.5)
+    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=9.5, alignment=2, leading=11.5)
+    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=9, alignment=0, leading=10.5)
     # Uniform header style for all column names - slightly smaller so long labels fit in one line
     to_right_style_desc_heading = ParagraphStyle(
         name="ToRightDesc",
@@ -351,23 +349,26 @@ def generate_invoice_pdf(request):
 
     # --- Header Table ---
     header_data = [
-        [Paragraph(f"<font color='black' size='16'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
-        [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
+        [Paragraph(f"<font color='black' size='12'><b>{request.session['company_info']['company_name']}</b></font><br/><font size='8.0'>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}</font>", center_style)],    
+        [Paragraph(f"<font size='8.0'>GST : {company.gst_number}, Pan no. : {company_profile.pan_number}</font>", center_style)],
         [Paragraph("<b>Tax Invoice</b>", title_style)],
     ]
-    header_table = Table(header_data, colWidths=[available_width])
-    header_table.setStyle(
-        TableStyle(
-            [
-                ("LINEBELOW", (0, 2), (-1, 2), 1.0, colors.black),
-                ("LINEBELOW", (0, 1), (-1, 1), 0.8, colors.black),
-                # Slightly tighter padding so the header block consumes less height.
-                ("TOPPADDING", (0, 0), (-1, -1), 1),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ]
+    
+    def build_header_block():
+        header_table = Table(header_data, colWidths=[available_width])
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("LINEBELOW", (0, 2), (-1, 2), 1.0, colors.black),
+                    ("LINEBELOW", (0, 1), (-1, 1), 0.8, colors.black),
+                    # Tighter padding so the header block consumes minimal height.
+                    ("TOPPADDING", (0, 0), (-1, -1), 1),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
         )
-    )
+        return header_table
 
     # --- Invoice footer helper ---
     # def build_footer_block():
@@ -470,7 +471,7 @@ def generate_invoice_pdf(request):
             name="FooterText",
             parent=to_style,
             alignment=1,
-            leading=12,
+            leading=9,
         )
 
         footer_name = (
@@ -546,14 +547,14 @@ def generate_invoice_pdf(request):
                     ("LEFTPADDING", (0, 0), (2, -1), 0),
                     ("RIGHTPADDING", (0, 0), (2, -1), 0),
 
-                    ("TOPPADDING", (0, 0), (2, 0), 10),   # space above labels
-                    ("BOTTOMPADDING", (0, 0), (2, 0), 3),
+                    ("TOPPADDING", (0, 0), (2, 0), 1),   # space above labels
+                    ("BOTTOMPADDING", (0, 0), (2, 0), 1),
                     # Extra blank area above signature line for stamp/signature.
-                    ("TOPPADDING", (0, 1), (2, 1), 24),
-                    ("BOTTOMPADDING", (0, 1), (2, 1), 2),
+                    ("TOPPADDING", (0, 1), (2, 1), 10),
+                    ("BOTTOMPADDING", (0, 1), (2, 1), 1),
                     # Name appears below line with light spacing.
-                    ("TOPPADDING", (0, 2), (2, 2), 10),
-                    ("BOTTOMPADDING", (0, 2), (2, 2), 10),
+                    ("TOPPADDING", (0, 2), (2, 2), 1),
+                    ("BOTTOMPADDING", (0, 2), (2, 2), 1),
                 ]
             )
         )
@@ -673,12 +674,9 @@ def generate_invoice_pdf(request):
             "totalfreight",
             "unloading_charge_2",
         ]
-        center_fields = ["sr_no", "gc_note", "km", "dc_field", "truck_no"]
-
-        # Use the same compact typography as the download invoice PDF so that
-        # header + 12 rows + TOTAL + footer fit identically on a single page.
-        compact_fs = 8.0
-        compact_leading = 9
+        center_fields = ["sr_no", "gc_note", "km", "dc_field", "truck_no"]        # Beautiful, spacious typography for professional presentation
+        compact_fs = 7.5
+        compact_leading = 9.0
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocal",
@@ -706,8 +704,8 @@ def generate_invoice_pdf(request):
         header_style_uniform = ParagraphStyle(
             name="HeaderUniform",
             parent=to_right_style_desc_heading,
-            fontSize=8.5,
-            leading=10,
+            fontSize=7.5,
+            leading=9.0,
             alignment=1,  # Center all headers
             splitLongWords=1,
             wordWrap="CJK",
@@ -731,8 +729,8 @@ def generate_invoice_pdf(request):
         total_style_local = ParagraphStyle(
             name="TotalStyleLocal",
             parent=total_style,
-            fontSize=compact_fs or total_style.fontSize,
-            leading=compact_leading or total_style.leading,
+            fontSize=8.0,
+            leading=10.0,
             splitLongWords=0,
         )
         total_label_style_local = ParagraphStyle(
@@ -809,21 +807,21 @@ def generate_invoice_pdf(request):
                 elif field in ("depature_date", "dep_date"):
                     row.append(d.dep_date.strftime("%d-%m-%Y") if d.dep_date else "")
                 elif field == "dc_field" or field == "None":
-                    row.append(d.challan_no)
+                    row.append(_sanitize_cell_text(d.challan_no))
                 elif field in ("luggage", "totalfreight"):
                     # keep invoice structure consistent even when freight is missing; show Rs with 2 decimals
                     row.append(_money(d.totalfreight))
                 elif field in ("product_name", "product"):
-                    row.append(d.product_name)
+                    row.append(_sanitize_cell_text(d.product_name))
                 elif field == "amount":
                     # Total amount (Rs.) per row – always 2 decimals
                     row.append(_money(total_amount))
                 elif field == "gc_note":
-                    row.append(d.gc_note_no)
+                    row.append(_sanitize_cell_text(d.gc_note_no))
                 elif field == "main_party":
-                    row.append(d.main_party or "")
+                    row.append(_sanitize_cell_text(d.main_party))
                 elif field == "sub_party":
-                    row.append(d.sub_party or "")
+                    row.append(_sanitize_cell_text(d.sub_party))
                 elif field in ("unloading_charge_1", "unloading_charge_2", "loading_charge"):
                     # Loading / unloading (Rs.) – always 2 decimals
                     row.append(_money(getattr(d, field, None)))
@@ -836,9 +834,8 @@ def generate_invoice_pdf(request):
                     # Keep rate with 4 fixed decimals
                     row.append(_num(getattr(d, field, None), decimals=4))
                 else:
-                    # Avoid 'None' showing in PDF
                     v = getattr(d, field, "")
-                    row.append("" if v in (None, "None", "null", "NULL") else v)
+                    row.append(_sanitize_cell_text(v))
             data.append(row)
 
         # Determine total row logic
@@ -970,13 +967,13 @@ def generate_invoice_pdf(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Ultra-tight paddings so table visually touches "PARTICULARS"
-            ("LEFTPADDING", (0,0), (-1,-1), 0.5),
-            ("RIGHTPADDING", (0,0), (-1,-1), 0.5),
-            ("TOPPADDING", (0,0), (-1,0), 0),   # Header padding
-            ("BOTTOMPADDING", (0,0), (-1,0), 0),
-            ("TOPPADDING", (0,1), (-1,-2), 0),  # Data rows padding
-            ("BOTTOMPADDING", (0,1), (-1,-2), 0),
+            # Professional paddings for clean presentation
+            ("LEFTPADDING", (0,0), (-1,-1), 1.5),
+            ("RIGHTPADDING", (0,0), (-1,-1), 1.5),
+            ("TOPPADDING", (0,0), (-1,0), 5.0),   # Header padding
+            ("BOTTOMPADDING", (0,0), (-1,0), 5.0),
+            ("TOPPADDING", (0,1), (-1,-2), 4.0),  # Data rows padding
+            ("BOTTOMPADDING", (0,1), (-1,-2), 4.0),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -1004,9 +1001,9 @@ def generate_invoice_pdf(request):
             styles += [
                 ("FONTNAME", (0,-1), (-1,-1), "Helvetica-Bold"),
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
-                # Slightly larger total-row padding so TOTAL stands out but still fits 12 rows
-                ("TOPPADDING", (0,-1), (-1,-1), 3),
-                ("BOTTOMPADDING", (0,-1), (-1,-1), 3),
+                # Slightly larger total-row padding so TOTAL stands out
+                ("TOPPADDING", (0,-1), (-1,-1), 5.0),
+                ("BOTTOMPADDING", (0,-1), (-1,-1), 5.0),
                 ("LINEABOVE", (0,-1), (-1,-1), 1.0, colors.black),
             ]
         table.setStyle(TableStyle(styles))
@@ -1044,8 +1041,8 @@ def generate_invoice_pdf(request):
                     elements.append(PageBreak())
 
                 # Header
-                elements.append(header_table)
-                elements.append(Spacer(1, 3))  # Minimal spacing for 12 rows per page
+                elements.append(build_header_block())
+                elements.append(Spacer(1, 4))
 
                 # TO Table with Page number
                 to_content = [
@@ -1087,14 +1084,14 @@ def generate_invoice_pdf(request):
                             ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                             ("LEFTPADDING", (0, 0), (-1, -1), 2),
                             ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-                            ("TOPPADDING", (0, 0), (-1, -1), 4),
-                            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                            ("TOPPADDING", (0, 0), (-1, -1), 0),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
                         ]
                     )
                 )
                 elements.append(to_table)
-                elements.append(Spacer(1, 3))
-                elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
+                elements.append(Spacer(1, 4))
+                elements.append(Paragraph("<center><font size='10.5'><b>PARTICULARS</b></font></center>", center_style))
                 elements.append(Spacer(1, 3))
 
                 # Dispatch Table for this page
@@ -1115,8 +1112,8 @@ def generate_invoice_pdf(request):
                         all_dispatches=dispatches,
                         start_index=(i + 1),
                     ),
-                    # Very small gap between table and footer
-                    Spacer(1, 2),
+                    # Gap between table and footer
+                    Spacer(1, 8),
                 ]
                 page_block.extend(build_footer_block())
                 # Do not force table+footer to stay together; this avoids pushing the
@@ -1135,9 +1132,8 @@ def generate_invoice_pdf(request):
             if i > 0:
                 elements.append(PageBreak())
 
-            elements.append(header_table)
-            # Reduce vertical gap between header and TO table
-            elements.append(Spacer(1, 1))
+            elements.append(build_header_block())
+            elements.append(Spacer(1, 4))
 
             # TO Table
             to_content = [
@@ -1178,17 +1174,16 @@ def generate_invoice_pdf(request):
                         ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                         ("LEFTPADDING", (0, 0), (-1, -1), 2),
                         ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-                        ("TOPPADDING", (0, 0), (-1, -1), 2),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
                     ]
                 )
             )
 
             elements.append(to_table)
-            elements.append(Spacer(1, 1))
-            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
-            # Keep spacing here minimal so the dispatch table starts higher on the page
-            elements.append(Spacer(1, 1))
+            elements.append(Spacer(1, 4))
+            elements.append(Paragraph("<center><font size='10.5'><b>PARTICULARS</b></font></center>", center_style))
+            elements.append(Spacer(1, 3))
 
             # Determine if we should show total based on total_option
             if total_option == "every_page":
@@ -1204,8 +1199,7 @@ def generate_invoice_pdf(request):
                     all_dispatches=dispatches,
                     start_index=(i + 1),
                 ),
-                # Smaller spacer between table and footer
-                Spacer(1, 2),
+                Spacer(1, 8),
             ]
             page_block.extend(build_footer_block())
             # Allow table/footer to split naturally so the table can start
@@ -1324,16 +1318,13 @@ def _download_generate_invoice_pdf_impl(request):
 
     # --- PDF Generation ---
     buffer = BytesIO()
-    # Optimized margins for full-page utilization while maintaining professional appearance
+    # Optimized margins to ensure header + 12 rows + TOTAL + signatures fit on one page
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        # Tighter margins so header + 12 rows + TOTAL + signatures fit on one page
         rightMargin=6 * mm,
         leftMargin=6 * mm,
-        # Slightly smaller top margin so table block starts higher on the page
-        topMargin=4 * mm,
-        # Keep a reasonable bottom margin but not too large
+        topMargin=6 * mm,
         bottomMargin=6 * mm,
     )
     styles = getSampleStyleSheet()
@@ -1344,14 +1335,22 @@ def _download_generate_invoice_pdf_impl(request):
 
     # --- Styles ---
     # Typography tuned so header + 12 rows + TOTAL + signatures fit on a single landscape A4 page
-    center_style = ParagraphStyle(name="Center", fontName="Helvetica", fontSize=12, alignment=1, leading=14)
+    center_style = ParagraphStyle(
+        name="Center",
+        fontName="Helvetica",
+        fontSize=9,
+        alignment=1,
+        leading=11,
+        spaceBefore=0,
+        spaceAfter=0,
+    )
     center_style_desc = ParagraphStyle(name="CenterDesc", fontName="Helvetica", fontSize=10, alignment=1, leading=12)
-    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=16, alignment=1, leading=18)
-    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=10, alignment=0, leading=12)
-    # Slightly larger font for bill details on the right so they are easier to read.
-    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=11, alignment=2, leading=13)
-    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=10, alignment=2, leading=12)
-    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=9, alignment=0, leading=10)
+    title_style = ParagraphStyle(name="Title", fontName="Helvetica-Bold", fontSize=12, alignment=1, leading=14)
+    # Compact fonts for billing info
+    to_style = ParagraphStyle(name="To", fontName="Helvetica", fontSize=8.5, alignment=0, leading=10.0)
+    to_right_style = ParagraphStyle(name="ToRight", fontName="Helvetica", fontSize=9.0, alignment=2, leading=10.5)
+    total_style = ParagraphStyle(name="TotalStyle", fontName="Helvetica-Bold", fontSize=9.5, alignment=2, leading=11.5)
+    to_style_desc = ParagraphStyle(name="ToDesc", fontName="Helvetica", fontSize=9, alignment=0, leading=10.5)
     # Uniform header style for all column names - slightly smaller so long labels fit in one line
     to_right_style_desc_heading = ParagraphStyle(
         name="ToRightDesc",
@@ -1364,18 +1363,26 @@ def _download_generate_invoice_pdf_impl(request):
 
     # --- Header Table ---
     header_data = [
-        [Paragraph(f"<font color='black' size='16'><b>{request.session['company_info']['company_name']}</b></font><br/>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}", center_style)],    
-        [Paragraph(f"GST : {company.gst_number}, Pan no. : {company_profile.pan_number}", center_style)],
+        [Paragraph(f"<font color='black' size='12'><b>{request.session['company_info']['company_name']}</b></font><br/><font size='8.0'>{company_profile.address}, {company_profile.city}, {company_profile.state}-{company_profile.pincode}</font>", center_style)],    
+        [Paragraph(f"<font size='8.0'>GST : {company.gst_number}, Pan no. : {company_profile.pan_number}</font>", center_style)],
         [Paragraph("<b>Tax Invoice</b>", title_style)],
     ]
-    header_table = Table(header_data, colWidths=[available_width])
-    header_table.setStyle(TableStyle([
-        ('LINEBELOW', (0,2), (-1,2), 1.0, colors.black), 
-        ('LINEBELOW', (0,1), (-1,1), 0.8, colors.black),
-        ('TOPPADDING', (0,0), (-1,-1), 2),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    
+    def build_header_block():
+        header_table = Table(header_data, colWidths=[available_width])
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("LINEBELOW", (0, 2), (-1, 2), 1.0, colors.black),
+                    ("LINEBELOW", (0, 1), (-1, 1), 0.8, colors.black),
+                    # Tighter padding so the header block consumes minimal height.
+                    ("TOPPADDING", (0, 0), (-1, -1), 1),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
+        return header_table
 
     # --- Invoice footer helper ---
     def build_footer_block():
@@ -1390,7 +1397,7 @@ def _download_generate_invoice_pdf_impl(request):
             name="FooterText",
             parent=to_style,
             alignment=1,
-            leading=12,
+            leading=9,
         )
 
         footer_name = (
@@ -1461,12 +1468,12 @@ def _download_generate_invoice_pdf_impl(request):
                     ("VALIGN", (0, 0), (2, -1), "TOP"),
                     ("LEFTPADDING", (0, 0), (2, -1), 0),
                     ("RIGHTPADDING", (0, 0), (2, -1), 0),
-                    ("TOPPADDING", (0, 0), (2, 0), 10),
-                    ("BOTTOMPADDING", (0, 0), (2, 0), 3),
-                    ("TOPPADDING", (0, 1), (2, 1), 24),
-                    ("BOTTOMPADDING", (0, 1), (2, 1), 2),
-                    ("TOPPADDING", (0, 2), (2, 2), 10),
-                    ("BOTTOMPADDING", (0, 2), (2, 2), 10),
+                    ("TOPPADDING", (0, 0), (2, 0), 1),
+                    ("BOTTOMPADDING", (0, 0), (2, 0), 1),
+                    ("TOPPADDING", (0, 1), (2, 1), 10),
+                    ("BOTTOMPADDING", (0, 1), (2, 1), 1),
+                    ("TOPPADDING", (0, 2), (2, 2), 1),
+                    ("BOTTOMPADDING", (0, 2), (2, 2), 1),
                 ]
             )
         )
@@ -1561,8 +1568,9 @@ def _download_generate_invoice_pdf_impl(request):
 
         # Fixed compact sizing so header + up to 12 rows + TOTAL + footer
         # reliably fit on a single landscape A4 page without text breaking across lines.
-        compact_fs = 8.0
-        compact_leading = 9
+        # Beautiful, spacious typography for professional presentation
+        compact_fs = 7.5
+        compact_leading = 9.0
 
         center_style_desc_local = ParagraphStyle(
             name="CenterDescLocalDl",
@@ -1598,8 +1606,8 @@ def _download_generate_invoice_pdf_impl(request):
         header_style_uniform = ParagraphStyle(
             name="HeaderUniformDl",
             parent=to_right_style_desc_heading,
-            fontSize=8.5,
-            leading=10,
+            fontSize=7.5,
+            leading=9.0,
             alignment=1,  # Center all headers
             splitLongWords=1,
             wordWrap="CJK",
@@ -1614,8 +1622,8 @@ def _download_generate_invoice_pdf_impl(request):
         total_style_local = ParagraphStyle(
             name="TotalStyleLocalDl",
             parent=total_style,
-            fontSize=compact_fs or total_style.fontSize,
-            leading=compact_leading or total_style.leading,
+            fontSize=8.0,
+            leading=10.0,
             splitLongWords=0,
         )
         total_label_style_local = ParagraphStyle(
@@ -1898,13 +1906,13 @@ def _download_generate_invoice_pdf_impl(request):
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            # Moderately tight paddings so the table appears larger but still fits 12 rows per page
-            ("LEFTPADDING", (0,0), (-1,-1), 1.0),
-            ("RIGHTPADDING", (0,0), (-1,-1), 1.0),
-            ("TOPPADDING", (0,0), (-1,0), 2),   # Header padding
-            ("BOTTOMPADDING", (0,0), (-1,0), 2),
-            ("TOPPADDING", (0,1), (-1,-2), 2),  # Data rows padding
-            ("BOTTOMPADDING", (0,1), (-1,-2), 2),
+            # Professional paddings for clean presentation
+            ("LEFTPADDING", (0,0), (-1,-1), 1.5),
+            ("RIGHTPADDING", (0,0), (-1,-1), 1.5),
+            ("TOPPADDING", (0,0), (-1,0), 3.0),   # Header padding
+            ("BOTTOMPADDING", (0,0), (-1,0), 3.0),
+            ("TOPPADDING", (0,1), (-1,-2), 2.0),  # Data rows padding
+            ("BOTTOMPADDING", (0,1), (-1,-2), 2.0),
             # Clean borders - top and bottom of header
             ("LINEABOVE", (0,0), (-1,0), 1.0, colors.black),
             ("LINEBELOW", (0,0), (-1,0), 1.0, colors.black),
@@ -1931,9 +1939,9 @@ def _download_generate_invoice_pdf_impl(request):
             styles += [
                 ("FONTNAME", (0,-1), (-1,-1), "Helvetica-Bold"),
                 ("BACKGROUND", (0,-1), (-1,-1), colors.whitesmoke),
-                # Slightly larger total-row padding so TOTAL stands out but still fits 12 rows
-                ("TOPPADDING", (0,-1), (-1,-1), 3),
-                ("BOTTOMPADDING", (0,-1), (-1,-1), 3),
+                # Slightly larger total-row padding so TOTAL stands out
+                ("TOPPADDING", (0,-1), (-1,-1), 3.5),
+                ("BOTTOMPADDING", (0,-1), (-1,-1), 3.5),
                 ("LINEABOVE", (0,-1), (-1,-1), 1.0, colors.black),
             ]
         table.setStyle(TableStyle(styles))
@@ -1993,9 +2001,8 @@ def _download_generate_invoice_pdf_impl(request):
                     elements.append(PageBreak())
                 
                 # Header
-                elements.append(header_table)
-                # Very tight spacing between company header and "TO" block
-                elements.append(Spacer(1, 1))
+                elements.append(build_header_block())
+                elements.append(Spacer(1, 4))
 
                 # TO Table with Page number
                 to_content = [
@@ -2025,30 +2032,20 @@ def _download_generate_invoice_pdf_impl(request):
                     ("ALIGN",(1,0),(1,0),"RIGHT"),  
                     ("LEFTPADDING",(0,0),(-1,-1),2),
                     ("RIGHTPADDING",(0,0),(-1,-1),2),
-                    ("TOPPADDING",(0,0),(-1,-1),2),
-                    ("BOTTOMPADDING",(0,0),(-1,-1),2)
+                    ("TOPPADDING",(0,0),(-1,-1),0),
+                    ("BOTTOMPADDING",(0,0),(-1,-1),0)
                 ]))
                 elements.append(to_table)
-                # Keep a very small, positive gap so "PARTICULARS" is clearly visible
-                # and never overlapped by the table header in any viewer.
-                elements.append(Spacer(1, 1))
-                elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
-
-                # Dispatch Table for this page
-                # Determine if we should show total based on total_option
-                show_total = (total_option == "every_page")
-
-                # Small positive spacer so the table starts just below "PARTICULARS"
-                # without overlapping the heading in the rendered PDF.
-                elements.append(Spacer(1, 1))
+                elements.append(Spacer(1, 4))
+                elements.append(Paragraph("<center><font size='10.5'><b>PARTICULARS</b></font></center>", center_style))
+                elements.append(Spacer(1, 3))
                 elements.append(
                     build_table_page(
                         dispatch_chunk,
                         add_total_row=show_total,
                     )
                 )
-                # Small gap before footer only (does not affect space above table)
-                elements.append(Spacer(1, 4))
+                elements.append(Spacer(1, 8))
                 elements.extend(build_footer_block())
 
     else:
@@ -2062,8 +2059,8 @@ def _download_generate_invoice_pdf_impl(request):
             if i > 0:
                 elements.append(PageBreak())
 
-            elements.append(header_table)
-            elements.append(Spacer(1, 1))  # Very tight spacing below header
+            elements.append(build_header_block())
+            elements.append(Spacer(1, 4))
 
             # TO Table
             to_content = [
@@ -2092,17 +2089,13 @@ def _download_generate_invoice_pdf_impl(request):
                 ("ALIGN",(1,0),(1,0),"RIGHT"),
                 ("LEFTPADDING",(0,0),(-1,-1),2),
                 ("RIGHTPADDING",(0,0),(-1,-1),2),
-                ("TOPPADDING",(0,0),(-1,-1),2),
-                ("BOTTOMPADDING",(0,0),(-1,-1),2)
+                ("TOPPADDING",(0,0),(-1,-1),0),
+                ("BOTTOMPADDING",(0,0),(-1,-1),0)
             ]))
             elements.append(to_table)  
-            # Small positive space so "PARTICULARS" appears clearly between
-            # the TO block and the dispatch table.
-            elements.append(Spacer(1, 1))
-            elements.append(Paragraph("<center><b>PARTICULARS</b></center>", center_style))
-            # Small positive spacer before the table so the heading is not clipped
-            # or hidden under the table header lines.
-            elements.append(Spacer(1, 1))
+            elements.append(Spacer(1, 4))
+            elements.append(Paragraph("<center><font size='10.5'><b>PARTICULARS</b></font></center>", center_style))
+            elements.append(Spacer(1, 3))
 
             # **Build table only ONCE per page**
             # Use start_index so Sr No continues across pages (13 after 12, etc.)
@@ -2120,8 +2113,7 @@ def _download_generate_invoice_pdf_impl(request):
                     start_index=(i + 1),
                 )
             )
-            # Reduce gap before footer so everything fits on one page
-            elements.append(Spacer(1, 4))
+            elements.append(Spacer(1, 8))
             elements.extend(build_footer_block())
 
     # --- Build PDF ---
