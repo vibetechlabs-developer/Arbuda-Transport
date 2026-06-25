@@ -186,6 +186,7 @@
               <input type="hidden" class="form-control" id="i_unloading_charge_2" name="i_unloading_charge_2"
                 value="0" />
               <input type="hidden" class="form-control" id="i_loading_charge" name="i_loading_charge" value="0" />
+              <input type="hidden" id="i_rate_calculation" value="" />
               <!-- end calculation -->
 
               <div class="mb-3 col-sm-6">
@@ -488,7 +489,7 @@
         if (data.rate && data.rate_calculation && data.how_calculation) {
           document.getElementById('rate').value = data.rate;
           document.getElementById('rate').setAttribute('readonly', true);
-          document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+          document.getElementById('rate_calculation').innerHTML = ` in (${data.rate_calculation} | ${data.how_calculation})`;
           document.getElementById('i_rate_calculation').value = data.rate_calculation;
           calculate_rent();
         } else {
@@ -513,11 +514,13 @@
         if (data.amount) {
           document.getElementById('rate').value = data.amount;
           document.getElementById('rate').setAttribute('readonly', true);
-          document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          document.getElementById('rate_calculation').innerHTML = ` in (MT)`;
+          document.getElementById('i_rate_calculation').value = "MT";
           calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
+          document.getElementById('rate_calculation').innerHTML = ``;
           document.getElementById('i_rate_calculation').value = "";
           calculate_rent();
         }
@@ -539,11 +542,14 @@
           document.getElementById('rate').setAttribute('readonly', true);
           let income_slab = document.getElementById('income-slab')
           income_slab.classList.remove('d-none')
-          document.getElementById('rate_calculation').innerHTML = ` <span id='i_rate_calculation'>MT</span>`;
+          document.getElementById('rate_calculation').innerHTML = ` in (MT)`;
+          document.getElementById('i_rate_calculation').value = "MT";
           calculate_rent();
         } else {
           document.getElementById('rate').removeAttribute('readonly', true);
           document.getElementById('rate').value = '';
+          document.getElementById('rate_calculation').innerHTML = ``;
+          document.getElementById('i_rate_calculation').value = "";
           calculate_rent();
         }
         if (data.slab) {
@@ -586,7 +592,7 @@
           if (data.rate && data.rate_calculation && data.how_calculation) {
             document.getElementById('rate').value = data.rate;
             document.getElementById('rate').setAttribute('readonly', true);
-            document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+            document.getElementById('rate_calculation').innerHTML = ` in (${data.rate_calculation} | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
             calculate_rent();
           } else {
@@ -614,7 +620,7 @@
           if (data.rate && data.rate_calculation && data.how_calculation) {
             document.getElementById('rate').value = data.rate;
             document.getElementById('rate').setAttribute('readonly', true);
-            document.getElementById('rate_calculation').innerHTML = ` in (<span id='i_rate_calculation'>${data.rate_calculation}</span> | ${data.how_calculation})`;
+            document.getElementById('rate_calculation').innerHTML = ` in (${data.rate_calculation} | ${data.how_calculation})`;
             document.getElementById('i_rate_calculation').value = data.rate_calculation;
             calculate_rent();
           } else {
@@ -631,6 +637,15 @@
     }
   }
 
+  function getRateCalculationType() {
+    const el = document.getElementById('i_rate_calculation');
+    if (!el) return '';
+    if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+      return String(el.value || '').trim();
+    }
+    return String(el.textContent || el.innerHTML || '').trim();
+  }
+
   function calculate_rent() {
     let weight = parseFloat(document.getElementById('weight').value) || 0
     let rate = parseFloat(document.getElementById('rate').value) || 0
@@ -644,8 +659,14 @@
     let load_amount = document.getElementById("loading_charge")
     let grand_total = document.getElementById('grand_total')
 
-    // Requirement: Freight Amount always = Ton * Rate * KM
-    totalfreight.value = (weight * rate * km).toFixed(2);
+    let rate_calculation = getRateCalculationType();
+    let freightAmount;
+    if (rate_calculation === "MT/KM") {
+      freightAmount = weight * rate * km;
+    } else {
+      freightAmount = weight * rate;
+    }
+    totalfreight.value = toExactAmount(freightAmount);
     totalfreight.setAttribute("readonly", true)
     
     if (document.getElementById("unloadingYes_1").checked) {
@@ -836,6 +857,22 @@
     initChargeRatesFromDispatch();
     // Fetch contract details to populate hidden fields
     fecthContractDetails();
+    
+    // Derive initial rate calculation type from existing dispatch values
+    const weightVal = parseFloat(document.getElementById('weight').value) || 0;
+    const rateVal = parseFloat(document.getElementById('rate').value) || 0;
+    const kmVal = parseFloat(document.getElementById('km').value) || 0;
+    const totalFreightVal = parseFloat(document.getElementById('totalfreight').value) || 0;
+    
+    let calc_mt = weightVal * rateVal;
+    let calc_mt_km = weightVal * rateVal * kmVal;
+    let rateCalcType = "MT";
+    if (kmVal > 0 && Math.abs(totalFreightVal - calc_mt_km) < Math.abs(totalFreightVal - calc_mt) && Math.abs(totalFreightVal - calc_mt_km) < 1.0) {
+      rateCalcType = "MT/KM";
+    }
+    document.getElementById('i_rate_calculation').value = rateCalcType;
+    document.getElementById('rate_calculation').innerHTML = ` in (${rateCalcType})`;
+
     // Keep totals in sync on initial render as well.
     calculate_rent();
   });
