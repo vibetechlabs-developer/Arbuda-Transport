@@ -275,6 +275,7 @@ def generate_invoice_pdf(request):
         Bill_date=bill_date,
         company_id=i_company_id,
         contract_id=contract,
+        rr_number=request.POST.get("rr_number", "").strip(),
     )
 
     dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
@@ -1054,19 +1055,17 @@ def generate_invoice_pdf(request):
                     Paragraph(f"GST NO. : {contract.gst_number}", to_style),
                 ]
                 # Include RR No. (only when provided) with bill details on every page
-                rr_display = request.POST.get("rr_number", "").strip()
+                rr_display = request.POST.get("rr_number", "").strip() or (invoice.rr_number or "").strip()
                 bill_no_content = [
                     Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                     Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
+                    Paragraph(f"From : {contract.from_center}", to_right_style),
+                    Paragraph(f"District : {district}", to_right_style),
                 ]
                 if rr_display:
                     bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
-                bill_no_content.extend(
-                    [
-                        Paragraph(f"From : {contract.from_center}", to_right_style),
-                        Paragraph(f"District : {district}", to_right_style),
-                        Paragraph(f"Page : {page_no} ", to_right_style),
-                    ]
+                bill_no_content.append(
+                    Paragraph(f"Page : {page_no} ", to_right_style)
                 )
 
                 # Calculate widths based on available space
@@ -1144,18 +1143,16 @@ def generate_invoice_pdf(request):
                 Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                 Paragraph(f"GST NO. : {contract.gst_number}", to_style),
             ]
-            rr_display = request.POST.get("rr_number", "").strip()
+            rr_display = request.POST.get("rr_number", "").strip() or (invoice.rr_number or "").strip()
             bill_no_content = [
                 Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                 Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
+                Paragraph(f"From : {contract.from_center}", to_right_style),
             ]
             if rr_display:
                 bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
-            bill_no_content.extend(
-                [
-                    Paragraph(f"From : {contract.from_center}", to_right_style),
-                    Paragraph(f"Page : {page_no} of {total_pages}", to_right_style),
-                ]
+            bill_no_content.append(
+                Paragraph(f"Page : {page_no} of {total_pages}", to_right_style)
             )
 
             # Calculate widths based on available space
@@ -2013,13 +2010,18 @@ def _download_generate_invoice_pdf_impl(request):
                     Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                     Paragraph(f"GST NO. : {contract.gst_number}", to_style)
                 ]
+                rr_display = request.POST.get("rr_number", "").strip() or (invoice.rr_number or "").strip()
                 bill_no_content = [
                     Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                     Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
                     Paragraph(f"From : {contract.from_center}", to_right_style),
                     Paragraph(f"District : {district}", to_right_style),
-                    Paragraph(f"Page : {page_no} of {total_pages} ", to_right_style)
                 ]
+                if rr_display:
+                    bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
+                bill_no_content.append(
+                    Paragraph(f"Page : {page_no} of {total_pages} ", to_right_style)
+                )
                 page_no += 1
                 
                 # Calculate widths based on available space
@@ -2072,12 +2074,17 @@ def _download_generate_invoice_pdf_impl(request):
                 Paragraph(f"{contract.billing_state}, {contract.billing_pin}", to_style),
                 Paragraph(f"GST NO. : {contract.gst_number}", to_style)
             ]
+            rr_display = request.POST.get("rr_number", "").strip() or (invoice.rr_number or "").strip()
             bill_no_content = [
                 Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                 Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
                 Paragraph(f"From : {contract.from_center}", to_right_style),
-                Paragraph(f"Page : {page_no} of {total_pages}", to_right_style)
             ]
+            if rr_display:
+                bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
+            bill_no_content.append(
+                Paragraph(f"Page : {page_no} of {total_pages}", to_right_style)
+            )
             page_no += 1
 
             # Calculate widths based on available space
