@@ -82,6 +82,24 @@ def sort_dispatches_by_challan_asc(dispatches):
     return sorted(dispatch_list, key=lambda d: get_numeric_value(d.challan_no))
 
 
+def sanitize_from_center(raw: Optional[str]) -> str:
+    """
+    Remove RR number / bracket part from FROM center field text.
+    Mimics sanitizeFromCenter from JavaScript.
+    """
+    if not raw:
+        return ""
+    txt = str(raw)
+    # 1) Strip anything from "RR No"/"RR.NO"/"RRNO" onward (case-insensitive)
+    txt = re.sub(r'RR\.?\s*NO.*$', '', txt, flags=re.IGNORECASE)
+    # 2) If there is any trailing bracket section like " [ ...", drop it too
+    txt = re.sub(r'[\[\(].*$', '', txt)
+    # 3) Trim and drop trailing comma / hyphen / bracket leftovers
+    txt = txt.strip()
+    txt = re.sub(r'[,\-\[\]\(\)]\s*$', '', txt)
+    return txt.strip()
+
+
 DEFAULT_INVOICE_FIELDS = [
     "sr_no",
     "dep_date",
@@ -1059,7 +1077,7 @@ def generate_invoice_pdf(request):
                 bill_no_content = [
                     Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                     Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
-                    Paragraph(f"From : {contract.from_center}", to_right_style),
+                    Paragraph(f"From : {sanitize_from_center(contract.from_center)}", to_right_style),
                     Paragraph(f"District : {district}", to_right_style),
                 ]
                 if rr_display:
@@ -1147,7 +1165,7 @@ def generate_invoice_pdf(request):
             bill_no_content = [
                 Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                 Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
-                Paragraph(f"From : {contract.from_center}", to_right_style),
+                Paragraph(f"From : {sanitize_from_center(contract.from_center)}", to_right_style),
             ]
             if rr_display:
                 bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
@@ -2014,7 +2032,7 @@ def _download_generate_invoice_pdf_impl(request):
                 bill_no_content = [
                     Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                     Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
-                    Paragraph(f"From : {contract.from_center}", to_right_style),
+                    Paragraph(f"From : {sanitize_from_center(contract.from_center)}", to_right_style),
                     Paragraph(f"District : {district}", to_right_style),
                 ]
                 if rr_display:
@@ -2078,7 +2096,7 @@ def _download_generate_invoice_pdf_impl(request):
             bill_no_content = [
                 Paragraph(f"Bill No : {invoice.Bill_no}", to_right_style),
                 Paragraph(f"Bill Date : {bill_date.strftime('%d-%m-%Y')}", to_right_style),
-                Paragraph(f"From : {contract.from_center}", to_right_style),
+                Paragraph(f"From : {sanitize_from_center(contract.from_center)}", to_right_style),
             ]
             if rr_display:
                 bill_no_content.append(Paragraph(f"RR No : {rr_display}", to_right_style))
