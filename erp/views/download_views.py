@@ -75,11 +75,33 @@ def sort_dispatches_by_challan_asc(dispatches):
         # Try to extract numeric part from the string
         num_match = re.search(r'\d+', str(challan_no))
         return int(num_match.group(0)) if num_match else 0
-    
+
     # Convert queryset to list if needed
     dispatch_list = list(dispatches) if hasattr(dispatches, '__iter__') and not isinstance(dispatches, list) else dispatches
     # Sort in ascending order by challan_no numeric value
     return sorted(dispatch_list, key=lambda d: get_numeric_value(d.challan_no))
+
+
+def sort_dispatches_by_dep_date_asc(dispatches):
+    """
+    Sort dispatches by Dep Date in ascending order (oldest first).
+    For dispatches sharing the same Dep Date, falls back to challan_no
+    (numeric) ascending so the order stays stable/predictable.
+    """
+    def get_numeric_value(challan_no):
+        """Extract numeric value from challan_no for tie-breaking."""
+        if not challan_no:
+            return 0
+        num_match = re.search(r'\d+', str(challan_no))
+        return int(num_match.group(0)) if num_match else 0
+
+    # Convert queryset to list if needed
+    dispatch_list = list(dispatches) if hasattr(dispatches, '__iter__') and not isinstance(dispatches, list) else dispatches
+    # Sort in ascending order by dep_date, then by challan_no numeric value
+    return sorted(
+        dispatch_list,
+        key=lambda d: (d.dep_date or datetime.min.date(), get_numeric_value(d.challan_no)),
+    )
 
 
 def sanitize_from_center(raw: Optional[str]) -> str:
@@ -297,8 +319,8 @@ def generate_invoice_pdf(request):
     )
 
     dispatches = Dispatch.objects.filter(id__in=dispatch_ids).order_by('dep_date')
-    # Sort by challan_no in ascending order (will be re-sorted for district-wise contracts)
-    dispatches = sort_dispatches_by_challan_asc(dispatches)
+    # Sort by Dep Date in ascending order (will be re-sorted for district-wise contracts)
+    dispatches = sort_dispatches_by_dep_date_asc(dispatches)
     invoice.dispatch_list.add(*dispatches)
 
     # --- Create GC Notes ---
@@ -1032,7 +1054,7 @@ def generate_invoice_pdf(request):
     # --- Split dispatches per page ---
 
     if contract.rate_type == "Distric-Wise":
-        # Sort dispatches by district, then by challan_no (ascending) within each district
+        # Sort dispatches by district, then by Dep Date (ascending) within each district
         page_no = 1
 
         def sort_key(d):
@@ -1042,8 +1064,8 @@ def generate_invoice_pdf(request):
                 num_match = re.search(r"\d+", str(challan_no))
                 return int(num_match.group(0)) if num_match else 0
 
-            # Positive for ascending challan order within each district
-            return (d.district or "", get_numeric_value(d.challan_no))
+            # Ascending Dep Date order within each district; challan_no as tie-breaker
+            return (d.district or "", d.dep_date or datetime.min.date(), get_numeric_value(d.challan_no))
 
         dispatches_sorted = sorted(dispatches, key=sort_key)
 
@@ -1317,8 +1339,8 @@ def _download_generate_invoice_pdf_impl(request):
         # No explicit selection → use all dispatch rows for this invoice
         dispatches = invoice.dispatch_list.all().order_by('dep_date')
 
-    # Sort by challan_no in ascending order
-    dispatches = sort_dispatches_by_challan_asc(dispatches)
+    # Sort by Dep Date in ascending order
+    dispatches = sort_dispatches_by_dep_date_asc(dispatches)
 
     bill_date_str = request.POST.get("bill_date")
     try:
@@ -1970,7 +1992,7 @@ def _download_generate_invoice_pdf_impl(request):
     if contract.rate_type == "Distric-Wise":
         page_no = 1
 
-        # Sort dispatches by district, then by challan_no (ascending) within each district
+        # Sort dispatches by district, then by Dep Date (ascending) within each district
         def sort_key(d):
             def get_numeric_value(challan_no):
                 if not challan_no:
@@ -1978,8 +2000,8 @@ def _download_generate_invoice_pdf_impl(request):
                 num_match = re.search(r"\d+", str(challan_no))
                 return int(num_match.group(0)) if num_match else 0
 
-            # Positive for ascending challan order within each district
-            return (d.district or "", get_numeric_value(d.challan_no))
+            # Ascending Dep Date order within each district; challan_no as tie-breaker
+            return (d.district or "", d.dep_date or datetime.min.date(), get_numeric_value(d.challan_no))
 
         dispatches_sorted = sorted(dispatches, key=sort_key)
 
