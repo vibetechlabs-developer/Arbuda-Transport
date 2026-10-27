@@ -55,7 +55,18 @@ def create_gc_notes_for_dispatches(
     """
     from transport.models import GC_Note
 
-    preserved = preserved_gc_by_dispatch or {}
+    preserved = dict(preserved_gc_by_dispatch or {})
+    for d in dispatches:
+        if d.id in preserved:
+            continue
+        raw = getattr(d, "gc_note_no", None)
+        if raw in (None, ""):
+            continue
+        try:
+            preserved[d.id] = int(raw)
+        except (TypeError, ValueError):
+            continue
+
     ordered = sort_dispatches_for_gc_notes(dispatches)
     next_new = next_gc_no_for_company(company_id)
     if preserved:

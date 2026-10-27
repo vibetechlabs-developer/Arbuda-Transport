@@ -685,6 +685,8 @@
     }
 
     add_extra_cost();
+    if (typeof calculate_profite === "function") calculate_profite();
+    if (typeof calculate_panding_amount === "function") calculate_panding_amount();
   }
 
   function toExactAmount(val) {

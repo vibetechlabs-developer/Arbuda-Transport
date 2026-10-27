@@ -1576,7 +1576,8 @@ def update_dispatch_Invoice(request):
             removed_dispatches = [d for d in current_dispatches if d not in new_dispatches]
             for d in removed_dispatches:
                 d.inv_status = False
-                d.gc_note_no = None
+                # Keep gc_note_no so the same GC number is reused when this
+                # dispatch is added back after an edit (challan, etc.).
                 d.save()
 
             # --- GC Notes: never renumber existing rows; only recreate when dispatch list changes ---

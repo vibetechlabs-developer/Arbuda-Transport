@@ -511,6 +511,51 @@ def get_gc(request):
         return JsonResponse({
            'error': 'dispatch not found' 
         })
+
+
+@session_required
+def update_gc_no(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Invalid method"}, status=405)
+
+    company_id = request.session["company_info"]["company_id"]
+    gc_id = (request.POST.get("gc_id") or "").strip()
+    gc_no_raw = (request.POST.get("gc_no") or "").strip()
+
+    if not gc_id or not gc_no_raw:
+        return JsonResponse({"ok": False, "error": "GC Note and GC number are required."}, status=400)
+
+    try:
+        new_gc_no = int(gc_no_raw)
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "GC number must be a whole number."}, status=400)
+
+    if new_gc_no <= 0:
+        return JsonResponse({"ok": False, "error": "GC number must be greater than 0."}, status=400)
+
+    try:
+        gc_note = GC_Note.objects.select_related("dispatch_id").get(id=gc_id, company_id=company_id)
+    except GC_Note.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "GC Note not found."}, status=404)
+
+    if GC_Note.objects.filter(company_id=company_id, gc_no=new_gc_no).exclude(id=gc_note.id).exists():
+        return JsonResponse(
+            {"ok": False, "error": f"GC number {new_gc_no} already exists."},
+            status=400,
+        )
+
+    from django.db import transaction
+
+    with transaction.atomic():
+        gc_note.gc_no = new_gc_no
+        gc_note.save(update_fields=["gc_no"])
+        if gc_note.dispatch_id_id:
+            dispatch = gc_note.dispatch_id
+            dispatch.gc_note_no = str(new_gc_no)
+            dispatch.save(update_fields=["gc_note_no"])
+
+    return JsonResponse({"ok": True, "gc_no": new_gc_no})
+
     
 @session_required
 def get_invoice(request):  

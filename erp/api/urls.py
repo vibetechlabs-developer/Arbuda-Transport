@@ -24,6 +24,7 @@ urlpatterns = [
 
     # invoice gc note fecthing
     path("get-gc", views.get_gc, name="get-gc"),
+    path("update-gc-no", views.update_gc_no, name="update-gc-no"),
     path("get-invoice", views.get_invoice, name="get-invoice"), # from invoice
 
 

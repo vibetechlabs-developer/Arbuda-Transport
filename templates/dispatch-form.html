@@ -1426,7 +1426,15 @@
       if (typeof toggleFn === 'function') toggleFn();
     }
     syncCharge('i_loading_charge', 'loading_charge', 'loadingYes', toggleloadingInput);
-    syncCharge('i_unloading_charge_1', 'unloading_charge_1', 'unloadingYes_1', toggleunloadingInput_1);
+    const unload1Rate = parseFloat(document.getElementById('i_unloading_charge_1')?.value) || 0;
+    const unloadingYes1 = document.getElementById('unloadingYes_1');
+    const unloadingNo1 = document.getElementById('unloadingNo_1');
+    if (unload1Rate > 0) {
+      if (unloadingYes1) unloadingYes1.checked = true;
+    } else if (unloadingNo1) {
+      unloadingNo1.checked = true;
+    }
+    if (typeof toggleunloadingInput_1 === 'function') toggleunloadingInput_1();
     syncCharge('i_unloading_charge_2', 'unloading_charge_2', 'unloadingYes_2', toggleunloadingInput_2);
   }
 

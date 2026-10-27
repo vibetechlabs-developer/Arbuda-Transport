@@ -295,6 +295,7 @@
           
           allDispatches = data.destinations;
           allfield = data.fields // save all data
+          editingGcId = null;
           
           renderTable(allDispatches, data.fields); // render initially
         }
@@ -327,6 +328,55 @@
   //   renderTable(filtered, allfield );
   // }
 let currentSearch = "";
+let editingGcId = null;
+
+function getCsrfToken() {
+  const el = document.querySelector('[name=csrfmiddlewaretoken]');
+  return el ? el.value : '';
+}
+
+function startEditGcNo(gcId) {
+  editingGcId = gcId;
+  renderTable(allDispatches, allfield);
+}
+
+function cancelEditGcNo() {
+  editingGcId = null;
+  renderTable(allDispatches, allfield);
+}
+
+function saveGcNo(gcId) {
+  const input = document.getElementById('edit_gc_no');
+  const gcNo = input ? String(input.value || '').trim() : '';
+  if (!gcNo) {
+    alert('Please enter a GC number.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('csrfmiddlewaretoken', getCsrfToken());
+  formData.append('gc_id', gcId);
+  formData.append('gc_no', gcNo);
+
+  fetch('/api/update-gc-no', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrfToken() },
+    body: formData,
+  })
+    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok || !data.ok) {
+        alert(data.error || 'Could not update GC number.');
+        return;
+      }
+      editingGcId = null;
+      fetchGC();
+    })
+    .catch(err => {
+      console.error('Error updating GC number:', err);
+      alert('Could not update GC number.');
+    });
+}
 
 function filterTable() {
   const from = document.getElementById("fromDate").value;
@@ -376,6 +426,12 @@ function renderTable(dispatches, fields) {
       tableHeader.appendChild(th);
     });
 
+    const actionTh = document.createElement("th");
+    actionTh.textContent = "Action";
+    actionTh.style.whiteSpace = "nowrap";
+    actionTh.style.textAlign = "center";
+    tableHeader.appendChild(actionTh);
+
     // Rows
     dispatches.forEach((dest, index) => {
       const tr = document.createElement("tr");
@@ -411,11 +467,68 @@ function renderTable(dispatches, fields) {
           td.textContent = dest.grand_total;
         } else if (field === "gc_note") {
           td.textContent = dest.gc_note_no;
+        } else if (field === "gc_no") {
+          if (editingGcId === dest.id) {
+            const input = document.createElement("input");
+            input.type = "number";
+            input.min = "1";
+            input.step = "1";
+            input.className = "form-control form-control-sm";
+            input.id = "edit_gc_no";
+            input.value = dest.gc_no || "";
+            input.style.width = "110px";
+            input.addEventListener("keydown", function (e) {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                saveGcNo(dest.id);
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancelEditGcNo();
+              }
+            });
+            td.appendChild(input);
+            setTimeout(function () { input.focus(); input.select(); }, 0);
+          } else {
+            td.textContent = dest.gc_no || "";
+          }
         } else {
           td.innerHTML = highlightText(dest[field]?.toString() || "", currentSearch);
         }
         tr.appendChild(td);
       });
+
+      const actionTd = document.createElement("td");
+      actionTd.style.textAlign = "center";
+      actionTd.style.whiteSpace = "nowrap";
+      if (editingGcId === dest.id) {
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "btn btn-primary btn-sm me-1";
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = function () { saveGcNo(dest.id); };
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "btn btn-outline-secondary btn-sm";
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.onclick = function () { cancelEditGcNo(); };
+
+        actionTd.appendChild(saveBtn);
+        actionTd.appendChild(cancelBtn);
+      } else {
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "btn btn-outline-primary";
+        editBtn.style.padding = "5px 10px";
+        editBtn.title = "Edit GC number";
+        const editIcon = document.createElement("i");
+        editIcon.className = "bx bx-edit";
+        editIcon.style.fontSize = "1rem";
+        editBtn.appendChild(editIcon);
+        editBtn.onclick = function () { startEditGcNo(dest.id); };
+        actionTd.appendChild(editBtn);
+      }
+      tr.appendChild(actionTd);
 
       tableBody.appendChild(tr);
     });
