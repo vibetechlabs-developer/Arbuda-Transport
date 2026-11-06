@@ -1,0 +1,99 @@
+{% extends 'masterpage.html' %}
+{% load tm_tags %}
+{% block title %}
+<title>ARBUDA | {{ title }}</title>
+{% endblock %}
+{% block content %}
+<div class="content-wrapper">
+  <div class="container-xxl grow container-p-y">
+    <div class="header d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <h4 class="fw-bold py-3 mb-0">{{ title }}</h4>
+      <div class="d-flex gap-2 flex-wrap">
+        {% block extra_buttons %}{% endblock %}
+        <a class="btn btn-outline-primary" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv">CSV</a>
+        <a class="btn btn-outline-primary" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=xls">Excel</a>
+        <a class="btn btn-outline-primary" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=pdf">PDF</a>
+        {% if create_url %}<a class="btn btn-primary" href="{{ create_url }}">Add</a>{% endif %}
+      </div>
+    </div>
+    <div class="card" style="overflow:auto; min-height:345px;">
+      <form method="get" class="row g-2 p-3 align-items-end">
+        <div class="col-6 col-md-2"><input type="date" class="form-control" name="start_date" value="{{ start_date }}"></div>
+        <div class="col-6 col-md-2"><input type="date" class="form-control" name="end_date" value="{{ end_date }}"></div>
+        <div class="col-6 col-md-2">
+          <select class="form-select" name="truck">
+            <option value="">All Trucks</option>
+            {% for t in tm_trucks %}<option value="{{ t.id }}" {% if request.GET.truck == t.id|stringformat:'s' %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <select class="form-select" name="driver">
+            <option value="">All Drivers</option>
+            {% for d in tm_drivers %}<option value="{{ d.id }}" {% if request.GET.driver == d.id|stringformat:'s' %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+          </select>
+        </div>
+        {% if statuses %}
+        <div class="col-6 col-md-2">
+          <select class="form-select" name="status">
+            <option value="">All Status</option>
+            {% for code,label in statuses %}<option value="{{ code }}" {% if status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <div class="col-6 col-md-2"><input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search"></div>
+        <div class="col-12 col-md-auto d-flex gap-2">
+          <button class="btn btn-primary" type="submit">Search</button>
+          <a class="btn btn-outline-secondary" href="{{ request.path }}">Reset</a>
+        </div>
+      </form>
+      <div class="table-responsive text-nowrap">
+        <table class="table">
+          <thead style="position:sticky;top:0;background:white;outline:2px solid #d9dee3;">
+            <tr>
+              <th>#</th>
+              <th>Actions</th>
+              {% for col in columns %}<th>{{ col.1 }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for obj in page_obj %}
+            <tr>
+              <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+              <td>
+                {% if has_detail %}<a class="btn btn-sm btn-outline-primary" href="{% url detail_name pk=obj.id %}"><i class="bx bx-show"></i></a>{% endif %}
+                {% if edit_name %}<a class="btn btn-sm btn-outline-primary" href="{% url edit_name pk=obj.id %}"><i class="bx bx-edit"></i></a>{% endif %}
+                {% if has_delete %}
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#del{{ obj.id }}"><i class="bx bx-trash"></i></button>
+                <div class="modal fade" id="del{{ obj.id }}" tabindex="-1">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <div class="modal-header"><h5 class="modal-title">Delete record?</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                      <div class="modal-body">This will hide the record if it has no blocking dependencies.</div>
+                      <div class="modal-footer">
+                        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                        <form method="post" action="{% url delete_name pk=obj.id %}">{% csrf_token %}<button class="btn btn-primary" type="submit">Delete</button></form>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% endif %}
+              </td>
+              {% for col in columns %}<td>{{ obj|tm_attr:col.0 }}</td>{% endfor %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="{{ columns|length|add:2 }}" class="text-center text-muted py-4">No records found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if page_obj.has_other_pages %}
+      <div class="p-3">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">Prev</a>{% endif %}
+        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

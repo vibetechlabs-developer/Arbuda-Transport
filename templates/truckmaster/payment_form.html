@@ -1,0 +1,23 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Payment</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Payment Collection</h4>
+<div class="card mb-3"><div class="card-body">
+  <h6>Outstanding invoices</h6>
+  <table class="table table-sm"><tr><th>Invoice</th><th>Party</th><th>Total</th><th>Balance</th></tr>
+    {% for inv in outstanding %}<tr><td>{{ inv.invoice_no }}</td><td>{{ inv.party.name }}</td><td>{{ inv.total_amount }}</td><td>{{ inv.balance }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="text-muted">No outstanding invoices</td></tr>{% endfor %}
+  </table>
+</div></div>
+<div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-4"><label class="form-label">Date *</label><input type="date" class="form-control" name="payment_date" required></div>
+  <div class="mb-3 col-sm-8"><label class="form-label">Party *</label><select class="form-select" name="party" required><option value="">Select</option>{% for p in tm_parties %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-6"><label class="form-label">Invoice</label><select class="form-select" name="invoice"><option value="">--</option>{% for inv in invoices %}<option value="{{ inv.id }}">{{ inv.invoice_no }} bal {{ inv.balance }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-6"><label class="form-label">Booking</label><select class="form-select" name="booking"><option value="">--</option>{% for b in bookings %}<option value="{{ b.id }}">{{ b.booking_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Amount *</label><input type="number" step="0.01" class="form-control" name="amount" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Mode</label><select class="form-select" name="payment_mode"><option value="cash">Cash</option><option value="bank">Bank</option><option value="upi">UPI</option><option value="cheque">Cheque</option></select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Reference</label><input class="form-control" name="reference_no"></div>
+  <div class="mb-3 col-12"><label class="form-label">Remarks</label><input class="form-control" name="remarks"></div>
+  <div class="col-12"><button class="btn btn-primary">Save Payment</button> <a class="btn btn-outline-secondary" href="{% url 'tm-payment-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

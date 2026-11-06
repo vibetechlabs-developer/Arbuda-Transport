@@ -1,0 +1,120 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Reports</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3 mb-4">
+  <h4 class="fw-bold py-3 mb-2">Office paper reports</h4>
+  <p class="text-muted mb-4">Month select karo. Vakara/Voucher mate truck, invoice mate party. Open thi paper jovu, Download PDF thi file save thai.</p>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-3 align-items-end" id="reportPick">
+        <div class="col-6 col-md-2">
+          <label class="form-label">Month</label>
+          <select name="month" class="form-select">
+            {% for m in months %}
+            <option value="{{ m.0 }}" {% if month == m.0 %}selected{% endif %}>{{ m.1 }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Year</label>
+          <select name="year" class="form-select">
+            {% for y in years %}
+            <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Truck (Vakara / Voucher)</label>
+          <select name="truck" class="form-select" id="reportTruck">
+            <option value="">Select truck</option>
+            {% for t in tm_trucks %}
+            <option value="{{ t.id }}" {% if request.GET.truck == t.id|stringformat:'s' %}selected{% endif %}>{{ t.registration_no }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Party (Invoice — blank = all)</label>
+          <select name="party" class="form-select" id="reportParty">
+            <option value="">All parties</option>
+            {% for p in tm_parties %}
+            <option value="{{ p.id }}" {% if request.GET.party == p.id|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="fw-semibold">1. Monthly Profit &amp; Loss</h5>
+          <p class="small text-muted">Har truck ni column, Gross Income thi FAST TAG, NET TOTAL, last year same month.</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-primary" href="{% url 'tm-paper-pnl' %}?year={{ year }}&month={{ month }}">Open</a>
+            <a class="btn btn-outline-primary" href="{% url 'tm-paper-pnl' %}?year={{ year }}&month={{ month }}&download=1">Download PDF</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="fw-semibold">2. Vakara Report</h5>
+          <p class="small text-muted">Daily trip, HOLD/ABSENT, diesel, driver advance, repairing, party freight + P&amp;L box.</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-primary" onclick="openTruckReport('{% url 'tm-paper-vakara' %}', false)">Open</button>
+            <button type="button" class="btn btn-outline-primary" onclick="openTruckReport('{% url 'tm-paper-vakara' %}', true)">Download PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="fw-semibold">3. Monthly Voucher</h5>
+          <p class="small text-muted">Loading/unloading, day-night, diesel bills, repair labour/parts, truck expenses, FASTag, net.</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-primary" onclick="openTruckReport('{% url 'tm-paper-voucher' %}', false)">Open</button>
+            <button type="button" class="btn btn-outline-primary" onclick="openTruckReport('{% url 'tm-paper-voucher' %}', true)">Download PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="fw-semibold">4. Transport Invoice / Statement</h5>
+          <p class="small text-muted">Bill no, lorry, from, destination, taluka, dist, weight, rent, labour, total, advance, balance.</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-primary" onclick="openInvoice(false)">Open</button>
+            <button type="button" class="btn btn-outline-primary" onclick="openInvoice(true)">Download PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function qs() {
+  var form = document.getElementById('reportPick');
+  return '?year=' + form.year.value + '&month=' + form.month.value;
+}
+function openTruckReport(base, download) {
+  var truck = document.getElementById('reportTruck').value;
+  if (!truck) { alert('Pehla truck select karo.'); return; }
+  var url = base + qs() + '&truck=' + truck;
+  if (download) url += '&download=1';
+  window.location.href = url;
+}
+function openInvoice(download) {
+  var party = document.getElementById('reportParty').value;
+  var url = '{% url "tm-paper-invoice" %}' + qs();
+  if (party) url += '&party=' + party;
+  if (download) url += '&download=1';
+  window.location.href = url;
+}
+</script>
+{% endblock %}

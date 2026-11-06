@@ -1,0 +1,104 @@
+{% extends 'truckmaster/paper_base.html' %}
+{% load tm_tags %}
+{% block paper_title %}Voucher {{ truck_no }}{% endblock %}
+{% block extra_css %}@page { size: A4 portrait; margin: 8mm; }{% endblock %}
+{% block paper %}
+<div class="sheet-head">
+  <h1>{{ company_name }}</h1>
+  <h2>{{ truck_no }}</h2>
+  <h2>{{ date_range }} &nbsp; VOUCHER - REPORT</h2>
+</div>
+<table class="sheet">
+  <tr>
+    <th>Date</th><th>Trip</th><th>Weight</th><th>Loading</th><th>Unloading</th>
+    <th>Labour</th><th>Commi</th><th>Toll Tax</th><th>Other Exp</th><th>Total</th><th>Remark</th>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.date|date:'d-m-Y' }}</td>
+    <td class="{% if r.is_hold %}hold{% endif %}">{{ r.trip }}</td>
+    <td class="num">{{ r.weight|tm_amt }}</td>
+    <td class="num">{{ r.loading|tm_amt }}</td>
+    <td class="num">{{ r.unloading|tm_amt }}</td>
+    <td class="num">{{ r.labour|tm_amt }}</td>
+    <td class="num">{{ r.commission|tm_amt }}</td>
+    <td class="num">{{ r.toll|tm_amt }}</td>
+    <td class="num">{{ r.other|tm_amt }}</td>
+    <td class="num">{{ r.total|tm_amt:"0" }}</td>
+    <td>{{ r.remark }}</td>
+  </tr>
+  {% endfor %}
+  <tr class="b">
+    <td colspan="2">TOTAL</td>
+    <td class="num">{{ totals.weight|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.loading|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.unloading|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.labour|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.commission|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.toll|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.other|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.total|tm_amt:"0" }}</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td class="b">EXPENCESS</td><td>DAY</td><td class="num">{{ day_count }}</td>
+    <td class="num">{{ day_exp|tm_amt }}</td><td colspan="5"></td>
+    <td class="num">{{ day_exp|tm_amt:"0" }}</td><td></td>
+  </tr>
+  <tr>
+    <td></td><td>NIGHT</td><td class="num">{{ night_count }}</td>
+    <td class="num">{{ night_exp|tm_amt }}</td><td colspan="5"></td>
+    <td class="num">{{ night_exp|tm_amt:"0" }}</td><td></td>
+  </tr>
+  <tr>
+    <td colspan="3">DIESEL BILL {% if diesel_formula %}{{ diesel_formula }}{% endif %}</td>
+    <td class="num">{{ diesel_total|tm_amt }}</td><td colspan="5"></td>
+    <td class="num">{{ diesel_total|tm_amt:"0" }}</td><td></td>
+  </tr>
+  <tr><td colspan="11" class="b">Repair &amp; Maintenance (With Labour)</td></tr>
+  {% for m in repairs %}
+  <tr>
+    <td>{{ m.entry_date|date:'d-m-y' }}</td>
+    <td colspan="2">{{ m.description|default:m.get_maintenance_type_display|upper }}</td>
+    <td class="num">{{ m.labour_charges|tm_amt }}</td>
+    <td colspan="5"></td>
+    <td class="num">{{ m.labour_charges|tm_amt }}</td>
+    <td></td>
+  </tr>
+  {% endfor %}
+  <tr><td colspan="9"></td><td class="num b">{{ repair_labour_total|tm_amt:"0" }}</td><td></td></tr>
+  <tr><td colspan="11" class="b">Repair &amp; Spare parts(Material)</td></tr>
+  {% for m in parts_repairs %}
+  <tr>
+    <td>{{ m.entry_date|date:'d-m-y' }}</td>
+    <td colspan="2">{{ m.description|default:m.get_maintenance_type_display|upper }}</td>
+    <td class="num">{{ m.spare_parts_cost|tm_amt }}</td>
+    <td colspan="5"></td>
+    <td class="num">{{ m.spare_parts_cost|tm_amt }}</td>
+    <td></td>
+  </tr>
+  {% endfor %}
+  <tr><td colspan="9"></td><td class="num b">{{ parts_total|tm_amt:"0" }}</td><td></td></tr>
+  <tr><td colspan="11" class="b">Truck Expenses</td></tr>
+  {% for e in truck_exp_rows %}
+  <tr>
+    <td></td><td>{{ e.name }}</td><td></td>
+    <td class="num">{{ e.amount|tm_amt }}</td>
+    <td colspan="5"></td>
+    <td class="num">{{ e.amount|tm_amt }}</td>
+    <td></td>
+  </tr>
+  {% endfor %}
+  <tr><td colspan="9"></td><td class="num b">{{ truck_exp_total|tm_amt:"0" }}</td><td></td></tr>
+  <tr>
+    <td colspan="9" class="b">FAST TAG STATEMENT (BANK)</td>
+    <td class="num b">{{ fastag_total|tm_amt:"0" }}</td>
+    <td></td>
+  </tr>
+  <tr class="b">
+    <td colspan="9">NET TOTAL</td>
+    <td class="num">{{ net|tm_amt:"0" }}</td>
+    <td></td>
+  </tr>
+</table>
+{% endblock %}

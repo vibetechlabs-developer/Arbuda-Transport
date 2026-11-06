@@ -1,0 +1,29 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Transport Invoice</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Transport Invoice</h4>
+<div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-4"><label class="form-label">Invoice Date *</label><input type="date" class="form-control" name="invoice_date" value="{{ obj.invoice_date|date:'Y-m-d' }}" required></div>
+  <div class="mb-3 col-sm-8"><label class="form-label">Customer *</label><select class="form-select" name="party" required><option value="">Select</option>{% for p in tm_parties %}<option value="{{ p.id }}" {% if obj.party_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-8"><label class="form-label">Address</label><textarea class="form-control" name="customer_address">{{ obj.customer_address }}</textarea></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">GSTIN</label><input class="form-control" name="gstin" value="{{ obj.gstin }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Vehicle</label><select class="form-select" name="truck"><option value="">--</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">From</label><input class="form-control" name="from_location" value="{{ obj.from_location }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Destination</label><input class="form-control" name="destination" value="{{ obj.destination }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Taluka</label><input class="form-control" name="taluka" value="{{ obj.taluka }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">District</label><input class="form-control" name="district" value="{{ obj.district }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Material</label><input class="form-control" name="material" value="{{ obj.material }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Weight</label><input type="number" step="0.001" class="form-control" name="weight" value="{{ obj.weight }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Rate</label><input type="number" step="0.01" class="form-control" name="rate" value="{{ obj.rate }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Freight</label><input type="number" step="0.01" class="form-control" name="freight" value="{{ obj.freight }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Labour</label><input type="number" step="0.01" class="form-control" name="labour" value="{{ obj.labour }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Other Charges</label><input type="number" step="0.01" class="form-control" name="other_charges" value="{{ obj.other_charges }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Advance</label><input type="number" step="0.01" class="form-control" name="advance" value="{{ obj.advance }}"></div>
+  <div class="mb-3 col-12"><label class="form-label">Trips on this invoice</label>
+    <select class="form-select" name="trips" multiple size="6">{% for t in trips %}<option value="{{ t.id }}">{{ t.trip_no }} {{ t.truck.registration_no }} {{ t.start_location }}→{{ t.destination }}</option>{% endfor %}</select>
+  </div>
+  <div class="mb-3 col-12"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks">{{ obj.remarks }}</textarea></div>
+  <p class="text-muted">Total = Freight + Labour + Other Charges. Balance = Total − Advance − Received.</p>
+  <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-invoice-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

@@ -1,0 +1,298 @@
+{% extends 'masterpage.html' %}
+{% load humanize %}
+{% block title %}<title>ARBUDA | Truck Dashboard</title>{% endblock %}
+{% block content %}
+<style>
+  .bg-light-danger { background-color: #ff3e1de8; }
+  .tm-dash .tm-kpi-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 0.35rem;
+  }
+  .tm-dash .tm-kpi-value {
+    font-weight: 700;
+    margin-bottom: 0;
+    line-height: 1.15;
+  }
+</style>
+<div class="container-xxl mt-3 mb-4 tm-dash">
+  <h4 class="fw-bold py-3 mb-3">Truck Dashboard</h4>
+
+  <div class="card mb-4">
+    <div class="card-body py-3">
+      <form method="get" class="row g-2 align-items-end tm-filter">
+        <div class="col-6 col-md-2">
+          <label class="form-label mb-1 small">From</label>
+          <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label mb-1 small">To</label>
+          <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label mb-1 small">Truck</label>
+          <select name="truck" class="form-select">
+            <option value="">All Trucks</option>
+            {% for t in tm_trucks %}<option value="{{ t.id }}" {% if request.GET.truck == t.id|stringformat:'s' %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label mb-1 small">Driver</label>
+          <select name="driver" class="form-select">
+            <option value="">All Drivers</option>
+            {% for d in tm_drivers %}<option value="{{ d.id }}" {% if request.GET.driver == d.id|stringformat:'s' %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label mb-1 small">Party</label>
+          <select name="party" class="form-select">
+            <option value="">All Parties</option>
+            {% for p in tm_parties %}<option value="{{ p.id }}" {% if request.GET.party == p.id|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2 d-flex gap-2">
+          <button class="btn btn-primary w-100" type="submit">Apply</button>
+          <a class="btn btn-outline-secondary" href="{% url 'tm-dashboard' %}">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-6 col-md-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-muted">Total Trucks</h5>
+          <p class="tm-kpi-value text-dark fs-2">{{ total_trucks }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-secondary">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Active Trucks</h5>
+          <p class="tm-kpi-value text-white fs-2">{{ active_trucks }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-muted">Available</h5>
+          <p class="tm-kpi-value text-dark fs-2">{{ available_trucks }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-secondary">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">On Trip</h5>
+          <p class="tm-kpi-value text-white fs-2">{{ trucks_on_trip }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-muted">Under Maintenance</h5>
+          <p class="tm-kpi-value text-dark fs-2">{{ trucks_maintenance }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-secondary">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Total Drivers</h5>
+          <p class="tm-kpi-value text-white fs-2">{{ total_drivers }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-muted">Today's Bookings</h5>
+          <p class="tm-kpi-value text-dark fs-2">{{ todays_bookings }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-secondary">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Today Completed</h5>
+          <p class="tm-kpi-value text-white fs-2">{{ todays_completed_trips }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-6 col-md-3">
+      <div class="card bg-primary">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Monthly Income</h5>
+          <p class="tm-kpi-value text-white fs-4">&#8377; {{ monthly_income|floatformat:0|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-light-danger">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Monthly Expenses</h5>
+          <p class="tm-kpi-value text-white fs-4">&#8377; {{ monthly_expenses|floatformat:0|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-warning">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Diesel Expenses</h5>
+          <p class="tm-kpi-value text-white fs-4">&#8377; {{ monthly_diesel|floatformat:0|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-secondary">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Maintenance</h5>
+          <p class="tm-kpi-value text-white fs-4">&#8377; {{ monthly_maintenance|floatformat:0|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-muted">Driver Salary</h5>
+          <p class="tm-kpi-value text-dark fs-4">&#8377; {{ monthly_salary|floatformat:0|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card bg-warning">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Outstanding</h5>
+          <p class="tm-kpi-value text-white fs-4">&#8377; {{ outstanding|floatformat:0|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="card {% if net_profit >= 0 %}bg-success{% else %}bg-light-danger{% endif %}">
+        <div class="card-body">
+          <h5 class="tm-kpi-label text-white">Monthly Net Profit / Loss</h5>
+          <p class="tm-kpi-value text-white fs-3">&#8377; {{ net_profit|floatformat:0|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="fw-semibold mb-3">Income vs Expense</h5>
+          <div id="tmIncomeChart"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="fw-semibold mb-3">Trip Status</h5>
+          {% for s in status_overview %}
+          <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+            <span>{{ s.label|default:s.status }}</span>
+            <span class="badge bg-label-primary">{{ s.total }}</span>
+          </div>
+          {% empty %}
+          <p class="text-muted mb-0">No trips in selected range.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="fw-semibold mb-3">Truck Utilization</h5>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>Truck</th><th class="text-end">Trips</th></tr></thead>
+              <tbody>
+                {% for u in utilization %}
+                <tr><td>{{ u.truck }}</td><td class="text-end">{{ u.trips }}</td></tr>
+                {% empty %}
+                <tr><td colspan="2" class="text-muted">No utilization data.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="fw-semibold mb-3">Recent Bookings</h5>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>No</th><th>Party</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for b in recent_bookings %}
+                <tr>
+                  <td><a href="{% url 'tm-booking-detail' b.id %}">{{ b.booking_no }}</a></td>
+                  <td>{{ b.party.name }}</td>
+                  <td class="text-capitalize">{{ b.get_status_display }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-muted">No bookings yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="fw-semibold mb-3">Upcoming Expiry Alerts</h5>
+          <ul class="mb-0 ps-3">
+            {% for t in truck_alerts %}
+            <li>{{ t.registration_no }} — insurance / fitness / PUC / permit due</li>
+            {% endfor %}
+            {% for d in license_alerts %}
+            <li>Driver {{ d.name }} license expires {{ d.license_expiry|date:"d-m-Y" }}</li>
+            {% endfor %}
+            {% for doc in doc_alerts %}
+            <li>{{ doc.truck.registration_no }} {{ doc.get_doc_type_display }} expires {{ doc.expiry_date|date:"d-m-Y" }}</li>
+            {% empty %}
+            {% if not truck_alerts and not license_alerts %}
+            <li class="text-muted">No upcoming expiries in 30 days.</li>
+            {% endif %}
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof ApexCharts === 'undefined') return;
+  var el = document.querySelector('#tmIncomeChart');
+  if (!el) return;
+  new ApexCharts(el, {
+    chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'Public Sans, sans-serif' },
+    colors: ['#696cff', '#ff3e1d'],
+    plotOptions: { bar: { columnWidth: '45%', borderRadius: 4 } },
+    series: [
+      { name: 'Income', data: {{ chart_income|safe }} },
+      { name: 'Expense', data: {{ chart_expense|safe }} }
+    ],
+    xaxis: { categories: {{ chart_labels|safe }} },
+    legend: { position: 'top' },
+    dataLabels: { enabled: false },
+    grid: { borderColor: '#eceef1' }
+  }).render();
+});
+</script>
+{% endblock %}

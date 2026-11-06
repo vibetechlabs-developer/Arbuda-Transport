@@ -1,0 +1,22 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Maintenance</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Maintenance & Repairing</h4>
+<div class="card"><div class="card-body"><form method="post" enctype="multipart/form-data" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-4"><label class="form-label">Truck *</label><select class="form-select" name="truck" required><option value="">Select</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Date *</label><input type="date" class="form-control" name="entry_date" value="{{ obj.entry_date|date:'Y-m-d' }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Type</label><select class="form-select" name="maintenance_type">{% for c,l in obj.TYPE_CHOICES %}<option value="{{ c }}" {% if obj.maintenance_type == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Odometer</label><input type="number" class="form-control" name="odometer" value="{{ obj.odometer }}"></div>
+  <div class="mb-3 col-sm-8"><label class="form-label">Description</label><input class="form-control" name="description" value="{{ obj.description }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Garage / Vendor</label><input class="form-control" name="garage" value="{{ obj.garage }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Labour</label><input type="number" step="0.01" class="form-control" name="labour_charges" value="{{ obj.labour_charges }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Spare Parts</label><input type="number" step="0.01" class="form-control" name="spare_parts_cost" value="{{ obj.spare_parts_cost }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Other Charges</label><input type="number" step="0.01" class="form-control" name="other_charges" value="{{ obj.other_charges }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Payment Mode</label><select class="form-select" name="payment_mode">{% for c,l in obj.PAYMENT_MODES %}<option value="{{ c }}" {% if obj.payment_mode == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Next Service Date</label><input type="date" class="form-control" name="next_service_date" data-allow-future="true" value="{{ obj.next_service_date|date:'Y-m-d' }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Next Service KM</label><input type="number" class="form-control" name="next_service_km" value="{{ obj.next_service_km }}"></div>
+  <div class="mb-3 col-sm-6"><label class="form-label">Bill</label><input type="file" class="form-control" name="bill_attachment"></div>
+  <div class="mb-3 col-12"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks">{{ obj.remarks }}</textarea></div>
+  <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-maintenance-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

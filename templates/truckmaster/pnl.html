@@ -1,0 +1,39 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | {{ title }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3">
+  <div class="d-flex justify-content-between flex-wrap gap-2">
+    <h4>{{ title }}</h4>
+    <form method="get" class="d-flex gap-2">
+      <input type="number" name="year" class="form-control" value="{{ year }}" style="width:100px">
+      <input type="number" name="month" class="form-control" value="{{ month }}" min="1" max="12" style="width:90px">
+      <label class="form-check mt-2"><input type="checkbox" name="yearly" value="1" {% if yearly %}checked{% endif %}> Yearly</label>
+      <button class="btn btn-primary">Go</button>
+      <a class="btn btn-outline-primary" href="?year={{ year }}&month={{ month }}{% if yearly %}&yearly=1{% endif %}&export=xls">Excel</a>
+      <a class="btn btn-outline-primary" href="?year={{ year }}&month={{ month }}{% if yearly %}&yearly=1{% endif %}&export=pdf">PDF</a>
+      <button class="btn btn-outline-primary" type="button" onclick="window.print()">Print</button>
+    </form>
+  </div>
+  <div class="card mt-3" style="overflow:auto">
+    <table class="table table-bordered text-nowrap">
+      <thead>
+        <tr>
+          <th>Particular</th>
+          {% for t in data.trucks %}<th>{{ t.registration_no }}</th>{% endfor %}
+          <th>Profit & Loss A/C</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in display_rows %}
+        <tr>
+          <td>{{ row.label }}</td>
+          {% for val in row.values %}<td class="text-end">{{ val }}</td>{% endfor %}
+          <td class="text-end fw-bold">{{ row.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="p-3 mb-0">Gross income {{ data.income_total }} | Total expenses {{ data.expense_total }} | Net {{ data.net_total }}</p>
+  </div>
+</div>
+{% endblock %}

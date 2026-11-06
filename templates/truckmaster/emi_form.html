@@ -1,0 +1,14 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | EMI</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Record EMI Payment</h4>
+<div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-6"><label class="form-label">Loan *</label><select class="form-select" name="loan" required><option value="">Select</option>{% for l in loans %}<option value="{{ l.id }}">{{ l.truck.registration_no }} - {{ l.finance_company }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Due Date *</label><input type="date" class="form-control" name="due_date" data-allow-future="true" required></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Payment Date</label><input type="date" class="form-control" name="payment_date"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Amount</label><input type="number" step="0.01" class="form-control" name="amount"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Mode</label><select class="form-select" name="payment_mode"><option value="bank">Bank</option><option value="upi">UPI</option><option value="cash">Cash</option></select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Remarks</label><input class="form-control" name="remarks"></div>
+  <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-loan-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

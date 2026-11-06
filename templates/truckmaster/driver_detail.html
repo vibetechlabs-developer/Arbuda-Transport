@@ -1,0 +1,29 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Driver {{ obj.name }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3">
+  <div class="d-flex justify-content-between"><h4>{{ obj.name }}</h4><a class="btn btn-primary" href="{% url 'tm-driver-edit' obj.id %}">Edit</a></div>
+  <p>Mobile: {{ obj.mobile }} | License: {{ obj.license_no }} exp {{ obj.license_expiry|date:'d-m-Y'|default:'-' }} | Truck: {{ obj.assigned_truck.registration_no|default:'-' }}</p>
+  <p>Pending salary: {{ pending_salary }}</p>
+  <div class="row g-3">
+    <div class="col-md-6"><div class="card"><div class="card-body"><h5>Trips</h5>{% for t in trips %}<div><a href="{% url 'tm-trip-detail' t.id %}">{{ t.trip_no }}</a> {{ t.trip_date }} {{ t.start_location }}→{{ t.destination }}</div>{% empty %}<p class="text-muted">No trips</p>{% endfor %}</div></div></div>
+    <div class="col-md-6"><div class="card"><div class="card-body"><h5>Salary</h5>{% for s in salaries %}<div>{{ s.salary_month }} net {{ s.net_salary }} pending {{ s.pending_salary }}</div>{% empty %}<p class="text-muted">No salary records</p>{% endfor %}<hr><h6>Advances</h6>{% for a in advances %}<div>{{ a.entry_date }} {{ a.amount }}</div>{% empty %}<p class="text-muted">No advances</p>{% endfor %}</div></div></div>
+    <div class="col-12"><div class="card"><div class="card-body">
+      <h5>Attendance / Leave</h5>
+      <form method="post" class="d-flex gap-2 flex-wrap mb-3">{% csrf_token %}
+        <input type="date" name="attendance_date" class="form-control" style="max-width:180px" required>
+        <select name="attendance_status" class="form-select" style="max-width:160px">
+          <option value="present">Present</option>
+          <option value="absent">Absent</option>
+          <option value="leave">Leave</option>
+          <option value="half">Half Day</option>
+        </select>
+        <input class="form-control" name="attendance_remarks" placeholder="Remarks" style="max-width:240px">
+        <button class="btn btn-primary">Save</button>
+      </form>
+      {% for a in attendance %}<div>{{ a.attendance_date }} — {{ a.get_status_display }} {{ a.remarks|default:'' }}</div>
+      {% empty %}<p class="text-muted mb-0">No attendance records.</p>{% endfor %}
+    </div></div></div>
+  </div>
+</div>
+{% endblock %}

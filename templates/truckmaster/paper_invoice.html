@@ -1,0 +1,58 @@
+{% extends 'truckmaster/paper_base.html' %}
+{% load tm_tags %}
+{% block paper_title %}Invoice Statement{% endblock %}
+{% block paper %}
+<table class="meta">
+  <tr>
+    <td>
+      <div class="b" style="font-size:16px">{{ company_name }}</div>
+      <div>{{ company_address }}</div>
+      <div>GSTIN: {{ company_gst }}</div>
+    </td>
+    <td class="num">
+      <div>Bill No : {% if bill_no %}{{ bill_no }}{% elif obj %}{{ obj.invoice_no }}{% endif %}</div>
+      <div>Date : {% if obj %}{{ obj.invoice_date|date:'d-M-y' }}{% else %}{{ end|date:'d-M-y' }}{% endif %}</div>
+      <div>Customer : {% if party %}{{ party.name }}{% elif obj %}{{ obj.party.name }}{% endif %}</div>
+      <div>GST No : {% if party %}{{ party.gstin }}{% elif obj %}{{ obj.gstin }}{% endif %}</div>
+    </td>
+  </tr>
+</table>
+<p class="b">SAC CODE : 996511</p>
+<table class="sheet">
+  <tr>
+    <th>No.</th><th>Date</th><th>Invoice No.</th><th>Lorry No.</th><th>From</th><th>Destination</th>
+    <th>Taluka</th><th>Dist.</th><th>Weight</th><th>Rent</th><th>Lab</th><th>Total</th><th>Advance</th><th>Balance</th>
+  </tr>
+  {% for line in lines %}
+  <tr>
+    <td class="ctr">{{ line.no }}</td>
+    <td>{{ line.date|date:'d-m-y' }}</td>
+    <td>{{ line.invoice_no }}</td>
+    <td>{{ line.lorry }}</td>
+    <td>{{ line.from_location }}</td>
+    <td>{{ line.destination }}</td>
+    <td>{{ line.taluka }}</td>
+    <td>{{ line.district }}</td>
+    <td class="num">{{ line.weight|tm_amt }}</td>
+    <td class="num">{{ line.rent|tm_amt }}</td>
+    <td class="num">{{ line.labour|tm_amt }}</td>
+    <td class="num">{{ line.total|tm_amt }}</td>
+    <td class="num">{{ line.advance|tm_amt }}</td>
+    <td class="num">{{ line.balance|tm_amt }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="14">Aa period ma invoice nathi.</td></tr>
+  {% endfor %}
+  <tr class="b">
+    <td colspan="7"></td>
+    <td>Total</td>
+    <td class="num">{{ totals.weight|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.rent|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.labour|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.total|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.advance|tm_amt:"0" }}</td>
+    <td class="num">{{ totals.balance|tm_amt:"0" }}</td>
+  </tr>
+</table>
+<p style="text-align:right;margin-top:24px" class="b">FOR {{ company_name|upper }}<br>AUTHORISED</p>
+{% endblock %}

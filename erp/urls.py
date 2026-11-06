@@ -57,6 +57,9 @@ urlpatterns = [
     path('summary-view', transport_views.summary_view, name='summary-view'),
     path('generate-summary-pdf', download_views.generate_summary_pdf, name='generate-summary-pdf'),
 
+    # Independent Truck Master module (additive)
+    path('', include('truckmaster.urls')),
+
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

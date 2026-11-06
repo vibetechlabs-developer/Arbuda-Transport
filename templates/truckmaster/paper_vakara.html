@@ -1,0 +1,69 @@
+{% extends 'truckmaster/paper_base.html' %}
+{% load tm_tags %}
+{% block paper_title %}Vakara {{ truck_no }}{% endblock %}
+{% block paper %}
+<div class="sheet-head">
+  <h1>{{ company_name }}</h1>
+  <h2>{{ date_range }}</h2>
+  <h2>{{ truck_no }} &nbsp; VAKARA-REPORT</h2>
+</div>
+<table class="sheet">
+  <tr>
+    <th>Date</th><th>Trip</th><th>Weight</th><th>Description</th><th>Part Name</th>
+    <th>Rate M.T.</th><th>Freight</th><th>Payment</th><th>BILL NO</th>
+    <th>Diesel</th><th>Pump</th><th>Dri.Adv</th><th>RIPAIRING</th>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.date|date:'d-m-Y' }}</td>
+    <td class="{% if r.is_hold %}hold{% endif %}">{{ r.trip }}</td>
+    <td class="num">{% if r.is_hold %}{{ r.weight|tm_amt:"0" }}{% else %}{{ r.weight|tm_amt }}{% endif %}</td>
+    <td>{{ r.description }}</td>
+    <td>{{ r.party }}</td>
+    <td class="num">{{ r.rate|tm_amt }}</td>
+    <td class="num">{{ r.freight|tm_amt:"0" }}</td>
+    <td>{{ r.payment }}</td>
+    <td>{{ r.bill_no }}</td>
+    <td class="num">{{ r.diesel|tm_amt }}</td>
+    <td>{{ r.pump }}</td>
+    <td class="num">{{ r.advance|tm_amt }}</td>
+    <td class="num">{{ r.repair|tm_amt }}</td>
+  </tr>
+  {% endfor %}
+  <tr class="b">
+    <td colspan="2">TOTAL</td>
+    <td class="num">{{ tot.weight|tm_amt:"0" }}</td>
+    <td colspan="3"></td>
+    <td class="num">{{ tot.freight|tm_amt:"0" }}</td>
+    <td colspan="2"></td>
+    <td class="num">{{ tot.diesel_ltr|tm_amt:"0" }}</td>
+    <td></td>
+    <td class="num">{{ tot.advance|tm_amt:"0" }}</td>
+    <td class="num">{{ tot.repair|tm_amt:"0" }}</td>
+  </tr>
+</table>
+<div class="two">
+  <div>
+    <table class="sheet">
+      <tr><th>Recd Freight List</th><th>Amt</th></tr>
+      {% for name, amt in party_totals %}
+      <tr><td>{{ name }}</td><td class="num">{{ amt|tm_amt }}</td></tr>
+      {% endfor %}
+      <tr><td>CASH</td><td class="num">{{ cash_total|tm_amt }}</td></tr>
+      <tr><td>CHEQUE</td><td class="num">{{ cheque_total|tm_amt }}</td></tr>
+      <tr class="b"><td>TOTAL</td><td class="num">{{ freight_total|tm_amt:"0" }}</td></tr>
+    </table>
+  </div>
+  <div>
+    <table class="sheet">
+      <tr><th>Particular</th><th>AMT</th></tr>
+      {% for b in box %}
+      <tr>
+        <td class="{% if 'NET' in b.label %}b{% endif %}">{{ b.label }}</td>
+        <td class="num">{{ b.amount|tm_amt:"0" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endblock %}

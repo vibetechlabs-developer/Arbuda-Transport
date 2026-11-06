@@ -1,0 +1,20 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Expense</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Truck Expense</h4>
+<div class="card"><div class="card-body"><form method="post" enctype="multipart/form-data" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-4"><label class="form-label">Date *</label><input type="date" class="form-control" name="expense_date" value="{{ obj.expense_date|date:'Y-m-d' }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Category *</label><select class="form-select" name="category" required><option value="">Select</option>{% for c in categories %}<option value="{{ c.id }}" {% if obj.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Amount *</label><input type="number" step="0.01" class="form-control" name="amount" value="{{ obj.amount }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Truck</label><select class="form-select" name="truck"><option value="">--</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Driver</label><select class="form-select" name="driver"><option value="">--</option>{% for d in tm_drivers %}<option value="{{ d.id }}" {% if obj.driver_id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Trip</label><select class="form-select" name="trip"><option value="">--</option>{% for t in trips %}<option value="{{ t.id }}" {% if obj.trip_id == t.id %}selected{% endif %}>{{ t.trip_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-6"><label class="form-label">Description</label><input class="form-control" name="description" value="{{ obj.description }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Vendor</label><input class="form-control" name="vendor_name" value="{{ obj.vendor_name }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Bill No</label><input class="form-control" name="bill_number" value="{{ obj.bill_number }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Payment Mode</label><select class="form-select" name="payment_mode">{% for c,l in obj.PAYMENT_MODES %}<option value="{{ c }}" {% if obj.payment_mode == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Attachment</label><input type="file" class="form-control" name="attachment"></div>
+  <div class="mb-3 col-12"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks">{{ obj.remarks }}</textarea></div>
+  <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-expense-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

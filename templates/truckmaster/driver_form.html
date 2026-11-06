@@ -1,0 +1,28 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Driver Form</title>{% endblock %}
+{% block content %}
+<div class="container-xxl">
+  <h4 class="fw-bold py-3">{{ obj.id|yesno:"Edit Driver,Add Driver" }}</h4>
+  <div class="card"><div class="card-body"><form method="post" enctype="multipart/form-data" class="row">{% csrf_token %}
+    <div class="mb-3 col-sm-6"><label class="form-label">Driver Name *</label><input class="form-control" name="name" value="{{ obj.name }}" required></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Mobile *</label><input class="form-control" name="mobile" value="{{ obj.mobile }}" required></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Alternate Mobile</label><input class="form-control" name="alternate_mobile" value="{{ obj.alternate_mobile }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Date of Birth</label><input class="form-control" type="date" name="date_of_birth" value="{{ obj.date_of_birth|date:'Y-m-d' }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Joining Date</label><input class="form-control" type="date" name="joining_date" value="{{ obj.joining_date|date:'Y-m-d' }}"></div>
+    <div class="mb-3 col-12"><label class="form-label">Address</label><textarea class="form-control" name="address">{{ obj.address }}</textarea></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">License Number *</label><input class="form-control" name="license_no" value="{{ obj.license_no }}" required></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">License Type</label><input class="form-control" name="license_type" value="{{ obj.license_type }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">License Expiry</label><input class="form-control" type="date" name="license_expiry" data-allow-future="true" value="{{ obj.license_expiry|date:'Y-m-d' }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Aadhaar (internal)</label><input class="form-control" name="aadhaar_no" value="{{ obj.aadhaar_no }}" autocomplete="off"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">PAN (internal)</label><input class="form-control" name="pan_no" value="{{ obj.pan_no }}" autocomplete="off"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Salary Type</label><select class="form-select" name="salary_type">{% for c,l in obj.SALARY_TYPE_CHOICES %}<option value="{{ c }}" {% if obj.salary_type == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Basic Salary</label><input class="form-control" type="number" step="0.01" name="basic_salary" value="{{ obj.basic_salary }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Allowances</label><input class="form-control" type="number" step="0.01" name="allowances" value="{{ obj.allowances }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Assigned Truck</label><select class="form-select" name="assigned_truck"><option value="">--</option>{% for t in trucks %}<option value="{{ t.id }}" {% if obj.assigned_truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Emergency Contact</label><input class="form-control" name="emergency_contact" value="{{ obj.emergency_contact }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Status</label><select class="form-select" name="status">{% for c,l in obj.STATUS_CHOICES %}<option value="{{ c }}" {% if obj.status == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Documents</label><input class="form-control" type="file" name="document"></div>
+    <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-driver-list' %}">Back</a></div>
+  </form></div></div>
+</div>
+{% endblock %}

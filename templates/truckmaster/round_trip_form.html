@@ -1,0 +1,19 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Round Trip</title>{% endblock %}
+{% block content %}
+<div class="container-xxl">
+  <h4 class="fw-bold py-3">{{ obj.id|yesno:"Edit Round Trip,Create Round Trip" }}</h4>
+  <div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+    <div class="mb-3 col-sm-6"><label class="form-label">Truck *</label><select class="form-select" name="truck" required><option value="">Select</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Driver</label><select class="form-select" name="driver"><option value="">Select</option>{% for d in tm_drivers %}<option value="{{ d.id }}" {% if obj.driver_id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Start Date *</label><input type="date" class="form-control" name="start_date" value="{{ obj.start_date|date:'Y-m-d' }}" required></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">End Date</label><input type="date" class="form-control" name="end_date" value="{{ obj.end_date|date:'Y-m-d' }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Starting KM</label><input type="number" class="form-control" name="starting_km" value="{{ obj.starting_km }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Ending KM</label><input type="number" class="form-control" name="ending_km" value="{{ obj.ending_km }}"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Outbound Route</label><input class="form-control" name="outbound_route" value="{{ obj.outbound_route }}" placeholder="Ahmedabad → Nadiad → Vadodara"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Return Route</label><input class="form-control" name="return_route" value="{{ obj.return_route }}" placeholder="Vadodara → Bharuch → Ahmedabad"></div>
+    <div class="mb-3 col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes">{{ obj.notes }}</textarea></div>
+    <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-round-list' %}">Back</a></div>
+  </form></div></div>
+</div>
+{% endblock %}

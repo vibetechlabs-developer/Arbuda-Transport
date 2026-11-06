@@ -1,0 +1,74 @@
+{% extends 'masterpage.html' %}
+{% load humanize %}
+{% block title %}<title>ARBUDA | {{ obj.trip_no }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3">
+  <div class="d-flex justify-content-between mb-3">
+    <h4>Trip {{ obj.trip_no }} <span class="badge bg-label-primary">{{ obj.get_status_display }}</span></h4>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary" href="{% url 'tm-trip-edit' obj.id %}">Edit</a>
+      <a class="btn btn-outline-primary" href="{% url 'tm-voucher-form' %}?trip={{ obj.id }}">Voucher</a>
+    </div>
+  </div>
+  <div class="card mb-3"><div class="card-body row">
+    <div class="col-md-4">
+      <p>Date: {{ obj.trip_date|date:'d-m-Y' }}</p>
+      <p>Truck: {{ obj.truck.registration_no }}</p>
+      <p>Driver: {{ obj.driver.name|default:'-' }}</p>
+      <p>Booking: {% if obj.booking %}<a href="{% url 'tm-booking-detail' obj.booking.id %}">{{ obj.booking.booking_no }}</a>{% else %}-{% endif %}</p>
+    </div>
+    <div class="col-md-4">
+      <p>{{ obj.start_location }} → {{ obj.destination }}</p>
+      <p>Direction: {{ obj.get_direction_display }} {% if obj.is_empty_return %}(empty){% endif %}</p>
+      <p>KM: {{ obj.start_odometer }} - {{ obj.end_odometer }} = {{ obj.total_km }}</p>
+      <p>Weight L/U: {{ obj.loaded_weight }} / {{ obj.unloaded_weight }}</p>
+    </div>
+    <div class="col-md-4">
+      <p>Freight: {{ obj.freight_amount|floatformat:2|intcomma }}</p>
+      <p>Advance + Received: {{ obj.advance_received }} + {{ obj.payment_received }}</p>
+      <p>Pending: {{ obj.pending_amount }}</p>
+      <p>Trip expenses: {{ breakdown.total }}</p>
+      <p><strong>Trip profit: {{ profit }}</strong></p>
+    </div>
+  </div></div>
+  <div class="card mb-3"><div class="card-body">
+    <form method="post" action="{% url 'tm-trip-action' obj.id %}" class="d-flex gap-2 flex-wrap">{% csrf_token %}
+      <button class="btn btn-outline-primary" name="action" value="loading">Mark Loading</button>
+      <button class="btn btn-outline-primary" name="action" value="transit">Mark In Transit</button>
+      <button class="btn btn-outline-primary" name="action" value="deliver">Mark Delivered</button>
+      <button class="btn btn-primary" name="action" value="complete">Complete Trip</button>
+    </form>
+  </div></div>
+  <div class="row g-3">
+    <div class="col-md-6"><div class="card"><div class="card-body">
+      <h5>Expense breakdown</h5>
+      <table class="table table-sm">
+        <tr><td>Diesel</td><td>{{ breakdown.diesel }}</td></tr>
+        <tr><td>Loading</td><td>{{ breakdown.loading }}</td></tr>
+        <tr><td>Unloading</td><td>{{ breakdown.unloading }}</td></tr>
+        <tr><td>Labour</td><td>{{ breakdown.labour }}</td></tr>
+        <tr><td>Toll / FASTag</td><td>{{ breakdown.toll }} / {{ breakdown.fastag }}</td></tr>
+        <tr><td>Commission</td><td>{{ breakdown.commission }}</td></tr>
+        <tr><td>Driver allowance</td><td>{{ breakdown.driver_allowance }}</td></tr>
+        <tr><td>Repair</td><td>{{ breakdown.repair }}</td></tr>
+        <tr><td>Other</td><td>{{ breakdown.other }}</td></tr>
+      </table>
+    </div></div></div>
+    <div class="col-md-6"><div class="card"><div class="card-body">
+      <h5>Add route leg</h5>
+      <form method="post" action="{% url 'tm-trip-leg' obj.id %}" class="row">{% csrf_token %}
+        <div class="col-6 mb-2"><input class="form-control" name="from_location" placeholder="From" required></div>
+        <div class="col-6 mb-2"><input class="form-control" name="to_location" placeholder="To" required></div>
+        <div class="col-6 mb-2"><input class="form-control" name="loading_point" placeholder="Loading point"></div>
+        <div class="col-6 mb-2"><input class="form-control" name="unloading_point" placeholder="Unloading point"></div>
+        <div class="col-4 mb-2"><input class="form-control" type="number" name="distance_km" placeholder="KM"></div>
+        <div class="col-4 mb-2"><input class="form-control" type="number" step="0.001" name="weight" placeholder="Weight"></div>
+        <div class="col-4 mb-2"><input class="form-control" type="number" step="0.01" name="freight" placeholder="Freight"></div>
+        <div class="col-12"><button class="btn btn-primary btn-sm">Add Leg</button></div>
+      </form>
+      <hr>
+      {% for leg in legs %}<div>{{ leg.sequence }}. {{ leg.from_location }} → {{ leg.to_location }} ({{ leg.distance_km }} km)</div>{% empty %}<p class="text-muted">No extra legs.</p>{% endfor %}
+    </div></div></div>
+  </div>
+</div>
+{% endblock %}

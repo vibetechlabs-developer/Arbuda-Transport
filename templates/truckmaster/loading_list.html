@@ -1,0 +1,33 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Loading & Unloading</title>{% endblock %}
+{% block content %}
+<div class="container-xxl grow container-p-y">
+  <div class="d-flex justify-content-between mb-3">
+    <h4 class="fw-bold">Loading & Unloading</h4>
+    <div class="d-flex gap-2">
+      <a class="btn btn-primary" href="{% url 'tm-loading-form' %}?kind=loading">Add Loading</a>
+      <a class="btn btn-primary" href="{% url 'tm-loading-form' %}?kind=unloading">Add Unloading</a>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-6"><div class="card"><div class="card-body">
+      <h5>Loading</h5>
+      <table class="table table-sm">
+        <tr><th>Date</th><th>Trip</th><th>Location</th><th>Weight</th><th>Charges</th></tr>
+        {% for r in loadings %}
+        <tr><td>{{ r.entry_date|date:'d-m-Y' }}</td><td>{{ r.trip.trip_no }}</td><td>{{ r.location }}</td><td>{{ r.loaded_weight }}</td><td>{{ r.loading_charges }} / labour {{ r.labour_charges }}</td></tr>
+        {% empty %}<tr><td colspan="5" class="text-muted">No loading records</td></tr>{% endfor %}
+      </table>
+    </div></div></div>
+    <div class="col-md-6"><div class="card"><div class="card-body">
+      <h5>Unloading</h5>
+      <table class="table table-sm">
+        <tr><th>Date</th><th>Trip</th><th>Location</th><th>Weight</th><th>Charges</th></tr>
+        {% for r in unloadings %}
+        <tr><td>{{ r.entry_date|date:'d-m-Y' }}</td><td>{{ r.trip.trip_no }}</td><td>{{ r.location }}</td><td>{{ r.unloaded_weight }}</td><td>{{ r.unloading_charges }} / labour {{ r.labour_charges }}</td></tr>
+        {% empty %}<tr><td colspan="5" class="text-muted">No unloading records</td></tr>{% endfor %}
+      </table>
+    </div></div></div>
+  </div>
+</div>
+{% endblock %}

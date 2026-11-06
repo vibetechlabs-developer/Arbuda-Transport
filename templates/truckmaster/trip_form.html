@@ -1,0 +1,31 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Trip</title>{% endblock %}
+{% block content %}
+<div class="container-xxl">
+  <h4 class="fw-bold py-3">{{ obj.id|yesno:"Edit Trip,Create Trip" }}</h4>
+  <div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+    <div class="mb-3 col-sm-4"><label class="form-label">Trip Date *</label><input type="date" class="form-control" name="trip_date" value="{{ obj.trip_date|date:'Y-m-d' }}" required></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Booking</label><select class="form-select" name="booking"><option value="">--</option>{% for b in bookings %}<option value="{{ b.id }}" {% if obj.booking_id == b.id %}selected{% endif %}>{{ b.booking_no }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Round Trip</label><select class="form-select" name="round_trip"><option value="">--</option>{% for r in round_trips %}<option value="{{ r.id }}" {% if obj.round_trip_id == r.id %}selected{% endif %}>{{ r.round_trip_no }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Direction</label><select class="form-select" name="direction">{% for c,l in obj.DIRECTION_CHOICES %}<option value="{{ c }}" {% if obj.direction == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Truck *</label><select class="form-select" name="truck" required><option value="">Select</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Driver</label><select class="form-select" name="driver"><option value="">Select</option>{% for d in tm_drivers %}<option value="{{ d.id }}" {% if obj.driver_id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">From *</label><input class="form-control" name="start_location" value="{{ obj.start_location }}" required></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Destination *</label><input class="form-control" name="destination" value="{{ obj.destination }}" required></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Actual Start</label><input type="datetime-local" class="form-control" name="actual_start" data-allow-future="true"></div>
+    <div class="mb-3 col-sm-6"><label class="form-label">Actual Delivery</label><input type="datetime-local" class="form-control" name="actual_delivery" data-allow-future="true"></div>
+    <div class="mb-3 col-sm-3"><label class="form-label">Start Odo</label><input type="number" class="form-control" name="start_odometer" value="{{ obj.start_odometer }}"></div>
+    <div class="mb-3 col-sm-3"><label class="form-label">End Odo</label><input type="number" class="form-control" name="end_odometer" value="{{ obj.end_odometer }}"></div>
+    <div class="mb-3 col-sm-3"><label class="form-label">Loaded Weight</label><input type="number" step="0.001" class="form-control" name="loaded_weight" value="{{ obj.loaded_weight }}"></div>
+    <div class="mb-3 col-sm-3"><label class="form-label">Unloaded Weight</label><input type="number" step="0.001" class="form-control" name="unloaded_weight" value="{{ obj.unloaded_weight }}"></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Material</label><input class="form-control" name="material_name" value="{{ obj.material_name }}"></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Freight Amount</label><input type="number" step="0.01" class="form-control" name="freight_amount" value="{{ obj.freight_amount }}"></div>
+    <div class="mb-3 col-sm-2"><label class="form-label">Advance</label><input type="number" step="0.01" class="form-control" name="advance_received" value="{{ obj.advance_received }}"></div>
+    <div class="mb-3 col-sm-2"><label class="form-label">Received</label><input type="number" step="0.01" class="form-control" name="payment_received" value="{{ obj.payment_received }}"></div>
+    <div class="mb-3 col-sm-4"><label class="form-label">Status</label><select class="form-select" name="status">{% for c,l in obj.STATUS_CHOICES %}<option value="{{ c }}" {% if obj.status == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div class="mb-3 col-sm-4 form-check mt-4"><input class="form-check-input" type="checkbox" name="is_empty_return" {% if obj.is_empty_return %}checked{% endif %}><label class="form-check-label">Empty return</label></div>
+    <div class="mb-3 col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes">{{ obj.notes }}</textarea></div>
+    <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-trip-list' %}">Back</a></div>
+  </form></div></div>
+</div>
+{% endblock %}

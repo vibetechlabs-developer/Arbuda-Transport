@@ -1,0 +1,16 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Voucher</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Generate Voucher</h4>
+<div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-4"><label class="form-label">Date *</label><input type="date" class="form-control" name="voucher_date" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Type</label><select class="form-select" name="voucher_type"><option value="trip">Trip</option><option value="truck">Truck</option><option value="monthly">Monthly</option></select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Trip</label><select class="form-select" name="trip"><option value="">Select trip to auto-fill</option>{% for t in trips %}<option value="{{ t.id }}" {% if request.GET.trip == t.id|stringformat:'s' %}selected{% endif %}>{{ t.trip_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Truck</label><select class="form-select" name="truck"><option value="">--</option>{% for t in tm_trucks %}<option value="{{ t.id }}">{{ t.registration_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Driver</label><select class="form-select" name="driver"><option value="">--</option>{% for d in tm_drivers %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Period From</label><input type="date" class="form-control" name="period_from"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Period To</label><input type="date" class="form-control" name="period_to"></div>
+  <div class="mb-3 col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes"></textarea></div>
+  <div class="col-12"><button class="btn btn-primary">Generate</button> <a class="btn btn-outline-secondary" href="{% url 'tm-voucher-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

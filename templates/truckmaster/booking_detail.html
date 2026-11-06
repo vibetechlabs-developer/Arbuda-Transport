@@ -1,0 +1,32 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | {{ obj.booking_no }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>Booking {{ obj.booking_no }} <span class="badge bg-label-primary">{{ obj.get_status_display }}</span></h4>
+    <a class="btn btn-outline-primary" href="{% url 'tm-booking-edit' obj.id %}">Edit</a>
+  </div>
+  <div class="card mb-3"><div class="card-body row">
+    <div class="col-md-4"><p>Date: {{ obj.booking_date|date:'d-m-Y' }}</p><p>Party: {{ obj.party.name }}</p><p>Contact: {{ obj.contact_number|default:'-' }}</p></div>
+    <div class="col-md-4"><p>{{ obj.source_location }} → {{ obj.destination }}</p><p>Material: {{ obj.material_description|default:'-' }}</p><p>Weight: {{ obj.total_weight }} {{ obj.weight_unit }}</p></div>
+    <div class="col-md-4"><p>Freight: {{ obj.total_freight }}</p><p>Advance: {{ obj.advance_amount }}</p><p>Balance: {{ obj.balance_amount }}</p><p>Truck: {{ obj.truck.registration_no|default:'Not assigned' }}</p><p>Driver: {{ obj.driver.name|default:'-' }}</p></div>
+  </div></div>
+  <div class="card mb-3"><div class="card-body">
+    <h5>Workflow</h5>
+    <form method="post" action="{% url 'tm-booking-action' obj.id %}" class="d-flex gap-2 flex-wrap">{% csrf_token %}
+      {% if obj.status == 'draft' %}<button class="btn btn-primary" name="action" value="confirm">Confirm Booking</button>{% endif %}
+      {% if obj.status == 'confirmed' or obj.status == 'truck_assigned' %}
+        <select name="truck" class="form-select" style="max-width:180px"><option value="">Truck</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select>
+        <select name="driver" class="form-select" style="max-width:180px"><option value="">Driver</option>{% for d in tm_drivers %}<option value="{{ d.id }}" {% if obj.driver_id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select>
+        <button class="btn btn-primary" name="action" value="assign">Assign Truck / Driver</button>
+      {% endif %}
+      {% if obj.status == 'truck_assigned' or obj.status == 'confirmed' %}<button class="btn btn-primary" name="action" value="create_trip">Create Trip</button>{% endif %}
+      {% if obj.status != 'cancelled' and obj.status != 'completed' %}<button class="btn btn-outline-danger" name="action" value="cancel">Cancel</button>{% endif %}
+    </form>
+  </div></div>
+  <div class="card"><div class="card-body"><h5>Linked Trips</h5>
+    {% for t in trips %}<div><a href="{% url 'tm-trip-detail' t.id %}">{{ t.trip_no }}</a> {{ t.status }} {{ t.start_location }} → {{ t.destination }}</div>
+    {% empty %}<p class="text-muted mb-0">No trip created yet.</p>{% endfor %}
+  </div></div>
+</div>
+{% endblock %}

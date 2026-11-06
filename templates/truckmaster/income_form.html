@@ -1,0 +1,19 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Income</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Freight & Income</h4>
+<div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-4"><label class="form-label">Date *</label><input type="date" class="form-control" name="entry_date" value="{{ obj.entry_date|date:'Y-m-d' }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Category</label><select class="form-select" name="category">{% for c,l in obj.CATEGORY_CHOICES %}<option value="{{ c }}" {% if obj.category == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Party</label><select class="form-select" name="party"><option value="">--</option>{% for p in tm_parties %}<option value="{{ p.id }}" {% if obj.party_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Truck</label><select class="form-select" name="truck"><option value="">--</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Trip</label><select class="form-select" name="trip"><option value="">--</option>{% for t in trips %}<option value="{{ t.id }}" {% if obj.trip_id == t.id %}selected{% endif %}>{{ t.trip_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Booking</label><select class="form-select" name="booking"><option value="">--</option>{% for b in bookings %}<option value="{{ b.id }}" {% if obj.booking_id == b.id %}selected{% endif %}>{{ b.booking_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-8"><label class="form-label">Description</label><input class="form-control" name="description" value="{{ obj.description }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Invoice Ref</label><input class="form-control" name="invoice_ref" value="{{ obj.invoice_ref }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Amount *</label><input type="number" step="0.01" class="form-control" name="amount" value="{{ obj.amount }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Received</label><input type="number" step="0.01" class="form-control" name="received_amount" value="{{ obj.received_amount }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Payment Mode</label><select class="form-select" name="payment_mode">{% for c,l in obj.PAYMENT_MODES %}<option value="{{ c }}" {% if obj.payment_mode == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-income-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

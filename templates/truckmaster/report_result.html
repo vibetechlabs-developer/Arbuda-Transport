@@ -1,0 +1,33 @@
+{% extends 'masterpage.html' %}
+{% load tm_tags %}
+{% block title %}<title>ARBUDA | {{ title }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl grow container-p-y">
+  <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
+    <h4>{{ title }}</h4>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv">CSV</a>
+      <a class="btn btn-outline-primary" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=xls">Excel</a>
+      <a class="btn btn-outline-primary" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=pdf">PDF</a>
+      <button class="btn btn-outline-primary" onclick="window.print()">Print</button>
+    </div>
+  </div>
+  <form method="get" class="d-flex gap-2 mb-3 flex-wrap">
+    <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}">
+    <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}">
+    <select name="truck" class="form-select"><option value="">All trucks</option>{% for t in tm_trucks %}<option value="{{ t.id }}">{{ t.registration_no }}</option>{% endfor %}</select>
+    <select name="driver" class="form-select"><option value="">All drivers</option>{% for d in tm_drivers %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select>
+    <select name="party" class="form-select"><option value="">All parties</option>{% for p in tm_parties %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+    <button class="btn btn-primary">Filter</button>
+  </form>
+  <div class="card" style="overflow:auto"><table class="table">
+    <thead><tr><th>#</th>{% for col in columns %}<th>{{ col.1 }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for obj in page_obj %}
+      <tr><td>{{ forloop.counter }}</td>{% for col in columns %}<td>{{ obj|tm_attr:col.0 }}</td>{% endfor %}</tr>
+      {% empty %}<tr><td colspan="20" class="text-muted text-center">No records for selected filters.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

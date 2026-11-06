@@ -1,0 +1,26 @@
+{% extends 'masterpage.html' %}
+{% load humanize %}
+{% block title %}<title>ARBUDA | Truck {{ obj.registration_no }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3">
+  <div class="d-flex justify-content-between"><h4>{{ obj.registration_no }} <small class="text-muted">{{ obj.get_status_display }}</small></h4><a class="btn btn-primary" href="{% url 'tm-truck-edit' obj.id %}">Edit</a></div>
+  <div class="row g-3">
+    <div class="col-md-4"><div class="card"><div class="card-body">
+      <p>Model: {{ obj.name_model|default:'-' }}</p>
+      <p>Type: {{ obj.vehicle_type|default:'-' }} / {{ obj.category|default:'-' }}</p>
+      <p>Capacity: {{ obj.capacity_ton }} Ton | Axles: {{ obj.axles }}</p>
+      <p>Chassis: {{ obj.chassis_no|default:'-' }} | Engine: {{ obj.engine_no|default:'-' }}</p>
+      <p>Ownership: {{ obj.get_ownership_type_display }}</p>
+      <p>Driver: {{ obj.assigned_driver.name|default:'-' }}</p>
+      <p>Insurance: {{ obj.insurance_expiry|date:'d-m-Y'|default:'-' }} | Fitness: {{ obj.fitness_expiry|date:'d-m-Y'|default:'-' }}</p>
+      <p>PUC: {{ obj.puc_expiry|date:'d-m-Y'|default:'-' }} | Permit: {{ obj.permit_expiry|date:'d-m-Y'|default:'-' }}</p>
+      <p>Income: {{ income_total|floatformat:2|intcomma }} | Expense: {{ expense_total|floatformat:2|intcomma }}</p>
+    </div></div></div>
+    <div class="col-md-8">
+      <div class="card mb-3"><div class="card-body"><h5>Trip History</h5><table class="table table-sm">{% for t in trips %}<tr><td><a href="{% url 'tm-trip-detail' t.id %}">{{ t.trip_no }}</a></td><td>{{ t.trip_date }}</td><td>{{ t.start_location }} → {{ t.destination }}</td><td>{{ t.status }}</td></tr>{% empty %}<tr><td class="text-muted">No trips</td></tr>{% endfor %}</table></div></div>
+      <div class="card mb-3"><div class="card-body"><h5>Maintenance</h5>{% for m in maint %}<div>{{ m.entry_date }} {{ m.get_maintenance_type_display }} {{ m.total_amount }}</div>{% empty %}<p class="text-muted">No maintenance</p>{% endfor %}</div></div>
+      <div class="card"><div class="card-body"><h5>Documents</h5>{% for d in docs %}<div>{{ d.get_doc_type_display }} exp {{ d.expiry_date }}</div>{% empty %}<p class="text-muted">No documents</p>{% endfor %}</div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

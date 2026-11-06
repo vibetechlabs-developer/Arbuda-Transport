@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block paper_title %}Report{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; margin: 16px; background: #fff; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .toolbar a, .toolbar button {
+      display: inline-block; padding: 7px 12px; border: 1px solid #444; background: #fff; color: #111;
+      text-decoration: none; font-size: 13px; cursor: pointer; border-radius: 4px;
+    }
+    .toolbar .dl { background: #2f6fed; color: #fff; border-color: #2f6fed; }
+    .sheet-head { text-align: center; margin-bottom: 8px; }
+    .sheet-head h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+    .sheet-head h2 { font-size: 13px; margin: 3px 0 0; font-weight: 700; }
+    .sheet-head p { margin: 2px 0 0; font-size: 11px; }
+    table.sheet { width: 100%; border-collapse: collapse; font-size: 11px; }
+    table.sheet th, table.sheet td { border: 1px solid #111; padding: 3px 4px; vertical-align: middle; }
+    table.sheet th { background: #f2f2f2; text-align: center; font-weight: 700; }
+    .num { text-align: right; white-space: nowrap; }
+    .ctr { text-align: center; }
+    .b { font-weight: 700; }
+    .hold { font-weight: 700; text-transform: uppercase; }
+    .two { display: flex; gap: 12px; margin-top: 10px; }
+    .two > div { flex: 1; }
+    .meta { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    .meta td { border: 0; padding: 1px 4px; }
+    @page { size: A4 landscape; margin: 8mm; }
+    @media print {
+      .toolbar { display: none !important; }
+      body { margin: 0; }
+    }
+    {% block extra_css %}{% endblock %}
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <a href="{{ back_url }}">Back</a>
+    <a class="dl" href="{{ pdf_url }}">Download PDF</a>
+    <button type="button" onclick="window.print()">Print</button>
+    {% if obj %}<a href="{% url 'tm-invoice-edit' obj.id %}">Edit invoice</a>{% endif %}
+  </div>
+  {% block paper %}{% endblock %}
+</body>
+</html>

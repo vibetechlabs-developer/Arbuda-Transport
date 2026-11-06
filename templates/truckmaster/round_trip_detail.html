@@ -1,0 +1,38 @@
+{% extends 'masterpage.html' %}
+{% load humanize %}
+{% block title %}<title>ARBUDA | {{ obj.round_trip_no }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3">
+  <div class="d-flex justify-content-between"><h4>Round Trip {{ obj.round_trip_no }}</h4><a class="btn btn-outline-primary" href="{% url 'tm-round-edit' obj.id %}">Edit</a></div>
+  <p>Truck {{ obj.truck.registration_no }} | Driver {{ obj.driver.name|default:'-' }} | {{ obj.start_date }} to {{ obj.end_date|default:'open' }}</p>
+  <div class="row g-3">
+    <div class="col-md-6"><div class="card"><div class="card-body">
+      <h5>Outbound</h5>
+      <p>{{ obj.outbound_route|default:'-' }}</p>
+      <p>Weight {{ obj.outbound_weight }} | Freight {{ obj.outbound_freight }} | Diesel {{ obj.outbound_diesel }} | Expenses {{ obj.outbound_expenses }}</p>
+      {% for t in outbound %}<div><a href="{% url 'tm-trip-detail' t.id %}">{{ t.trip_no }}</a> {{ t.start_location }}→{{ t.destination }}</div>{% empty %}<p class="text-muted">No outbound legs yet. Create a trip and link it.</p>{% endfor %}
+    </div></div></div>
+    <div class="col-md-6"><div class="card"><div class="card-body">
+      <h5>Return</h5>
+      <p>{{ obj.return_route|default:'-' }}</p>
+      <p>Weight {{ obj.return_weight }} | Freight {{ obj.return_freight }} | Diesel {{ obj.return_diesel }} | Expenses {{ obj.return_expenses }}</p>
+      {% for t in returning %}<div><a href="{% url 'tm-trip-detail' t.id %}">{{ t.trip_no }}</a> {{ t.start_location }}→{{ t.destination }} {% if t.is_empty_return %}(empty){% endif %}</div>{% empty %}<p class="text-muted">No return legs yet.</p>{% endfor %}
+    </div></div></div>
+    <div class="col-12"><div class="card"><div class="card-body">
+      <h5>Combined summary</h5>
+      <p>Total KM {{ obj.total_km }} | Income {{ obj.total_income|floatformat:2|intcomma }} | Expenses {{ obj.total_expenses|floatformat:2|intcomma }} | <strong>Net {{ obj.net_profit|floatformat:2|intcomma }}</strong></p>
+      <form method="post" action="{% url 'tm-round-link' obj.id %}" class="d-flex gap-2 flex-wrap">{% csrf_token %}
+        <select name="trip_id" class="form-select" style="max-width:240px" required>
+          <option value="">Select existing trip</option>
+          {% for t in linkable_trips %}<option value="{{ t.id }}">{{ t.trip_no }} {{ t.start_location }}→{{ t.destination }}</option>{% endfor %}
+        </select>
+        <select name="direction" class="form-select" style="max-width:160px"><option value="outbound">Outbound</option><option value="return">Return</option></select>
+        <button class="btn btn-primary">Link trip</button>
+        <a class="btn btn-outline-primary" href="{% url 'tm-trip-form' %}">Create trip</a>
+        <a class="btn btn-outline-primary" href="{% url 'tm-booking-form' %}">Create return booking</a>
+      </form>
+      <p class="small text-muted mt-2 mb-0">Outbound and return expenses are stored on their own trip records and never mixed in the combined total.</p>
+    </div></div></div>
+  </div>
+</div>
+{% endblock %}

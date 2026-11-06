@@ -1,0 +1,32 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | {{ obj.voucher_no }}</title>{% endblock %}
+{% block content %}
+<div class="container-xxl mt-3">
+  <div class="d-flex justify-content-between">
+    <h4>Voucher {{ obj.voucher_no }}</h4>
+    <div class="d-flex gap-2"><a class="btn btn-primary" href="?pdf=1">PDF</a><button class="btn btn-outline-primary" onclick="window.print()">Print</button></div>
+  </div>
+  <div class="card mt-3"><div class="card-body">
+    <p>{{ company_info.company_name }}</p>
+    <p>Date {{ obj.voucher_date|date:'d-m-Y' }} | {{ obj.get_voucher_type_display }}</p>
+    <p>Trip: {{ obj.trip.trip_no|default:'-' }} | Truck: {{ obj.truck.registration_no|default:'-' }} | Driver: {{ obj.driver.name|default:'-' }}</p>
+    <table class="table" style="max-width:480px">
+      <tr><td>Weight</td><td class="text-end">{{ obj.weight }}</td></tr>
+      <tr><td>Loading</td><td class="text-end">{{ obj.loading }}</td></tr>
+      <tr><td>Unloading</td><td class="text-end">{{ obj.unloading }}</td></tr>
+      <tr><td>Labour</td><td class="text-end">{{ obj.labour }}</td></tr>
+      <tr><td>Commission</td><td class="text-end">{{ obj.commission }}</td></tr>
+      <tr><td>Toll Tax</td><td class="text-end">{{ obj.toll_tax }}</td></tr>
+      <tr><td>Day Expenses</td><td class="text-end">{{ obj.day_expenses }}</td></tr>
+      <tr><td>Night Expenses</td><td class="text-end">{{ obj.night_expenses }}</td></tr>
+      <tr><td>Diesel Bills</td><td class="text-end">{{ obj.diesel_bills }}</td></tr>
+      <tr><td>Repair & Maintenance (Labour)</td><td class="text-end">{{ obj.repair_labour }}</td></tr>
+      <tr><td>Repair & Spare Parts</td><td class="text-end">{{ obj.repair_parts }}</td></tr>
+      <tr><td>Truck Expenses</td><td class="text-end">{{ obj.truck_expenses }}</td></tr>
+      <tr><td>FASTag Statement</td><td class="text-end">{{ obj.fastag_amount }}</td></tr>
+      <tr><td>Other Expenses</td><td class="text-end">{{ obj.other_expenses }}</td></tr>
+      <tr><th>Total</th><th class="text-end">{{ obj.total_amount }}</th></tr>
+    </table>
+  </div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Invoice {{ obj.invoice_no }}</title>{% endblock %}
+{% block content %}
+{% include 'truckmaster/_paper_print.css' %}
+<div class="container-xxl mt-3 paper-wrap">
+  <div class="no-print d-flex justify-content-between mb-3">
+    <h4 class="mb-0">Invoice {{ obj.invoice_no }}</h4>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'tm-invoice-list' %}">Back</a>
+      <a class="btn btn-outline-primary" href="{% url 'tm-invoice-edit' obj.id %}">Edit</a>
+      <a class="btn btn-primary" href="?pdf=1">Download PDF</a>
+      <button class="btn btn-outline-primary" onclick="window.print()">Print</button>
+    </div>
+  </div>
+
+  <div class="paper-head">
+    <h4>{{ company_info.company_name|default:'NARMADA TRANSPORT' }}</h4>
+    {% if company_info.gst_number %}<div>GSTIN: {{ company_info.gst_number }}</div>{% endif %}
+    <h6>TRANSPORT INVOICE</h6>
+  </div>
+  <table class="paper-table mb-3">
+    <tr>
+      <td><b>Bill No</b></td><td>{{ obj.invoice_no }}</td>
+      <td><b>Date</b></td><td>{{ obj.invoice_date|date:'d-m-Y' }}</td>
+    </tr>
+    <tr>
+      <td><b>Customer</b></td><td>{{ obj.party.name }}</td>
+      <td><b>GSTIN</b></td><td>{{ obj.gstin|default:'' }}</td>
+    </tr>
+    <tr>
+      <td><b>Address</b></td><td colspan="3">{{ obj.customer_address|default:'' }}</td>
+    </tr>
+  </table>
+
+  <div class="table-responsive">
+    <table class="paper-table">
+      <thead>
+        <tr>
+          <th>DATE</th>
+          <th>LORRY NO</th>
+          <th>FROM</th>
+          <th>DESTINATION</th>
+          <th>TALUKA</th>
+          <th>WEIGHT</th>
+          <th>RATE</th>
+          <th>RENT</th>
+          <th>LABOUR</th>
+          <th>TOTAL</th>
+          <th>ADVANCE</th>
+          <th>BALANCE</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in linked_trips %}
+        <tr>
+          <td>{{ it.trip.trip_date|date:'d-m-Y' }}</td>
+          <td>{{ obj.truck.registration_no|default:it.trip.truck.registration_no }}</td>
+          <td>{{ it.trip.start_location }}</td>
+          <td>{{ it.trip.destination }}</td>
+          <td>{{ obj.taluka }}</td>
+          <td class="num">{{ it.trip.loaded_weight }}</td>
+          <td class="num">{{ obj.rate }}</td>
+          <td class="num">{{ it.trip.freight_amount }}</td>
+          <td class="num"></td>
+          <td class="num">{{ it.trip.freight_amount }}</td>
+          <td class="num">{{ it.trip.advance_received }}</td>
+          <td class="num">{{ it.trip.pending_amount }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td>{{ obj.invoice_date|date:'d-m-Y' }}</td>
+          <td>{{ obj.truck.registration_no|default:'' }}</td>
+          <td>{{ obj.from_location }}</td>
+          <td>{{ obj.destination }}</td>
+          <td>{{ obj.taluka }}</td>
+          <td class="num">{% if obj.weight %}{{ obj.weight }}{% endif %}</td>
+          <td class="num">{% if obj.rate %}{{ obj.rate }}{% endif %}</td>
+          <td class="num">{% if obj.freight %}{{ obj.freight }}{% endif %}</td>
+          <td class="num">{% if obj.labour %}{{ obj.labour }}{% endif %}</td>
+          <td class="num">{% if obj.total_amount %}{{ obj.total_amount }}{% endif %}</td>
+          <td class="num">{% if obj.advance %}{{ obj.advance }}{% endif %}</td>
+          <td class="num">{% if obj.balance %}{{ obj.balance }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td colspan="5"><b>TOTAL</b></td>
+          <td class="num"><b>{{ obj.weight }}</b></td>
+          <td></td>
+          <td class="num"><b>{{ obj.freight }}</b></td>
+          <td class="num"><b>{{ obj.labour }}</b></td>
+          <td class="num"><b>{{ obj.total_amount }}</b></td>
+          <td class="num"><b>{{ obj.advance }}</b></td>
+          <td class="num"><b>{{ obj.balance }}</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% if obj.remarks %}<p class="small mt-2 mb-0">{{ obj.remarks }}</p>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Diesel</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Diesel Entry</h4>
+<div class="card"><div class="card-body"><form method="post" enctype="multipart/form-data" class="row" id="dieselForm">{% csrf_token %}
+  <div class="mb-3 col-sm-4"><label class="form-label">Date *</label><input type="date" class="form-control" name="entry_date" value="{{ obj.entry_date|date:'Y-m-d' }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Truck *</label><select class="form-select" name="truck" required><option value="">Select</option>{% for t in tm_trucks %}<option value="{{ t.id }}" {% if obj.truck_id == t.id %}selected{% endif %}>{{ t.registration_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Driver</label><select class="form-select" name="driver"><option value="">Select</option>{% for d in tm_drivers %}<option value="{{ d.id }}" {% if obj.driver_id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Trip</label><select class="form-select" name="trip"><option value="">--</option>{% for t in trips %}<option value="{{ t.id }}" {% if obj.trip_id == t.id %}selected{% endif %}>{{ t.trip_no }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Pump Name</label><input class="form-control" name="pump_name" value="{{ obj.pump_name }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Location</label><input class="form-control" name="location" value="{{ obj.location }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Fuel Type</label><input class="form-control" name="fuel_type" value="{{ obj.fuel_type|default:'diesel' }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Litres *</label><input type="number" step="0.001" class="form-control" name="litres" id="litres" value="{{ obj.litres }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Rate / Litre *</label><input type="number" step="0.01" class="form-control" name="rate_per_litre" id="rate_per_litre" value="{{ obj.rate_per_litre }}" required></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Total (auto)</label><input class="form-control" id="diesel_total" value="{{ obj.total_amount }}" readonly></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Odometer</label><input type="number" class="form-control" name="odometer" value="{{ obj.odometer }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Payment Mode</label><select class="form-select" name="payment_mode">{% for c,l in obj.PAYMENT_MODES %}<option value="{{ c }}" {% if obj.payment_mode == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Bill Number</label><input class="form-control" name="bill_number" value="{{ obj.bill_number }}"></div>
+  <div class="mb-3 col-sm-6"><label class="form-label">Bill Attachment</label><input type="file" class="form-control" name="bill_attachment"></div>
+  <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-diesel-list' %}">Back</a></div>
+</form></div></div></div>
+<script>
+function tot(){ const l=parseFloat(document.getElementById('litres').value||0), r=parseFloat(document.getElementById('rate_per_litre').value||0); document.getElementById('diesel_total').value=(l*r).toFixed(2); }
+document.getElementById('litres').addEventListener('input', tot); document.getElementById('rate_per_litre').addEventListener('input', tot);
+</script>
+{% endblock %}

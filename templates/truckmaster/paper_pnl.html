@@ -1,0 +1,41 @@
+{% extends 'truckmaster/paper_base.html' %}
+{% load tm_tags %}
+{% block paper_title %}Monthly P&amp;L {{ month_label }}{% endblock %}
+{% block paper %}
+<div class="sheet-head">
+  <h1>{{ company_name }}</h1>
+  <p>{{ company_address }}</p>
+</div>
+<table class="sheet">
+  <tr>
+    <th>{{ month_label }}</th>
+    <th></th>
+    <th colspan="{{ trucks|length|default:1 }}">{{ company_name }}</th>
+    <th>Profit &amp; Loss a/c</th>
+    <th>MONTHLY</th>
+  </tr>
+  <tr>
+    <th>Particular</th>
+    <th></th>
+    {% for code in truck_codes %}<th>{{ code }}</th>{% empty %}<th>-</th>{% endfor %}
+    <th></th>
+    <th>AMT</th>
+  </tr>
+  {% for row in display_rows %}
+  <tr>
+    <td class="{% if row.is_net %}b{% endif %}">{{ row.label }}</td>
+    <td></td>
+    {% for v in row.values %}<td class="num">{% if row.is_net %}{{ v|tm_amt:"0" }}{% else %}{{ v|tm_amt }}{% endif %}</td>{% empty %}<td></td>{% endfor %}
+    <td></td>
+    <td class="num b">{{ row.total|tm_amt:"0" }}</td>
+  </tr>
+  {% endfor %}
+  <tr>
+    <td class="b">{{ prev_label }}</td>
+    <td></td>
+    {% for v in prev_nets %}<td class="num">{{ v|tm_amt:"0" }}</td>{% empty %}<td></td>{% endfor %}
+    <td></td>
+    <td></td>
+  </tr>
+</table>
+{% endblock %}

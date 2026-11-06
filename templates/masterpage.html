@@ -267,6 +267,38 @@
               <div data-i18n="Summary">Summary</div>
             </a>
           </li>
+
+          <li class="menu-header small text-uppercase">
+            <span class="menu-header-text">Fleet</span>
+          </li>
+          <li class="menu-item {% if '/truck-master/' in request.path %}open active{% endif %}">
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+              <i class="menu-icon tf-icons fa fa-truck"></i>
+              <div data-i18n="Truck Master">TRUCK MASTER</div>
+            </a>
+            <ul class="menu-sub" style="list-style-type: none;">
+              <li class="menu-item {% if request.path == '/truck-master/dashboard' %}active{% endif %}"><a href="/truck-master/dashboard" class="menu-link"><div class="ms-4">Truck Dashboard</div></a></li>
+              <li class="menu-item {% if request.path == '/truck-master/trucks' %}active{% endif %}"><a href="/truck-master/trucks" class="menu-link"><div class="ms-4">Truck Master</div></a></li>
+              <li class="menu-item {% if request.path == '/truck-master/drivers' %}active{% endif %}"><a href="/truck-master/drivers" class="menu-link"><div class="ms-4">Driver Master</div></a></li>
+              <li class="menu-item {% if '/truck-master/bookings' in request.path %}active{% endif %}"><a href="/truck-master/bookings" class="menu-link"><div class="ms-4">Truck Booking</div></a></li>
+              <li class="menu-item {% if '/truck-master/trips' in request.path %}active{% endif %}"><a href="/truck-master/trips" class="menu-link"><div class="ms-4">Trip Management</div></a></li>
+              <li class="menu-item {% if '/truck-master/round-trips' in request.path %}active{% endif %}"><a href="/truck-master/round-trips" class="menu-link"><div class="ms-4">Round Trip Management</div></a></li>
+              <li class="menu-item {% if request.path == '/truck-master/income' %}active{% endif %}"><a href="/truck-master/income" class="menu-link"><div class="ms-4">Freight & Income</div></a></li>
+              <li class="menu-item {% if request.path == '/truck-master/diesel' %}active{% endif %}"><a href="/truck-master/diesel" class="menu-link"><div class="ms-4">Diesel Management</div></a></li>
+              <li class="menu-item {% if request.path == '/truck-master/expenses' %}active{% endif %}"><a href="/truck-master/expenses" class="menu-link"><div class="ms-4">Truck Expenses</div></a></li>
+              <li class="menu-item {% if '/truck-master/loading' in request.path %}active{% endif %}"><a href="/truck-master/loading" class="menu-link"><div class="ms-4">Loading & Unloading</div></a></li>
+              <li class="menu-item {% if '/truck-master/toll' in request.path %}active{% endif %}"><a href="/truck-master/toll" class="menu-link"><div class="ms-4">Toll & FASTag Management</div></a></li>
+              <li class="menu-item {% if '/truck-master/maintenance' in request.path %}active{% endif %}"><a href="/truck-master/maintenance" class="menu-link"><div class="ms-4">Maintenance & Repairing</div></a></li>
+              <li class="menu-item {% if '/truck-master/salary' in request.path or '/truck-master/advances' in request.path %}active{% endif %}"><a href="/truck-master/salary" class="menu-link"><div class="ms-4">Driver Salary & Advances</div></a></li>
+              <li class="menu-item {% if '/truck-master/documents' in request.path %}active{% endif %}"><a href="/truck-master/documents" class="menu-link"><div class="ms-4">Insurance & Documents</div></a></li>
+              <li class="menu-item {% if '/truck-master/loans' in request.path or '/truck-master/emi' in request.path %}active{% endif %}"><a href="/truck-master/loans" class="menu-link"><div class="ms-4">Loan & EMI Management</div></a></li>
+              <li class="menu-item {% if '/truck-master/parties' in request.path %}active{% endif %}"><a href="/truck-master/parties" class="menu-link"><div class="ms-4">Party / Customer Management</div></a></li>
+              <li class="menu-item {% if '/truck-master/invoices' in request.path %}active{% endif %}"><a href="/truck-master/invoices" class="menu-link"><div class="ms-4">Transport Invoices</div></a></li>
+              <li class="menu-item {% if '/truck-master/payments' in request.path %}active{% endif %}"><a href="/truck-master/payments" class="menu-link"><div class="ms-4">Payment & Outstanding</div></a></li>
+              <li class="menu-item {% if '/truck-master/vouchers' in request.path %}active{% endif %}"><a href="/truck-master/vouchers" class="menu-link"><div class="ms-4">Voucher Management</div></a></li>
+              <li class="menu-item {% if '/truck-master/reports' in request.path %}active{% endif %}"><a href="/truck-master/reports" class="menu-link"><div class="ms-4">Reports & Profit & Loss</div></a></li>
+            </ul>
+          </li>
         </ul>
       </aside>
 
@@ -409,8 +441,8 @@
 
         document.querySelectorAll('input[type="date"]').forEach(function (input) {
           // Skip contract end date - allow future dates
-          if (input.id === 'c_end_date' || input.name === 'c_end_date') {
-            return; // Don't restrict contract end date
+          if (input.id === 'c_end_date' || input.name === 'c_end_date' || input.dataset.allowFuture === 'true') {
+            return; // Don't restrict contract end date or document expiry fields
           }
           // Only tighten max; never relax an existing earlier max
           if (!input.max || input.max > maxDate) {

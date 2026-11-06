@@ -1,0 +1,22 @@
+{% extends 'masterpage.html' %}
+{% block title %}<title>ARBUDA | Salary</title>{% endblock %}
+{% block content %}
+<div class="container-xxl"><h4 class="fw-bold py-3">Driver Salary</h4>
+<div class="card"><div class="card-body"><form method="post" class="row">{% csrf_token %}
+  <div class="mb-3 col-sm-6"><label class="form-label">Driver *</label><select class="form-select" name="driver" required><option value="">Select</option>{% for d in tm_drivers %}<option value="{{ d.id }}" {% if obj.driver_id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-sm-6"><label class="form-label">Salary Month *</label><input type="month" class="form-control" name="salary_month" value="{{ obj.salary_month|date:'Y-m' }}" required></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Basic</label><input type="number" step="0.01" class="form-control" name="basic_salary" value="{{ obj.basic_salary }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Trip Incentive</label><input type="number" step="0.01" class="form-control" name="trip_incentive" value="{{ obj.trip_incentive }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">KM Incentive</label><input type="number" step="0.01" class="form-control" name="km_incentive" value="{{ obj.km_incentive }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Allowances</label><input type="number" step="0.01" class="form-control" name="allowances" value="{{ obj.allowances }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Advance Paid</label><input type="number" step="0.01" class="form-control" name="advance_paid" value="{{ obj.advance_paid }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Deductions</label><input type="number" step="0.01" class="form-control" name="deductions" value="{{ obj.deductions }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Other Adjustments</label><input type="number" step="0.01" class="form-control" name="other_adjustments" value="{{ obj.other_adjustments }}"></div>
+  <div class="mb-3 col-sm-3"><label class="form-label">Paid Amount</label><input type="number" step="0.01" class="form-control" name="paid_amount" value="{{ obj.paid_amount }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Payment Date</label><input type="date" class="form-control" name="payment_date" value="{{ obj.payment_date|date:'Y-m-d' }}"></div>
+  <div class="mb-3 col-sm-4"><label class="form-label">Payment Mode</label><select class="form-select" name="payment_mode">{% for c,l in obj.PAYMENT_MODES %}<option value="{{ c }}" {% if obj.payment_mode == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="mb-3 col-12"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks">{{ obj.remarks }}</textarea></div>
+  <p class="text-muted">Net = Basic + Incentives + Allowances + Adjustments − Deductions − Advance. Pending = Net − Paid.</p>
+  <div class="col-12"><button class="btn btn-primary">Save</button> <a class="btn btn-outline-secondary" href="{% url 'tm-salary-list' %}">Back</a></div>
+</form></div></div></div>
+{% endblock %}

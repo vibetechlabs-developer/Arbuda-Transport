@@ -1,0 +1,8 @@
+{% extends 'truckmaster/crud_list.html' %}
+{% block extra_buttons %}
+<form method="post" enctype="multipart/form-data" class="d-flex gap-2">{% csrf_token %}
+  <select name="truck" class="form-select" style="max-width:160px"><option value="">Default truck</option>{% for t in tm_trucks %}<option value="{{ t.id }}">{{ t.registration_no }}</option>{% endfor %}</select>
+  <input type="file" name="statement" class="form-control" accept=".csv,.xlsx,.xls" required>
+  <button class="btn btn-outline-primary">Import FASTag CSV</button>
+</form>
+{% endblock %}

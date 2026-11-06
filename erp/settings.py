@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'company',
     'client',
     'transport',
+    'truckmaster',
 ]
 
 MIDDLEWARE = [
